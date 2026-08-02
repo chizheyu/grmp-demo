@@ -32,7 +32,8 @@ shell(name, view){
   if(R.includes('lead')) items.push(['matching','🤝 Matching', db.pairs.filter(p=>p.status==='proposed').length]);
   if(R.includes('coordinator')) items.push(['reminders','⏰ Reminders']);
   if(R.includes('coordinator')) items.push(['waitlist','📋 Waitlist', db.people.filter(p=>p.appStatus==='waitlisted').length]);
-  if(R.includes('coordinator')) items.push(['exceptions','⚠ Exceptions', db.pairs.filter(p=>['rematch_needed'].includes(p.status)).length + db.pairs.filter(p=>p.rotation===1&&p.status==='approved').length]);
+  const pastR = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
+  if(R.includes('coordinator')) items.push(['exceptions','⚠ Exceptions', db.pairs.filter(p=>['rematch_needed'].includes(p.status)).length + db.pairs.filter(p=>pastR.includes(p.rotation)&&p.status==='approved').length]);
   if(R.includes('coordinator')) items.push(['events','🎪 Events']);
   if(R.includes('lead')) items.push(['certificates','🏅 Certificates']);
   if(R.includes('escalation')) items.push(['concerns','🔒 Concern inbox', db.concerns.length]);
@@ -61,22 +62,30 @@ v_dashboard(admin){
   const ackDone = acc.filter(D.ackComplete).length;
   const orient = acc.filter(p=>p.orientation).length;
   const r1closed = db.pairs.filter(p=>p.rotation===1&&p.status==='closed').length;
-  const r2 = db.pairs.filter(p=>p.rotation===2&&['approved','closed'].includes(p.status)).length;
+  const curN = D.currentRotation(db)?D.currentRotation(db).n:3;
+  const r2 = db.pairs.filter(p=>p.rotation===curN&&['approved','closed'].includes(p.status)).length;
   const blocked = db.people.filter(p=>p.appStatus==='accepted'&&D.gateBlocked(p));
-  const exceptions = db.pairs.filter(p=>p.status==='rematch_needed').length + db.pairs.filter(p=>p.rotation===1&&p.status==='approved').length;
+  const pastRd = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
+  const exceptions = db.pairs.filter(p=>p.status==='rematch_needed').length + db.pairs.filter(p=>pastRd.includes(p.rotation)&&p.status==='approved').length;
   const track = t => db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&p.track===t).length;
   return `<h1 class="co-title">Dashboard</h1>
-  <p class="co-sub">Single source of truth · today is 15 Dec 2026 · Rotation 2 (Know Your World) is running.</p>
+  <p class="co-sub">Single source of truth · simulated today: ${db.today}${D.currentRotation(db)?` · Rotation ${D.currentRotation(db).n} (${D.currentRotation(db).label}) is running`:' · closing phase'}.</p>
   <div class="funnel-grid">
     <div class="stat"><div class="n">${db.people.filter(p=>p.kind==='mentee').length} / ${db.people.filter(p=>p.kind==='mentor').length}</div><div class="l">Mentee / mentor applications</div></div>
     <div class="stat"><div class="n">60 + 60</div><div class="l">Accepted (incl. 6 bench mentors)</div></div>
     <div class="stat"><div class="n">${ackDone}<span style="font-size:13px;color:var(--ink-3)">/${acc.length}</span></div><div class="l">Acknowledged (binding gate)</div></div>
     <div class="stat"><div class="n">${orient}<span style="font-size:13px;color:var(--ink-3)">/${acc.length}</span></div><div class="l">Orientation complete</div></div>
     <div class="stat"><div class="n">${r1closed}/60</div><div class="l">R1 closed off</div></div>
-    <div class="stat"><div class="n">${r2}</div><div class="l">R2 pairs running</div></div>
+    <div class="stat"><div class="n">${r2}</div><div class="l">R${D.currentRotation(db)?D.currentRotation(db).n:3} pairs</div></div>
     <div class="stat"><div class="n" style="color:${exceptions?'var(--warn)':'var(--ok)'}">${exceptions}</div><div class="l">Open exceptions</div></div>
     <div class="stat"><div class="n">${track('general')}·${track('entrepreneurship')}·${track('ai')}</div><div class="l">Mentees by track (G·E·AI)</div></div>
+    <div class="stat"><div class="n">${db.midreviews.length}</div><div class="l">Mid-programme reviews in</div></div>
+    <div class="stat"><div class="n">${db.builderReflections.length}</div><div class="l">Builder Reflections in</div></div>
+    <div class="stat"><div class="n">${db.certificates.length}</div><div class="l">Certificates issued</div></div>
+    <div class="stat"><div class="n">${db.events.kickoff.attendance.length}</div><div class="l">Kickoff attendance</div></div>
   </div>
+  ${admin.roles.includes('lead')?`<div style="margin:-6px 0 14px"><button class="btn sm btn-ghost" data-act="exportReport">⬇ Export cohort report (CSV)</button>
+    <span style="font-size:11px;color:var(--ink-3);margin-left:8px">export restricted to Programme Lead + System Administrator</span></div>`:''}
   ${blocked.length?`<div class="qcard"><b style="font-size:13.5px">⛔ Blocked at the gates (${blocked.length})</b>
     <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 8px">Accepted but not yet matchable — acknowledgement or orientation outstanding. The system will not let these into matching.</p>
     ${blocked.map(p=>`<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line-2);font-size:13px">
@@ -151,13 +160,15 @@ v_decisions(admin){
 /* ---------- 5.2 matching board ---------- */
 v_matching(admin){
   const db = __demo.db, D = GRMP.D;
-  const rot = 2;
+  const rotNow = D.currentRotation(db);
+  const rot = rotNow ? rotNow.n : 3;
   const tracks = ['general','entrepreneurship','ai'];
   const unmatched = t => db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&p.track===t
     && !D.gateBlocked(p)
     && !db.pairs.some(x=>x.rotation===rot&&x.menteeId===p.id&&['proposed','approved','closed'].includes(x.status)));
   const proposed = db.pairs.filter(p=>p.rotation===rot&&p.status==='proposed');
-  return `<h1 class="co-title">Matching — Rotation 2 (Know Your World)</h1>
+  const rotLabel = db.config.rotations.find(r=>r.n===rot).label;
+  return `<h1 class="co-title">Matching — Rotation ${rot} (${rotLabel})</h1>
   <p class="co-sub">Strictly within track. Hard constraints enforced: ≤2 mentees per mentor · no conflict · no repeat mentor.
   AI proposes with rationale; nothing is matched until you approve it.</p>
   ${inferred('Q3')}
@@ -217,14 +228,15 @@ v_waitlist(admin){
 /* ---------- 6.4/6.6 exceptions ---------- */
 v_exceptions(admin){
   const db = __demo.db, D = GRMP.D;
-  const missing = db.pairs.filter(p=>p.rotation===1&&p.status==='approved');
+  const pastRots = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
+  const missing = db.pairs.filter(p=>pastRots.includes(p.rotation)&&p.status==='approved');
   const rematch = db.pairs.filter(p=>p.status==='rematch_needed');
   const bench = t => db.people.filter(p=>p.appStatus==='reserve_bench'&&p.track===t);
   return `<h1 class="co-title">Exceptions</h1>
   <p class="co-sub">The only things the system escalates: a close-off not completed after a rotation, and a mentor dropout. Everything else, the pair manages themselves.</p>
   <h3 style="font-size:14.5px;margin:6px 0 8px">Rotation 1 close-off missing (${missing.length})</h3>
   ${missing.map(x=>{const e=D.person(db,x.menteeId), m=D.person(db,x.mentorId);
-    return `<div class="pair-row"><div class="who"><b>${e.name}</b><div class="sub">paired with ${m.name} · R1 ended 30 Nov · <b style="color:var(--warn)">15 days overdue</b></div></div>
+    return `<div class="pair-row"><div class="who"><b>${e.name}</b><div class="sub">paired with ${m.name} · R${x.rotation} ended · <b style="color:var(--warn)">close-off overdue</b></div></div>
       <button class="btn sm btn-ghost" data-act="remindCloseoff" data-email="${e.email}">Remind again</button>
       <a class="btn sm btn-ghost" href="#/me/${e.id}" style="text-decoration:none">Open their page</a></div>`;}).join('')||'<p style="color:var(--ink-3)">None.</p>'}
   <h3 style="font-size:14.5px;margin:18px 0 8px">Mentor dropout — replacement needed (${rematch.length})</h3>
@@ -316,6 +328,13 @@ v_config(admin){
   <div class="qcard"><b>Open items (the yellow cards)</b>
     <p style="font-size:12.5px;color:var(--ink-2)">Eight inferred defaults are running in this demo. Each is marked where it lives, and listed in Round 2 for one-tap confirmation.</p>
     ${Object.entries(db.config.openItems).map(([k,v])=>`<div style="font-size:12.5px;padding:4px 0;border-top:1px solid var(--line-2)"><b>${k}</b> — ${v.title}</div>`).join('')}</div>
+  <div class="qcard"><b>Demo clock</b>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 8px">Advance the simulated date to walk the full cycle to the end — Rotation 3 matching, final close-offs, Builder Reflections and certificates.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm ${db.today==='2026-12-15'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2026-12-15">15 Dec 2026 · Rotation 2</button>
+      <button class="btn sm ${db.today==='2027-02-01'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2027-02-01">1 Feb 2027 · Rotation 3 begins</button>
+      <button class="btn sm ${db.today==='2027-03-20'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2027-03-20">20 Mar 2027 · closing week</button>
+    </div></div>
   <div class="qcard"><b>Demo controls</b><br>
     <button class="btn sm btn-ghost" style="margin-top:8px" data-act="reset">↺ Reset demo data to seeded state</button></div>`;
 },

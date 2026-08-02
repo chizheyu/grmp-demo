@@ -70,8 +70,10 @@ function renderOpenAs(){
 
 /* ---------- banner ---------- */
 function demoBanner(){
-  return `<div class="demo-banner">Requirements demo · sample data only · today is simulated as <b>15 Dec 2026</b> (mid-cycle) ·
-    yellow boxes are inferred defaults awaiting confirmation · <a href="#/manual">user manual</a></div>`;
+  const rot = GRMP.D.currentRotation(db);
+  const phase = rot ? `Rotation ${rot.n} · ${rot.label}` : (db.today>'2027-03-31'?'after the cycle':'closing weeks');
+  return `<div class="demo-banner">Requirements demo · sample data only · simulated today: <b>${db.today}</b> (${phase}) ·
+    advance the demo clock in <a href="#/console/Esther/config">Configuration</a> · yellow boxes are inferred defaults · <a href="#/manual">user manual</a></div>`;
 }
 
 /* ---------- router ---------- */
@@ -164,6 +166,24 @@ const Actions = {
   pickTrack(d){
     document.querySelectorAll('.track-opt').forEach(el=>el.classList.remove('sel'));
     document.querySelector(`.track-opt[data-track="${d.track}"]`).classList.add('sel');
+  },
+  setToday(d){ act(x=>GRMP.D.setToday(x, d.date)); },
+  exportReport(){
+    const D=GRMP.D;
+    const rows=[['id','name','kind','track','status','acknowledged','orientation','closeoffs','mid_review','builder_reflection','certificate']];
+    db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus)).forEach(p=>{
+      rows.push([p.id,p.name,p.kind,p.track,p.appStatus,D.ackComplete(p)?'yes':'no',p.orientation?'yes':'no',
+        p.kind==='mentee'?D.menteeCloseoffs(db,p.id).length:'-',
+        p.kind==='mentor'?(db.midreviews.some(m=>m.mentorId===p.id)?'yes':'no'):'-',
+        p.kind==='mentee'?(db.builderReflections.some(b=>b.menteeId===p.id)?'yes':'no'):'-',
+        db.certificates.some(c=>c.personId===p.id)?'yes':'no']);
+    });
+    const csv=rows.map(r=>r.join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download='grmp_cohort_report.csv'; aEl.click();
+    toast('Cohort report downloaded ('+(rows.length-1)+' rows).');
+    db.audit.push({at:db.today,actor:'lead',action:'export_report',entity:'dashboard'});
+    GRMP.Store.save(db);
   },
   raiseConcern(){
     const t = document.getElementById('cn-text').value.trim();

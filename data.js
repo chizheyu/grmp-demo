@@ -232,8 +232,9 @@ const D = {
     if(p.kind==='mentee'){
       return D.menteeCloseoffs(db,p.id).length>=3 && db.builderReflections.some(b=>b.menteeId===p.id);
     }
-    const served = db.pairs.filter(x=>x.mentorId===p.id&&['approved','closed'].includes(x.status)).length>0;
-    return served && db.midreviews.some(m=>m.mentorId===p.id);
+    const served = db.pairs.some(x=>x.mentorId===p.id&&['approved','closed'].includes(x.status));
+    const earlyServed = db.pairs.some(x=>x.mentorId===p.id&&x.rotation<=2&&['approved','closed','replaced'].includes(x.status));
+    return served && (!earlyServed || db.midreviews.some(m=>m.mentorId===p.id));
   },
   aiSummary:p=>{                                   // simulated AI output, clearly labelled in UI
     if(p.kind==='mentor')
@@ -340,6 +341,10 @@ const D = {
     db.emails.push({at:db.today,to:e.email,kind:'match',subject:`Your new mentor for Rotation ${old.rotation}: ${bench.name}`});
     db.audit.push({at:db.today,actor,action:'mentor_replaced',entity:pairId});
     return pr;
+  },
+  setToday(db, dateStr){
+    db.today = dateStr;
+    db.audit.push({at:dateStr,actor:'demo',action:'clock_set:'+dateStr,entity:'config'});
   },
   raiseConcern(db, summary){
     const c={id:'C'+String(db.concerns.length+1).padStart(3,'0'),at:db.today,from:'(identity visible to Escalation Owner only)',

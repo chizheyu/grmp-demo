@@ -67,7 +67,7 @@
 
 **3.3 Matched.** Per rotation you see your mentee card(s) — at most two — with their goals and development needs, the rotation guide, and a suggested first step.
 
-**3.4 Mid-programme review (January).** During Rotation 2 your page (and the shown email) asks for one short review — how the pairing is going, any support needed. Mentees don't fill this; this is the mentor's only checkpoint form.
+**3.4 Mid-programme review (January).** Mentors who served in Rotation 1 or 2 submit one short review — how the pairing is going, any support needed. Mentees don't fill this; it is the mentor's only checkpoint form, and it is part of the mentor's certificate rule. (A mentor who only joins for Rotation 3 has no mid-programme duty.)
 
 **3.5 Certificate.** After serving all rotations and submitting the mid-programme review, your certificate appears.
 > **⚠ Inferred (R2-Q2):** mentor rule = all rotations served + mid-programme review. Confirm.
@@ -99,7 +99,7 @@
 
 ## 6 · Coordinator — operations console (Wei Kiat)
 
-**6.1 Dashboard.** One screen: the cohort funnel (Applied → Screened → Accepted → Acknowledged → Orientated → Matched → per-rotation Closed-off → Certified), per-track counts, the two gates' blocked lists, and open exceptions with age.
+**6.1 Dashboard.** One screen: the cohort funnel (Applied → Screened → Accepted → Acknowledged → Orientated → Matched → per-rotation Closed-off → Certified), per-track counts, the two gates' blocked lists, open exceptions, and checkpoint counters (mid-programme reviews, Builder Reflections, certificates, event attendance). The Programme Lead can **export the cohort report (CSV)** — export stays restricted to Lead + System Administrator.
 
 **6.2 Reminder schedule.** The September acknowledgement ladder (W1 notify / W2 remind / W3 final) shown against today's date; each reminder that would fire lists its recipients and message. In the demo you can press **Advance demo clock** to watch the ladder fire.
 
@@ -122,7 +122,7 @@
 
 ## 8 · Admin — cohort configuration
 
-**8.1** Dates and windows: cycle dates, three rotation windows, the reminder ladder, event dates — all editable configuration, no code.
+**8.1** Dates and windows: cycle dates, three rotation windows, the reminder ladder, event dates — all editable configuration, no code. **Demo clock:** advance the simulated date (15 Dec · R2 → 1 Feb · R3 → 20 Mar · closing week) to walk the full cycle to the end — Rotation 3 matching, final close-offs, Builder Reflections and certificates.
 > **⚠ Inferred (R2-Q8):** demo runs on placeholder dates (registration opens early Sept · Kickoff early Oct · microsite live before registration). Replace with real dates.
 
 **8.2** Role assignments per cohort (the SMU pilot names are pre-loaded), document versions for acknowledgement, and **Reset demo data**.

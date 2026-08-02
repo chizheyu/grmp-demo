@@ -313,8 +313,8 @@ personal(personId){
         Rotation ${rotNow?rotNow.n:2} matches — you'll get one email with your mentor, the dates and the guide.</p></div>`;
     }
   } else {                                     /* mentor next-steps */
-    const inR2 = myPairs.some(x=>x.rotation===2 && x.status!=='replaced');
-    if(!hasMR && inR2){
+    const servedEarly = GRMP.D.pairsFor(db,personId).some(x=>x.rotation<=2 && x.status!=='rejected');
+    if(!hasMR && servedEarly){
       nextCard = `<div class="card"><h3>📝 Mid-programme review (your one checkpoint)</h3>
         <p style="font-size:13px;color:var(--ink-2)">Two minutes in January: how is the pairing going, anything the team should know?
         (The demo lets you submit early.)</p>
