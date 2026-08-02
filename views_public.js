@@ -344,10 +344,17 @@ personal(personId){
           <div style="font-size:12.5px;color:var(--ink-2)">${mentee?esc(other.role+' · '+other.org):esc(other.university+' · '+other.course+', year '+other.year)}</div>
           <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+other.background):esc('Goal: '+other.goals)}</div>
         </div></div>
+      ${x.status==='closed'&&x.closeoff&&x.closeoff.comment&&mentee?`<div style="margin-top:10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Your close-off note</b><br>“${esc(x.closeoff.comment)}”</div>`:''}
       <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>
     </div>`;
   }).join('');
 
+  const myBR = db.builderReflections.find(b=>b.menteeId===personId);
+  const myMR = db.midreviews.find(m=>m.mentorId===personId);
+  const brCard = (mentee&&myBR)?`<div class="card"><h3>🏗 Your Builder Reflection <span class="badge b-ok"><span class="d"></span>submitted ${myBR.at}</span></h3>
+      <p style="font-size:13.5px;margin:0">“${esc(myBR.text)}”</p></div>`:'';
+  const mrCard = (!mentee&&myMR)?`<div class="card"><h3>📝 Your mid-programme review <span class="badge b-ok"><span class="d"></span>submitted ${myMR.at}</span></h3>
+      <p style="font-size:13.5px;margin:0">“${esc(myMR.text)}”</p></div>`:'';
   const certCard = cert ? `<div class="cert"><div style="font-size:11px;letter-spacing:.18em;font-weight:800;color:var(--gold)">SINGAPORE MENTORSHIP COMMITTEE</div>
       <h2>Certificate of Completion</h2><div class="nm">${esc(p.name)}</div>
       <div class="meta">Global Ready Mentorship Programme 2026 · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
@@ -361,7 +368,7 @@ personal(personId){
     </div>
     <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — no account, no password. That's by design.</div>
     <div class="steps">${steps.map((s,i)=>`<div class="step ${s[1]?'done':(i===curIdx?'cur':'')}"><div class="dot">${s[1]?'✓':i+1}</div><span>${s[0]}</span></div>`).join('')}</div>
-    ${nextCard}${certCard}${pairCards}
+    ${nextCard}${certCard}${brCard}${mrCard}${pairCards}
     ${inferred('Q2')}
   </div>`;
 },

@@ -2,7 +2,7 @@
    Single source of truth in localStorage. Deterministic seed (mulberry32) so tests are stable.
    Demo date is fixed at 2026-12-15 (mid-cycle: R1 closed, R2 running) so every view has life. */
 
-const DB_KEY = 'grmp_demo_v2';   // bumped: forces reseed for visitors holding the pre-full-cycle seed
+const DB_KEY = 'grmp_demo_v3';   // bumped: roles + submissions views
 const TODAY = '2026-12-15';
 
 /* Node compatibility: same file runs headless for CLI backend tests (localStorage shim). */
@@ -187,9 +187,9 @@ function buildSeed(){
       admins:[{name:'Esther', role:'Programme Lead', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
               {name:'Wei Kiat', role:'Programme Coordinator', roles:['coordinator','mentor_reviewer','mentee_reviewer']},
               {name:'Kenzie', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer']},
-              {name:'Yu Tong', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer']},
-              {name:'Portia', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer']},
-              {name:'Sapranshu', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer']}],
+              {name:'Yu Tong', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer','dashboard_viewer']},
+              {name:'Portia', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']},
+              {name:'Sapranshu', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']}],
       openItems:{
         Q1:{title:'Reflection Sheet lives on the microsite; system records close-offs only', inferred:true},
         Q2:{title:'Certificate after all 3 rotations (mentee: 3 close-offs + Builder Reflection; mentor: all rotations + mid-programme review)', inferred:true},

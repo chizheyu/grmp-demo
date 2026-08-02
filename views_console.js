@@ -25,11 +25,12 @@ shell(name, view){
   if(!admin) return this.login();
   const R = admin.roles;
   const items = [];
-  if(R.includes('coordinator')||R.includes('lead')) items.push(['dashboard','📊 Dashboard']);
+  if(R.includes('coordinator')||R.includes('lead')||R.includes('dashboard_viewer')) items.push(['dashboard','📊 Dashboard']);
   if(R.includes('mentor_reviewer')) items.push(['review-mentors','🎓 Review mentors', db.people.filter(p=>p.kind==='mentor'&&p.appStatus==='submitted').length]);
   if(R.includes('mentee_reviewer')) items.push(['review-mentees','👤 Review mentees', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='submitted').length]);
   if(R.includes('lead')) items.push(['decisions','⚖ Decisions', db.people.filter(p=>p.appStatus==='submitted'&&db.reviews.some(v=>v.personId===p.id)).length]);
-  if(R.includes('lead')) items.push(['matching','🤝 Matching', db.pairs.filter(p=>p.status==='proposed').length]);
+  if(R.includes('lead')||R.includes('coordinator')) items.push(['matching','🤝 Matching', db.pairs.filter(p=>p.status==='proposed').length]);
+  if(R.includes('lead')||R.includes('coordinator')) items.push(['submissions','📝 Submissions', db.midreviews.length+db.builderReflections.length]);
   if(R.includes('coordinator')) items.push(['reminders','⏰ Reminders']);
   if(R.includes('coordinator')) items.push(['waitlist','📋 Waitlist', db.people.filter(p=>p.appStatus==='waitlisted').length]);
   const pastR = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
@@ -185,7 +186,7 @@ v_matching(admin){
         <div class="sub">${e.course}, yr ${e.year} · wants: ${(e.goals||'').slice(0,60)}…</div></div>
       <div style="color:var(--ai);font-weight:800">→</div>
       <div class="who"><b>${m.name}</b><div class="sub">${m.role} · ${m.org}</div></div>
-      <button class="btn sm btn-primary" data-act="approvePair" data-pair="${x.id}" data-actor="${admin.name}">Approve match</button>
+      ${admin.roles.includes('lead')?`<button class="btn sm btn-primary" data-act="approvePair" data-pair="${x.id}" data-actor="${admin.name}">Approve match</button>`:`<span class="badge b-warn"><span class="d"></span>awaiting Programme Lead approval</span>`}
       <ul class="why">${x.rationale.map(r=>`<li>${r}</li>`).join('')}
         <li style="color:var(--ai-ink);font-weight:650">AI-suggested (simulated in demo) — the decision above is yours.</li></ul>
     </div>`;}).join('')}
@@ -297,6 +298,28 @@ v_certificates(admin){
     <td>${r.has?'<span class="badge b-ok"><span class="d"></span>Issued</span>' : r.eligible?'<span class="badge b-warn"><span class="d"></span>Ready to issue</span>':'<span class="badge b-neut"><span class="d"></span>In progress</span>'}</td></tr>`).join('')}
   </table>
   <p style="font-size:11.5px;color:var(--ink-3);margin-top:8px">Showing 25 of ${rows.length} — most of the cohort is naturally “in progress” on 15 Dec; the two fast-forward preview mentees exist so you can see the full path today.</p>`;
+},
+
+/* ---------- submissions: reviews, reflections, close-off notes ---------- */
+v_submissions(admin){
+  const db = __demo.db, D = GRMP.D;
+  const notes = db.pairs.filter(p=>p.status==='closed'&&p.closeoff&&p.closeoff.comment).slice(-12).reverse();
+  return `<h1 class="co-title">Submissions</h1>
+  <p class="co-sub">Everything participants have written, in one place — visible to the Programme Lead and Coordinator only. (Private reflections are never here: they live outside the system by design.)</p>
+  <h3 style="font-size:14.5px;margin:6px 0 8px">Mid-programme reviews — mentors (${db.midreviews.length})</h3>
+  ${db.midreviews.map(m=>{const p=D.person(db,m.mentorId);return `<div class="qcard" style="padding:12px 16px">
+    <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+    <span style="font-size:11.5px;color:var(--ink-3)"> · ${m.at}</span>
+    <p style="font-size:13px;margin:6px 0 0">${m.text}</p></div>`}).join('')||'<p style="color:var(--ink-3);font-size:13px">None yet — mentors submit these in the January window.</p>'}
+  <h3 style="font-size:14.5px;margin:16px 0 8px">Builder Reflections — mentees (${db.builderReflections.length})</h3>
+  ${db.builderReflections.map(b=>{const p=D.person(db,b.menteeId);return `<div class="qcard" style="padding:12px 16px">
+    <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+    <span style="font-size:11.5px;color:var(--ink-3)"> · ${b.at}</span>
+    <p style="font-size:13px;margin:6px 0 0">${b.text}</p></div>`}).join('')||'<p style="color:var(--ink-3);font-size:13px">None yet — mentees submit these at closing (March).</p>'}
+  <h3 style="font-size:14.5px;margin:16px 0 8px">Close-off notes — optional comments (latest ${notes.length})</h3>
+  ${notes.map(x=>{const e=D.person(db,x.menteeId);return `<div class="qcard" style="padding:10px 16px;font-size:13px">
+    <b>${e.name}</b> <span style="color:var(--ink-3);font-size:11.5px">R${x.rotation} · ${x.closeoff.at}</span>
+    <span style="margin-left:8px">“${x.closeoff.comment}”</span></div>`}).join('')||'<p style="color:var(--ink-3);font-size:13px">No comments yet.</p>'}`;
 },
 
 /* ---------- 7 concern inbox ---------- */

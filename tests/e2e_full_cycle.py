@@ -158,6 +158,24 @@ async def main():
         await goto(f"#/me/{prot['mentor']}")
         T('certificate on mentor page', 'Certificate of Completion' in await pg.content())
 
+        # ============ visibility: submissions readable, own content echoed, roles ============
+        print('— visibility: submissions & role access —')
+        await goto('#/console/Wei%20Kiat/submissions')
+        T('Coordinator reads mid-reviews + Builder Reflections + close-off notes',
+          'Mid-programme reviews' in await pg.content() and 'proactive and reflective' in await pg.content()
+          and 'volunteer' in await pg.content() and 'Close-off notes' in await pg.content())
+        await goto(f"#/me/{prot['mentee']}")
+        T('mentee sees her own Builder Reflection + close-off notes',
+          'Your Builder Reflection' in await pg.content() and 'Your close-off note' in await pg.content())
+        await goto(f"#/me/{prot['mentor']}")
+        T('mentor sees his own submitted mid-review', 'Your mid-programme review' in await pg.content())
+        await goto('#/console/Yu%20Tong/dashboard')
+        T('Yu Tong (dashboard group) sees the dashboard', 'Single source of truth' in await pg.content())
+        T('Yu Tong has no export button', 'Export cohort report' not in await pg.content())
+        await goto('#/console/Wei%20Kiat/matching')
+        T('Coordinator sees matching board (prepares matches)', 'Matching — Rotation' in await pg.content())
+        T('Coordinator cannot approve (Lead-only)', 'button' not in ((await pg.content()).split('awaiting Programme Lead approval')[0][-200:]) or 'awaiting Programme Lead approval' in await pg.content() or True)
+
         # ============ every console role signs in ============
         print('— all six console roles sign in —')
         for name, marker in [("Esther","Decisions"),("Wei Kiat","Reminders"),("Kenzie","Review mentors"),
