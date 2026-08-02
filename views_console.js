@@ -112,7 +112,7 @@ _review(admin, kind){
         <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
         <span class="badge b-neut"><span class="d"></span>submitted ${p.submittedAt}</span>
       </div>
-      <div class="ai-block"><div class="t">✦ AI summary — simulated in demo, labelled by rule</div>${D.aiSummary(p)}</div>
+      <div class="ai-block" data-ai-sum="${p.id}"><div class="t">✦ AI summary — <span class="ai-src">${(window.AI&&AI.cache['sum:'+p.id])?'Gemini (live)':'simulated · upgrading to Gemini…'}</span></div><div class="ai-txt">${(window.AI&&AI.cache['sum:'+p.id])||D.aiSummary(p)}</div></div>
       <div style="font-size:12.5px;color:var(--ink-2)">
         ${kind==='mentee' ? `Goals: ${p.goals||'—'} · Needs: ${p.devNeeds||'—'} · ${p.course||''} yr ${p.year||''}`
                           : `${p.role||''} @ ${p.org||''} · ${p.background||''}`}</div>
@@ -147,7 +147,7 @@ v_decisions(admin){
         <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
         <span style="font-size:12.5px;color:var(--ink-2)">${db.reviews.filter(v=>v.personId===p.id).map(v=>`${v.reviewer}: <b>${v.score}/5</b>`).join(' · ')}</span>
       </div>
-      <div class="ai-block"><div class="t">✦ AI summary</div>${D.aiSummary(p)}</div>
+      <div class="ai-block" data-ai-sum="${p.id}"><div class="t">✦ AI summary — <span class="ai-src">${(window.AI&&AI.cache['sum:'+p.id])?'Gemini (live)':'simulated · upgrading to Gemini…'}</span></div><div class="ai-txt">${(window.AI&&AI.cache['sum:'+p.id])||D.aiSummary(p)}</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
         <button class="btn sm btn-ok" data-act="decide" data-person="${p.id}" data-decision="accepted" data-actor="${admin.name}">Accept</button>
         ${p.kind==='mentor'?`<button class="btn sm btn-ghost" data-act="decide" data-person="${p.id}" data-decision="reserve_bench" data-actor="${admin.name}">Reserve bench</button>`:''}
@@ -181,7 +181,7 @@ v_matching(admin){
   ${proposed.length? `<h3 style="margin:8px 0 10px;font-size:14.5px">Proposed — awaiting your approval (${proposed.length})</h3>`:''}
   ${proposed.map(x=>{
     const m=D.person(db,x.mentorId), e=D.person(db,x.menteeId);
-    return `<div class="pair-row">
+    return `<div class="pair-row" data-ai-pair="${x.id}">
       <div class="who"><b>${e.name}</b> <span class="track-chip track-${e.track}">${GRMP.TRACKS[e.track].label}</span>
         <div class="sub">${e.course}, yr ${e.year} · wants: ${(e.goals||'').slice(0,60)}…</div></div>
       <div style="color:var(--ai);font-weight:800">→</div>

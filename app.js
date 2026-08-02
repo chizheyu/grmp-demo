@@ -98,7 +98,40 @@ function render(){
   $app().innerHTML = demoBanner() + html + renderOpenAs();
   bindGlobal();
   flushEmails();
+  upgradeAI();
   window.scrollTo(0,0);
+}
+
+/* ---------- progressive AI upgrade: simulated → Gemini, in place ---------- */
+async function upgradeAI(){
+  if(!window.AI || !AI.enabled) return;
+  document.querySelectorAll('[data-ai-sum]').forEach(async el=>{
+    const id = el.dataset.aiSum, ck = 'sum:'+id;
+    if(AI.cache[ck]) return;                                  // rendered from cache already
+    const p = GRMP.D.person(db, id); if(!p) return;
+    const txt = await AI.gen(ck, AI.summaryPrompt(p));
+    if(txt && el.isConnected){
+      const tx=el.querySelector('.ai-txt'), src=el.querySelector('.ai-src');
+      if(tx) tx.textContent = txt;
+      if(src) src.textContent = 'Gemini (live)';
+    } else if(el.isConnected){
+      const src=el.querySelector('.ai-src'); if(src) src.textContent='simulated in demo';
+    }
+  });
+  document.querySelectorAll('[data-ai-pair]').forEach(async el=>{
+    const id = el.dataset.aiPair, ck = 'pair:'+id;
+    const pr = db.pairs.find(x=>x.id===id); if(!pr || pr.status!=='proposed') return;
+    const apply = lines=>{
+      pr.rationale = lines; pr.aiLive = true; GRMP.Store.save(db);
+      const ul = el.querySelector('ul.why');
+      if(ul) ul.innerHTML = lines.map(l=>`<li>${esc(l)}</li>`).join('')
+        + `<li style="color:var(--ai-ink);font-weight:650">Generated live by Gemini — the decision above is yours.</li>`;
+    };
+    if(AI.cache[ck]){ if(!pr.aiLive) apply(AI.cache[ck].split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,3)); return; }
+    const m = GRMP.D.person(db, pr.mentorId), e = GRMP.D.person(db, pr.menteeId);
+    const txt = await AI.gen(ck, AI.rationalePrompt(m, e));
+    if(txt && el.isConnected) apply(txt.split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,3));
+  });
 }
 function bindGlobal(){
   const t = document.getElementById('openas-toggle');
