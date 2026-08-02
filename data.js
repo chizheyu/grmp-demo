@@ -2,7 +2,7 @@
    Single source of truth in localStorage. Deterministic seed (mulberry32) so tests are stable.
    Demo date is fixed at 2026-12-15 (mid-cycle: R1 closed, R2 running) so every view has life. */
 
-const DB_KEY = 'grmp_demo_v1';
+const DB_KEY = 'grmp_demo_v2';   // bumped: forces reseed for visitors holding the pre-full-cycle seed
 const TODAY = '2026-12-15';
 
 /* Node compatibility: same file runs headless for CLI backend tests (localStorage shim). */
