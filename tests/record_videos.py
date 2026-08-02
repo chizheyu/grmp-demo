@@ -122,9 +122,47 @@ async def clip_completion(pg):
     await pg.goto(BASE + f"#/me/{pvid}"); await pg.wait_for_timeout(1200)
     await pg.mouse.wheel(0, 200); await pg.wait_for_timeout(2600)      # certificate on screen
 
+# ---------- Clip 5: full cycle to certificate (R2 close → clock → R3 → cert) ----------
+async def clip_full_cycle(pg):
+    mid=await pg.evaluate("(()=>{const db=__demo.db;return db.pairs.find(p=>p.rotation===2&&p.status==='approved'&&!db.people.find(x=>x.id===p.menteeId).previewFastForward).menteeId})()")
+    await pg.goto(BASE+f"#/me/{mid}"); await pg.wait_for_timeout(1600)
+    await click_el(pg,'label.f-check:has(#co-met) span',pause=0.5)
+    await click_el(pg,'label.f-check:has(#co-ref) span',pause=0.5)
+    await type_into(pg,'#co-comment','Two great meetups — rethought my shortlist.')
+    await click_el(pg,'button[data-act="closeoff"]',pause=1.3)
+    await pg.goto(BASE+"#/console/Esther/config"); await pg.wait_for_timeout(1200)
+    await click_el(pg,'button[data-act="setToday"][data-date="2027-02-01"]',pause=1.3)
+    await click_el(pg,'button.co-item:has-text("Matching")',pause=1.3)
+    tr=await pg.evaluate(f"__demo.db.people.find(p=>p.id==='{mid}').track")
+    await click_el(pg,f'button[data-act="suggest"][data-track="{tr}"]',pause=1.5)
+    pid=await pg.evaluate(f"(()=>{{const x=__demo.db.pairs.find(p=>p.rotation===3&&p.status==='proposed'&&p.menteeId==='{mid}');return x?x.id:null}})()")
+    await click_el(pg,f'button[data-act="approvePair"][data-pair="{pid}"]',pause=1.5)
+    await pg.goto(BASE+f"#/me/{mid}"); await pg.wait_for_timeout(1500)
+    await click_el(pg,'label.f-check:has(#co-met) span',pause=0.4)
+    await click_el(pg,'label.f-check:has(#co-ref) span',pause=0.4)
+    await click_el(pg,'button[data-act="closeoff"]',pause=1.3)
+    await type_into(pg,'#br-text','I will mentor juniors in my CCA and volunteer next cycle.')
+    await click_el(pg,f'button[data-act="builder"]',pause=1.4)
+    m3=await pg.evaluate(f"__demo.db.pairs.find(p=>p.rotation===3&&p.menteeId==='{mid}').mentorId")
+    await pg.goto(BASE+f"#/me/{m3}"); await pg.wait_for_timeout(1300)
+    if await pg.locator('#mr-text').count():
+        await type_into(pg,'#mr-text','Pairing went well — proactive mentee.')
+        await click_el(pg,'button[data-act="midreview"]',pause=1.2)
+    await pg.goto(BASE+"#/console"); await pg.wait_for_timeout(800)
+    await click_el(pg,'.login-row:has-text("Esther")',pause=1.0)
+    await click_el(pg,'button.co-item:has-text("Certificates")',pause=1.4)
+    await click_el(pg,'button[data-act="issueCerts"]',pause=1.6)
+    await pg.goto(BASE+f"#/me/{mid}"); await pg.wait_for_timeout(1200)
+    await pg.mouse.wheel(0,120); await pg.wait_for_timeout(2600)
+
 async def main():
+    import sys as _s
+    only=_s.argv[1] if len(_s.argv)>1 else None
     async with async_playwright() as pw:
-        await record(pw, "1_applicant_journey", clip_applicant)
+        if only=="5":
+            await record(pw, "5_full_cycle_to_certificate", clip_full_cycle)
+        else:
+            await record(pw, "1_applicant_journey", clip_applicant)
         await record(pw, "2_review_decide_match", clip_admin)
         await record(pw, "3_mentee_gates_closeoff", clip_mentee)
         await record(pw, "4_completion_certificate", clip_completion)

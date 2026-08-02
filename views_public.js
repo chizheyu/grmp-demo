@@ -277,9 +277,14 @@ personal(personId){
     nextCard = `<div class="card"><h3>🎓 Complete your orientation</h3>
       <p style="font-size:13px;color:var(--ink-2)">Attend the live session, or watch the recorded module —
       <b>required before Rotation 1, no exceptions.</b></p>
+      <div style="background:#14171d;border-radius:12px;aspect-ratio:16/7;display:grid;place-items:center;margin:4px 0 10px;cursor:pointer" data-act="orient" data-person="${p.id}" data-mode="recorded" role="button" tabindex="0" aria-label="Play orientation recording">
+        <div style="text-align:center;color:#fff"><div style="width:54px;height:54px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin:0 auto 8px;font-size:20px">▶</div>
+        <div style="font-size:13px;font-weight:700">GRMP Orientation 2026 — session recording</div>
+        <div style="font-size:11px;opacity:.7">sent to everyone after the live session · opening it records your completion</div></div>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-primary" data-act="orient" data-person="${p.id}" data-mode="recorded">▶ Watch recorded module (marks complete)</button>
-        <span class="badge b-neut" style="align-self:center">live attendance is marked by the coordinator</span>
+        <span class="badge b-neut" style="align-self:center">live attendance is marked by the coordinator (Events)</span>
       </div></div>`;
   } else if(mentee){
     const openPair = myPairs.find(x=>x.status==='approved' && x.rotation===(rotNow?rotNow.n:2));
@@ -297,7 +302,7 @@ personal(personId){
         <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px 26px"><a href="#/reflection">Open the Reflection Sheet ↗</a></div>
         <div class="f-row"><input type="text" id="co-comment" placeholder="Optional comment"></div>
         <button class="btn btn-primary" data-act="closeoff" data-pair="${openPair.id}">Submit close-off</button>
-        ${rotEnded?'':'<p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Rotation 2 runs until 31 Jan — in the demo you can close off early.</p>'}</div>`;
+        ${rotEnded?'':`<p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Rotation ${openPair.rotation} runs until ${rotNow.end} — in the demo you can close off early.</p>`}</div>`;
     } else if(closed>=3 && !hasBR){
       nextCard = `<div class="card"><h3>🏗 Your Builder Reflection</h3>
         <p style="font-size:13px;color:var(--ink-2)">You've completed all three rotations. Close the programme with a free-text

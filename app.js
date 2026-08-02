@@ -116,7 +116,7 @@ const Actions = {
   reset(){ if(confirm('Reset all demo data to the seeded state?')){ db = GRMP.Store.reset(); lastEmailShown = db.emails.length; render(); } },
   ack(d){ act(x=>GRMP.D.acknowledge(x, d.person, d.doc)); },
   ackAll(d){ act(x=>{['rules','charter','governance','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); },
-  orient(d){ act(x=>GRMP.D.completeOrientation(x, d.person, d.mode)); },
+  orient(d){ act(x=>GRMP.D.completeOrientation(x, d.person, d.mode)); toast(d.mode==='recorded'?'Recording opened — your completion has been recorded.':'Live attendance marked — orientation complete.'); },
   closeoff(d){
     const met = document.getElementById('co-met').checked;
     const ref = document.getElementById('co-ref').checked;

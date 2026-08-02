@@ -261,9 +261,17 @@ v_events(admin){
       <button class="btn sm ${e.attendance.includes(p.id)?'btn-ok':'btn-ghost'}" data-act="checkin" data-event="${key}" data-person="${p.id}">
         ${e.attendance.includes(p.id)?'✓ Present':'Check in'}</button></div>`).join('')}
     <div style="font-size:11.5px;color:var(--ink-3);padding:6px 0">…list truncated in demo (showing 30 of ${acc.length}); search comes with the real build.</div></div></div>`;
+  const noOrient = acc.filter(p=>!p.orientation);
+  const orientRow = `<div class="qcard"><b style="font-size:14px">Orientation — live session</b>
+    <span style="font-size:12px;color:var(--ink-3)"> · mark in-person attendance (per your rule: live = tracked in person) · ${acc.length-noOrient.length}/${acc.length} complete</span>
+    ${noOrient.length? `<div style="margin-top:10px;border-top:1px solid var(--line-2)">
+      ${noOrient.slice(0,20).map(p=>`<div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line-2);font-size:13px">
+        <span style="flex:1"><b>${p.name}</b> <span style="color:var(--ink-3);font-size:11.5px">${p.kind}</span></span>
+        <button class="btn sm btn-ghost" data-act="orient" data-person="${p.id}" data-mode="live">Mark attended</button></div>`).join('')}
+      </div>` : '<div style="font-size:12.5px;color:var(--ok);margin-top:8px">Everyone has completed orientation (live or recorded).</div>'}</div>`;
   return `<h1 class="co-title">Events check-in</h1>
   <p class="co-sub">Built for a phone at the door. Attendance feeds completion recognition (Kickoff) and the cohort report (Appreciation Night). SMC Hikes are a separate programme — not tracked here.</p>
-  ${row('kickoff',ev.kickoff)}${row('appreciation',ev.appreciation)}`;
+  ${orientRow}${row('kickoff',ev.kickoff)}${row('appreciation',ev.appreciation)}`;
 },
 
 /* ---------- 5.4 certificates ---------- */
