@@ -129,8 +129,8 @@ function buildSeed(){
                  `Capacity and no-repeat checks passed`]};
     pairs.push(pr); return pr;
   }
-  // R1: everyone paired; 57 closed off, 3 missing (exception queue)
-  const r1=[]; activeMentees.forEach(e=>{const p=pairUp(1,e,'approved'); if(p)r1.push(p)});
+  // R1: everyone paired EXCEPT the gate-blocked (no acknowledgement → never matched, per the binding rule)
+  const r1=[]; activeMentees.filter(e=>!lateAck.includes(e)).forEach(e=>{const p=pairUp(1,e,'approved'); if(p)r1.push(p)});
   const r1Missing = pickN(r1,3);
   r1.forEach(p=>{ if(!r1Missing.includes(p)){ p.status='closed';
       p.closeoff={metTwice:true,reflectionDone:true,at:'2026-11-'+String(25+Math.floor(rnd()*5)),comment:pick(['Great pairing.','Learned a lot.','We clicked well.',''])};}});

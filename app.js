@@ -26,6 +26,19 @@ function flushEmails(){
   while(lastEmailShown < db.emails.length){ showEmail(db.emails[lastEmailShown]); lastEmailShown++; }
 }
 
+/* ---------- non-blocking toast (replaces alert — never blocks the page or automation) ---------- */
+function toast(msg, ok=true){
+  const root = document.getElementById('overlay-root');
+  const el = document.createElement('div');
+  el.className='email-pop'; el.style.width='360px';
+  el.innerHTML = `<div class="head" style="background:${ok?'#2E9E6B':'#C8102E'}">${ok?'✓':'!'} ${ok?'DONE':'CHECK'}
+      <button class="x" aria-label="close">×</button></div>
+    <div class="body"><div class="txt" style="font-size:13.5px;color:var(--ink)">${esc(msg)}</div></div>`;
+  el.querySelector('.x').onclick=()=>el.remove();
+  root.appendChild(el);
+  setTimeout(()=>el.remove(), 5000);
+}
+
 /* ---------- yellow card helper ---------- */
 function inferred(qid){
   const it = db.config.openItems[qid]; if(!it) return '';
@@ -105,18 +118,18 @@ const Actions = {
   closeoff(d){
     const met = document.getElementById('co-met').checked;
     const ref = document.getElementById('co-ref').checked;
-    if(!met || !ref){ alert('Both confirmations are required to close off the rotation.'); return; }
+    if(!met || !ref){ toast('Both confirmations are required to close off the rotation.', false); return; }
     const c = document.getElementById('co-comment').value;
     act(x=>GRMP.D.closeoff(x, d.pair, true, true, c));
   },
   midreview(d){
     const t = document.getElementById('mr-text').value.trim();
-    if(!t){ alert('Please write a short review first.'); return; }
+    if(!t){ toast('Please write a short review first.', false); return; }
     act(x=>GRMP.D.submitMidReview(x, d.person, t));
   },
   builder(d){
     const t = document.getElementById('br-text').value.trim();
-    if(!t){ alert('Please write your Builder Reflection first.'); return; }
+    if(!t){ toast('Please write your Builder Reflection first.', false); return; }
     act(x=>GRMP.D.submitBuilderReflection(x, d.person, t));
   },
   score(d){
@@ -125,11 +138,11 @@ const Actions = {
     act(x=>GRMP.D.score(x, d.person, d.reviewer, Number(s), c));
   },
   decide(d){ act(x=>GRMP.D.decide(x, d.person, d.decision, d.actor)); },
-  suggest(d){ const n = act(x=>GRMP.D.suggestMatches(x, Number(d.rotation), d.track)); if(!n.length) alert('No unmatched mentees (or no capacity) in this track right now.'); },
+  suggest(d){ const n = act(x=>GRMP.D.suggestMatches(x, Number(d.rotation), d.track)); if(!n.length) toast('No unmatched mentees (or no capacity) in this track right now.', false); },
   approvePair(d){ act(x=>GRMP.D.approvePair(x, d.pair, d.actor)); },
   promote(d){ act(x=>GRMP.D.promoteWaitlist(x, d.person, d.actor)); },
   replaceMentor(d){ act(x=>GRMP.D.replaceMentor(x, d.pair, d.bench, d.actor)); },
-  issueCerts(d){ const out = act(x=>GRMP.D.issueCertificates(x, d.actor)); alert(out.length? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.'); },
+  issueCerts(d){ const out = act(x=>GRMP.D.issueCertificates(x, d.actor)); toast(out.length? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.', out.length>0); },
   remindCloseoff(d){ act(x=>{ x.emails.push({at:x.today,to:d.email,kind:'closeoff',subject:'Reminder: please close off your rotation (two quick confirmations)'}); }); },
   checkin(d){ act(x=>{ const ev=x.events[d.event]; const i=ev.attendance.indexOf(d.person);
     if(i>=0) ev.attendance.splice(i,1); else ev.attendance.push(d.person); }); },
@@ -154,10 +167,10 @@ const Actions = {
   },
   raiseConcern(){
     const t = document.getElementById('cn-text').value.trim();
-    if(!t){ alert('Please describe the concern first.'); return; }
+    if(!t){ toast('Please describe the concern first.', false); return; }
     act(x=>GRMP.D.raiseConcern(x, t));
-    alert('Submitted privately. Only the Escalation Owner can see this; it is referred to the SMC Grievance & Misconduct process.');
     location.hash = '#/';
+    toast('Submitted privately. Only the Escalation Owner can see this; it is referred to the SMC Grievance & Misconduct process.');
   },
 };
 window.__demo = {get db(){return db}, act, Actions};   // exposed for Playwright tests
