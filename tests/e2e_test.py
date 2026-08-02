@@ -101,7 +101,9 @@ async def main():
             pg.on('dialog', lambda d: asyncio.ensure_future(d.accept()))
             await pg.wait_for_timeout(200)
             T('2.6 both ticks required (still approved)', await state(pg,f"db.pairs.find(p=>p.id==='{row['pair']}').status==='approved'"))
-            await pg.check('#co-met'); await pg.check('#co-ref')
+            # regression: clicking the LABEL TEXT must toggle (real-user behaviour, caught in live Chrome)
+            await pg.click('label.f-check:has(#co-met) span'); await pg.click('label.f-check:has(#co-ref) span')
+            T('2.6 label-text click toggles checkboxes', await state(pg,"document.getElementById('co-met').checked && document.getElementById('co-ref').checked"))
             await pg.click('button[data-act="closeoff"]'); await pg.wait_for_timeout(250)
             T('2.6 close-off recorded', await state(pg,f"(()=>{{const p=db.pairs.find(x=>x.id==='{row['pair']}');return p.status==='closed'&&p.closeoff.metTwice&&p.closeoff.reflectionDone}})()"))
 

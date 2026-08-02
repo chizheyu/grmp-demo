@@ -195,8 +195,8 @@ apply(kind){
           <div class="track-opt" data-track="entrepreneurship" data-act="pickTrack"><h4>Entrepreneurship</h4><p>Founders & builders</p></div>
           <div class="track-opt" data-track="ai" data-act="pickTrack"><h4>AI</h4><p>AI applied in the workplace</p></div>
         </div>${inferred('Q3')}</div>
-      <div class="f-row f-check"><input type="checkbox" id="f-consent">
-        <span>I consent to SMC collecting and using this information to run GRMP, per the PDPA consent statement. <span class="req">*</span></span></div>
+      <label class="f-row f-check" style="display:flex"><input type="checkbox" id="f-consent">
+        <span>I consent to SMC collecting and using this information to run GRMP, per the PDPA consent statement. <span class="req">*</span></span></label>
       <button class="btn btn-primary" data-act="submitApply" data-kind="${kind}">Submit ${mentee?'application':'registration'}</button>
       <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Submitting with missing required fields saves your application as
         <b>incomplete</b> and sends a reminder — try it: that behaviour is part of the demo.</p>
@@ -292,8 +292,8 @@ personal(personId){
       const rotEnded = rotNow && db.today >= rotNow.end;
       nextCard = `<div class="card"><h3>✅ Close off Rotation ${openPair.rotation} (one minute)</h3>
         <p style="font-size:13px;color:var(--ink-2)">At the end of the rotation, confirm two things. The platform tracks nothing else about your meetings — it's on the two of you.</p>
-        <div class="f-check" style="margin:8px 0"><input type="checkbox" id="co-met"><span>We met at least <b>twice</b> this rotation</span></div>
-        <div class="f-check" style="margin:8px 0"><input type="checkbox" id="co-ref"><span>I completed my <a href="#/reflection">private reflection</a></span></div>
+        <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-met"><span>We met at least <b>twice</b> this rotation</span></label>
+        <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-ref"><span>I completed my <a href="#/reflection">private reflection</a></span></label>
         <div class="f-row"><input type="text" id="co-comment" placeholder="Optional comment"></div>
         <button class="btn btn-primary" data-act="closeoff" data-pair="${openPair.id}">Submit close-off</button>
         ${rotEnded?'':'<p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Rotation 2 runs until 31 Jan — in the demo you can close off early.</p>'}</div>`;
