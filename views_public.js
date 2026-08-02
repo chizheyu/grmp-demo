@@ -293,7 +293,8 @@ personal(personId){
       nextCard = `<div class="card"><h3>✅ Close off Rotation ${openPair.rotation} (one minute)</h3>
         <p style="font-size:13px;color:var(--ink-2)">At the end of the rotation, confirm two things. The platform tracks nothing else about your meetings — it's on the two of you.</p>
         <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-met"><span>We met at least <b>twice</b> this rotation</span></label>
-        <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-ref"><span>I completed my <a href="#/reflection">private reflection</a></span></label>
+        <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-ref"><span>I completed my private reflection</span></label>
+        <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px 26px"><a href="#/reflection">Open the Reflection Sheet ↗</a></div>
         <div class="f-row"><input type="text" id="co-comment" placeholder="Optional comment"></div>
         <button class="btn btn-primary" data-act="closeoff" data-pair="${openPair.id}">Submit close-off</button>
         ${rotEnded?'':'<p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Rotation 2 runs until 31 Jan — in the demo you can close off early.</p>'}</div>`;
