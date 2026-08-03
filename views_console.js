@@ -191,8 +191,19 @@ v_matching(admin){
       <ul class="why">${x.rationale.map(r=>`<li>${r}</li>`).join('')}
         <li style="color:var(--ai-ink);font-weight:650">AI-suggested (simulated in demo) — the decision above is yours.</li></ul>
     </div>`;}).join('')}
-  ${db.pairs.filter(p=>p.rotation===rot&&p.status==='approved').length?
-    `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--ink-2)">Approved this rotation: ${db.pairs.filter(p=>p.rotation===rot&&p.status==='approved').length} pairs</h3>`:''}`;
+  ${(()=>{
+    const done = db.pairs.filter(p=>p.rotation===rot&&['approved','closed'].includes(p.status))
+      .sort((a,b)=>String(b.approvedAt||'').localeCompare(String(a.approvedAt||'')));
+    if(!done.length) return '';
+    return `<h3 style="margin:18px 0 8px;font-size:14.5px">Approved this rotation (${done.length})</h3>
+    <table class="tb"><tr><th>Mentee</th><th>Mentor</th><th>Track</th><th>Approved</th><th>Status</th></tr>
+    ${done.map(x=>{const m=D.person(db,x.mentorId), e=D.person(db,x.menteeId);
+      return `<tr><td><b>${e?e.name:x.menteeId}</b></td><td>${m?m.name:x.mentorId}</td>
+        <td><span class="track-chip track-${e?e.track:'general'}">${e?GRMP.TRACKS[e.track].label:''}</span></td>
+        <td style="white-space:nowrap">${x.approvedAt||'—'}</td>
+        <td>${x.status==='closed'?'<span class="badge b-ok"><span class="d"></span>Closed off</span>':'<span class="badge b-neut"><span class="d"></span>Running</span>'}</td></tr>`;}).join('')}
+    </table>`;
+  })()}`;
 },
 
 /* ---------- 6.2 reminders ---------- */
