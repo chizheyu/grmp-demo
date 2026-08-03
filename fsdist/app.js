@@ -227,8 +227,10 @@ function __decideDefault(d){
 function demoBanner(){
   const rot = GRMP.D.currentRotation(db);
   const phase = rot ? `Rotation ${rot.n} · ${rot.label}` : (db.today>'2027-03-31'?'after the cycle':'closing weeks');
-  return `<div class="demo-banner">Requirements demo · sample data only · simulated today: <b>${db.today}</b> (${phase}) ·
-    advance the demo clock in <a href="#/console/Esther/config">Configuration</a> · yellow boxes are inferred defaults · <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a></div>`;
+  const who = (NET && SESSION && SESSION.identity)
+    ? ` · signed in: <b>${esc(SESSION.identity.name||SESSION.identity.label)}</b> · <a href="#" data-act="logout">sign out</a>` : '';
+  return `<div class="demo-banner">Sample data only · simulated today: <b>${db.today}</b> (${phase}) ·
+    yellow boxes are inferred defaults · <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a>${who}</div>`;
 }
 
 /* ---------- router ---------- */

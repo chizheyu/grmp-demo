@@ -12,7 +12,7 @@ T('60 accepted-side mentors (incl. bench)', db.people.filter(p=>p.kind==='mentor
 T('60 accepted mentees', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length===60);
 T('reserve bench = 6 mentors (10%)', db.people.filter(p=>p.appStatus==='reserve_bench').length===6);
 T('mentee waitlist populated', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='waitlisted').length===8);
-T('2 fresh submitted mentees for screening demo', db.people.filter(p=>p.appStatus==='submitted').length===2);
+T('fresh submitted applicants for screening demo (2 mentees + 2 mentors)', db.people.filter(p=>p.appStatus==='submitted'&&p.kind==='mentee').length===2 && db.people.filter(p=>p.appStatus==='submitted'&&p.kind==='mentor').length===2);
 T('every pair is same-track', db.pairs.every(x=>D.person(db,x.mentorId).track===D.person(db,x.menteeId).track));
 T('capacity ≤2 respected in seed', (()=>{const c={};for(const x of db.pairs.filter(p=>p.status!=='replaced')){const k=x.rotation+'/'+x.mentorId;c[k]=(c[k]||0)+1;if(c[k]>2)return false}return true})());
 T('no repeat mentor across rotations', (()=>{const h={};for(const x of db.pairs.filter(p=>['approved','closed'].includes(p.status))){const k=x.menteeId+'/'+x.mentorId;h[k]=(h[k]||0)+1;if(h[k]>1)return false}return true})());
