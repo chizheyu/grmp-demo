@@ -88,7 +88,8 @@ function logout(token) {
 function boot(token) {
   const db = loadDb_();
   const id = sessionIdentity_(db, token);
-  if (!id) return { ok: false, error: 'no session' };
+  // staging: the public microsite is browsable without a session (fictional data);
+  // gated views are enforced client-side and every privileged action server-side.
   return { ok: true, db: db, identity: id };
 }
 
@@ -129,8 +130,12 @@ function applyAction(token, fn, args) {
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     const db = loadDb_();
-    const id = sessionIdentity_(db, token);
-    if (!id) return { ok: false, error: 'Session expired — sign in again.', db: null };
+    let id = sessionIdentity_(db, token);
+    if (!id) {
+      const spec = PERMS[fn];
+      if (spec && spec.includes('*')) id = { kind: 'anon', name: 'visitor', label: 'visitor', roles: [] };
+      else return { ok: false, error: 'Session expired — sign in again.', db: null };
+    }
     if (!allowed_(id, fn, args || [], db)) return { ok: false, error: 'Not permitted for your role (' + id.label + ').', db: db };
     let out;
     if (fn === 'ackAllDocs') {

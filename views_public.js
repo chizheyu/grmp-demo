@@ -11,6 +11,7 @@ msNav(){
     <a href="#/guide/mentor">For Mentors</a>
     <a href="#/reflection">Reflection Sheet</a>
     <a href="#/apply/mentee" class="btn sm" style="background:#fff;color:var(--red);border-radius:8px">Apply</a>
+    ${(typeof REMOTE!=='undefined'&&REMOTE)?(SESSION?`<a href="${SESSION.identity&&SESSION.identity.kind==='person'?'#/me/'+SESSION.identity.personId:'#/console/'+encodeURIComponent((SESSION.identity&&SESSION.identity.name)||'')}" style="font-size:12px;opacity:.95">👤 ${esc((SESSION.identity&&SESSION.identity.name)||'me')}</a>`:`<a href="#/login" style="font-size:12.5px;font-weight:700">Sign in</a>`):''}
   </div></nav>`;
 },
 msFooter(){

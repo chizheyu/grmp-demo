@@ -1,8 +1,10 @@
-# GRMP Platform — Requirements Demo
+# GRMP Platform
 
-A **fully working demo** of the GRMP digital platform, built to align requirements by using the real thing instead of reading documents.
+The GRMP digital platform — born as a requirements demo, now a **shared-database staging system**. Requirements and development are one loop: the system itself is the requirements document; feedback and in-product decision cards drive changes.
 
-**Live demo:** https://chizheyu.github.io/grmp-demo/
+**Platform (shared DB, sign in):** see `AISMC/GRMP_Accounts.md` for the URL & demo accounts
+**Public sandbox (no login, per-browser data):** https://chizheyu.github.io/grmp-demo/
+**Docs:** [`ARCHITECTURE.md`](ARCHITECTURE.md) — code map, runtimes, data flow, deploy · [`USER_MANUAL.md`](USER_MANUAL.md) — the manual-first spec
 
 - The complete journey runs for every role: microsite → apply → screening (AI summaries) → decisions → acknowledgement gate → orientation gate → AI-suggested matching (human-approved) → rotations → close-off → mid-programme review → Builder Reflection → certificates → dashboard.
 - **Yellow "INFERRED" cards** mark the 8 open decisions: we inferred the most sensible default from SMC's own documents, implemented it, and the programme team confirms or changes it (Round 2 sheet).

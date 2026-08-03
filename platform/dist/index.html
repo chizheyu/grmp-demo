@@ -749,6 +749,7 @@ msNav(){
     <a href="#/guide/mentor">For Mentors</a>
     <a href="#/reflection">Reflection Sheet</a>
     <a href="#/apply/mentee" class="btn sm" style="background:#fff;color:var(--red);border-radius:8px">Apply</a>
+    ${(typeof REMOTE!=='undefined'&&REMOTE)?(SESSION?`<a href="${SESSION.identity&&SESSION.identity.kind==='person'?'#/me/'+SESSION.identity.personId:'#/console/'+encodeURIComponent((SESSION.identity&&SESSION.identity.name)||'')}" style="font-size:12px;opacity:.95">👤 ${esc((SESSION.identity&&SESSION.identity.name)||'me')}</a>`:`<a href="#/login" style="font-size:12.5px;font-weight:700">Sign in</a>`):''}
   </div></nav>`;
 },
 msFooter(){
@@ -1829,7 +1830,9 @@ const routes = [
   {re:/^#\/console\/([^/]+)\/?([^/]*)$/, view:m=>Console.shell(decodeURIComponent(m[1]), m[2]||'')},
 ];
 function render(){
-  if(REMOTE && !SESSION){ $app().innerHTML = renderLogin(); bindGlobal(); return; }
+  const h0 = location.hash || '#/';
+  const gated = /^#\/(console|me\/)/.test(h0);
+  if(REMOTE && !SESSION && (gated || h0==='#/login')){ $app().innerHTML = renderLogin(); bindGlobal(); return; }
   if(REMOTE && !db){ $app().innerHTML = `<div class="login-wrap"><div class="login-card" style="text-align:center"><h1>GRMP Platform</h1><div class="sub">Connecting to the shared database…</div></div></div>`; return; }
   const h = location.hash || '#/';
   let html = null;
@@ -1859,6 +1862,7 @@ function renderLogin(){
         <b>Participants:</b> mentee.new · mentee.mid · mentee.done · mentor.active · mentor.bench</div>
     </div>
     <div class="sim-note">Fictional sample data · every action is shared with everyone signed in — that's the point.</div>
+    <div style="text-align:center;margin-top:10px"><a href="#/" onclick="location.hash='#/';" style="font-size:12.5px">← Browse the public microsite without signing in</a></div>
   </div></div>`;
 }
 
@@ -1904,13 +1908,13 @@ function bindGlobal(){
 window.addEventListener('hashchange', render);
 window.addEventListener('DOMContentLoaded', ()=>{
   if(!REMOTE){ render(); loadDecisions().then(()=>render()); return; }
-  if(!SESSION){ render(); return; }           // straight to login
-  render();                                   // splash while booting
-  rpc('boot', SESSION.token).then(r=>{
-    if(r.ok){ db=r.db; lastEmailShown=db.emails.length; if(r.identity) SESSION={...SESSION, identity:r.identity};
-      render(); loadDecisions().then(()=>render()); }
-    else { SESSION=null; localStorage.removeItem('grmp_session'); render(); }
-  }).catch(e=>{ SESSION=null; render(); toast('Could not reach the server — sign in to retry.', false); });
+  render();                                   // splash / login while booting
+  rpc('boot', SESSION&&SESSION.token).then(r=>{
+    db=r.db; lastEmailShown=db?db.emails.length:0;
+    if(r.identity){ SESSION={...(SESSION||{}), identity:r.identity}; }
+    else if(SESSION){ SESSION=null; localStorage.removeItem('grmp_session'); }
+    render(); loadDecisions().then(()=>render());
+  }).catch(e=>{ $app().innerHTML='<div class="login-wrap"><div class="login-card"><h1>GRMP Platform</h1><div class="sub">Could not reach the server — refresh to retry.</div></div></div>'; });
 });
 
 /* ---------- action registry (wired from data-act attributes) ---------- */
