@@ -243,6 +243,7 @@ changelog(){
     if(!url){ box.innerHTML = '<p style="color:var(--ink-3)">The feedback channel is being connected — check back shortly.</p>'; return; }
     try{
       const r = await fetch(url+'?list=1'); const j = await r.json();
+      j.items = (j.items||[]).filter(it=>!String(it.page||'').startsWith('DECISION:'));
       if(!j.ok || !j.items.length){ box.innerHTML='<p style="color:var(--ink-3)">No feedback yet — be the first: every screen has a 💬 Feedback button.</p>'; return; }
       const chip = s => s==='fixed' ? '<span class="badge b-ok"><span class="d"></span>Fixed</span>'
         : s==='in_progress' ? '<span class="badge b-warn"><span class="d"></span>In progress</span>'

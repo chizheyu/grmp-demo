@@ -280,20 +280,38 @@ const Actions = {
     document.querySelector(`.track-opt[data-track="${d.track}"]`).classList.add('sel');
   },
   openFeedback(){ openFeedbackModal(); },
-  async decideDefault(d){
+  decideDefault(d){
     const it = db.config.openItems[d.q]; if(!it || !FEEDBACK_URL) return;
-    const name = prompt((d.kind==='confirm' ? 'Confirm this default:' : 'Request a change to:')+'\n\n'+it.title+'\n\nYour name (for the decision record):');
-    if(!name || !name.trim()) return;
-    let text = d.kind==='confirm' ? 'Confirmed as running.' : '';
-    if(d.kind==='change'){
-      text = prompt('What should it be instead?') || '';
-      if(!text.trim()) return;
-    }
-    try{
-      await fetch(FEEDBACK_URL, {method:'POST', body: JSON.stringify({page:'DECISION:'+d.q+':'+d.kind, role:'decision', author:name.trim(), text})});
-      toast(d.kind==='confirm' ? 'Decision recorded — thank you, '+name.trim()+'.' : 'Change request recorded — the build team will follow up.');
-      await loadDecisions(); render();
-    }catch(e){ toast('Could not record right now — try again in a minute.', false); }
+    const confirm_ = d.kind==='confirm';
+    const root = document.getElementById('overlay-root');
+    const wrap = document.createElement('div');
+    wrap.className='fb-wrap';
+    wrap.innerHTML = `<div class="fb-bg"></div>
+     <div class="fb-modal">
+       <h3 style="margin:0 0 4px;font-size:16px">${confirm_?'Confirm this default':'Request a change'}</h3>
+       <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px;background:var(--surface-2);border-radius:8px;padding:9px 12px"><b>${d.q}</b> · ${esc(it.title)}</div>
+       <div class="f-row"><label>Your name (for the decision record) <span class="req">*</span></label><input type="text" id="dc-name" placeholder="e.g. Esther"></div>
+       ${confirm_?'':`<div class="f-row"><label>What should it be instead? <span class="req">*</span></label><textarea id="dc-text"></textarea></div>`}
+       <div style="display:flex;gap:8px;justify-content:flex-end">
+         <button class="btn sm btn-ghost" id="dc-cancel">Cancel</button>
+         <button class="btn sm ${confirm_?'btn-ok':'btn-primary'}" id="dc-send">${confirm_?'✓ Confirm':'Send change request'}</button>
+       </div></div>`;
+    root.appendChild(wrap);
+    wrap.querySelector('.fb-bg').onclick=()=>wrap.remove();
+    wrap.querySelector('#dc-cancel').onclick=()=>wrap.remove();
+    wrap.querySelector('#dc-send').onclick=async ()=>{
+      const name=wrap.querySelector('#dc-name').value.trim();
+      if(!name){ toast('Please add your name — decisions need an owner.', false); return; }
+      const text=confirm_?'Confirmed as running.':(wrap.querySelector('#dc-text').value.trim());
+      if(!text){ toast('Please describe the change.', false); return; }
+      wrap.querySelector('#dc-send').disabled=true;
+      try{
+        await fetch(FEEDBACK_URL,{method:'POST',body:JSON.stringify({page:'DECISION:'+d.q+':'+d.kind,role:'decision',author:name,text})});
+        wrap.remove();
+        toast(confirm_?'Decision recorded — thank you, '+name+'.':'Change request recorded — the build team will follow up.');
+        await loadDecisions(); render();
+      }catch(e){ wrap.querySelector('#dc-send').disabled=false; toast('Could not record right now — try again in a minute.', false); }
+    };
   },
   setToday(d){ act(x=>GRMP.D.setToday(x, d.date)); },
   exportReport(){
