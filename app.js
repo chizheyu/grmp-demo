@@ -5,7 +5,7 @@ let db = GRMP.Store.load();
 
 /* Feedback channel — filled in once the Apps Script backend is deployed.
    Empty string = button hidden, demo unaffected. */
-const FEEDBACK_URL = '';
+const FEEDBACK_URL = 'https://script.google.com/macros/s/AKfycbwvothqM0XvOFOE_HxzkcoZS0v9kSmiEiP_D3FmdJEZOOGz4L46QHD7jvP00PyGdo3v/exec';
 const $app = () => document.getElementById('app');
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
