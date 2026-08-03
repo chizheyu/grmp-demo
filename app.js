@@ -43,11 +43,33 @@ function toast(msg, ok=true){
   setTimeout(()=>el.remove(), 5000);
 }
 
-/* ---------- yellow card helper ---------- */
+/* ---------- yellow card helper (in-product decision confirmation) ---------- */
+let decisionCache = null;
 function inferred(qid){
   const it = db.config.openItems[qid]; if(!it) return '';
+  const dec = decisionCache && decisionCache[qid];
+  const status = dec ? (dec.kind==='confirm'
+      ? `<span class="badge b-ok" style="flex:none"><span class="d"></span>Confirmed by ${esc(dec.author)}</span>`
+      : `<span class="badge b-warn" style="flex:none"><span class="d"></span>Change requested by ${esc(dec.author)}</span>`) : '';
   return `<div class="inferred" data-inferred="${qid}"><span class="tag">INFERRED · ${qid}</span>
-    <div><b>Running as the default — confirm or change (Round 2 · ${qid}).</b> ${esc(it.title)}</div></div>`;
+    <div style="flex:1"><b>Running as the default.</b> ${esc(it.title)}
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+        ${status || `<button class="btn sm btn-ok" data-act="decideDefault" data-q="${qid}" data-kind="confirm">✓ Confirm</button>
+        <button class="btn sm btn-ghost" data-act="decideDefault" data-q="${qid}" data-kind="change">✎ Request a change</button>`}
+        <a href="#/decisions" style="font-size:11.5px">all decisions →</a>
+      </div></div></div>`;
+}
+async function loadDecisions(){
+  if(!FEEDBACK_URL) return;
+  try{
+    const r = await fetch(FEEDBACK_URL+'?list=1'); const j = await r.json();
+    const map = {};
+    [...j.items].reverse().forEach(it=>{                       // oldest→newest so latest wins
+      const m = (it.page||'').match(/^DECISION:(Q\d+):(confirm|change)$/);
+      if(m) map[m[1]] = {kind:m[2], author:it.author, text:it.text, ts:it.ts, status:it.status, note:it.note};
+    });
+    decisionCache = map;
+  }catch(e){}
 }
 
 /* ---------- open-as switcher ---------- */
@@ -143,6 +165,7 @@ const routes = [
   {re:/^#\/me\/(.+)$/,        view:m=>Views.personal(m[1])},
   {re:/^#\/manual$/,          view:()=>Views.manual()},
   {re:/^#\/changelog$/,       view:()=>Views.changelog()},
+  {re:/^#\/decisions$/,       view:()=>Views.decisions()},
   {re:/^#\/console$/,         view:()=>Console.login()},
   {re:/^#\/console\/([^/]+)\/?([^/]*)$/, view:m=>Console.shell(decodeURIComponent(m[1]), m[2]||'')},
 ];
@@ -198,7 +221,7 @@ function bindGlobal(){
   });
 }
 window.addEventListener('hashchange', render);
-window.addEventListener('DOMContentLoaded', render);
+window.addEventListener('DOMContentLoaded', ()=>{ render(); loadDecisions().then(()=>render()); });
 
 /* ---------- action registry (wired from data-act attributes) ---------- */
 const Actions = {
@@ -257,6 +280,21 @@ const Actions = {
     document.querySelector(`.track-opt[data-track="${d.track}"]`).classList.add('sel');
   },
   openFeedback(){ openFeedbackModal(); },
+  async decideDefault(d){
+    const it = db.config.openItems[d.q]; if(!it || !FEEDBACK_URL) return;
+    const name = prompt((d.kind==='confirm' ? 'Confirm this default:' : 'Request a change to:')+'\n\n'+it.title+'\n\nYour name (for the decision record):');
+    if(!name || !name.trim()) return;
+    let text = d.kind==='confirm' ? 'Confirmed as running.' : '';
+    if(d.kind==='change'){
+      text = prompt('What should it be instead?') || '';
+      if(!text.trim()) return;
+    }
+    try{
+      await fetch(FEEDBACK_URL, {method:'POST', body: JSON.stringify({page:'DECISION:'+d.q+':'+d.kind, role:'decision', author:name.trim(), text})});
+      toast(d.kind==='confirm' ? 'Decision recorded — thank you, '+name.trim()+'.' : 'Change request recorded — the build team will follow up.');
+      await loadDecisions(); render();
+    }catch(e){ toast('Could not record right now — try again in a minute.', false); }
+  },
   setToday(d){ act(x=>GRMP.D.setToday(x, d.date)); },
   exportReport(){
     const D=GRMP.D;

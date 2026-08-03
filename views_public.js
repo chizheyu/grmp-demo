@@ -264,6 +264,32 @@ changelog(){
   </div>` + this.msFooter();
 },
 
+/* ---------- decisions register (replaces the Round 2 sheet) ---------- */
+decisions(){
+  setTimeout(async ()=>{
+    await loadDecisions();
+    const box=document.getElementById('dc-body'); if(!box) return;
+    const items = Object.entries(__demo.db.config.openItems).map(([q,it])=>{
+      const dec = decisionCache && decisionCache[q];
+      const chip = dec ? (dec.kind==='confirm'
+        ? `<span class="badge b-ok"><span class="d"></span>Confirmed · ${dec.author} · ${dec.ts}</span>`
+        : `<span class="badge b-warn"><span class="d"></span>Change requested · ${dec.author}</span>`)
+        : '<span class="badge b-ai">Awaiting confirmation</span>';
+      return `<div class="doc-card" style="padding:14px 18px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${q}</b>${chip}</div>
+        <p style="font-size:13.5px;margin:6px 0 0">${it.title}</p>
+        ${dec&&dec.kind==='change'?`<p style="font-size:12.5px;margin:6px 0 0;color:var(--warn)">Requested: “${dec.text}”</p>`:''}
+      </div>`;
+    }).join('');
+    box.innerHTML = items;
+  },50);
+  return this.msNav() + `<div class="doc-page">
+    <h1>Decisions register</h1>
+    <p class="lede">The eight inferred defaults running in this system. Confirm or request a change right where you see each yellow card — Q1 and Q2 are Esther's calls. This register replaces the Round-2 sheet.</p>
+    <div id="dc-body"><p style="color:var(--ink-3)">Loading…</p></div>
+  </div>` + this.msFooter();
+},
+
 /* ---------- 2/3 personal pages ---------- */
 personal(personId){
   const db = __demo.db, D = GRMP.D;
