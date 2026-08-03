@@ -65,6 +65,7 @@ async function loadDecisions(){
     const r = await fetch(FEEDBACK_URL+'?list=1'); const j = await r.json();
     const map = {};
     [...j.items].reverse().forEach(it=>{                       // oldest→newest so latest wins
+      if(it.status==='wont_fix') return;                       // voided decisions (admin) don't count
       const m = (it.page||'').match(/^DECISION:(Q\d+):(confirm|change)$/);
       if(m) map[m[1]] = {kind:m[2], author:it.author, text:it.text, ts:it.ts, status:it.status, note:it.note};
     });
