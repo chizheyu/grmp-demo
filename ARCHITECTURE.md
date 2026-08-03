@@ -7,8 +7,8 @@
 | Mode | Where | Storage | Who uses it |
 |---|---|---|---|
 | **Sandbox** | GitHub Pages / local file | `localStorage` (per browser) | Public demo, all automated tests |
-| **Platform (current)** | Google Apps Script Web App | Drive JSON file + CacheService, LockService-serialised | SMC staging — shared DB, preset accounts |
-| **Platform (next)** | Firebase Hosting + **Firestore** | Firestore collections, real-time listeners | Migration in progress — millisecond writes, live cross-browser sync |
+| **Platform (CURRENT)** | Firebase Hosting + **Firestore** — https://grmp-platform.web.app | `state` collection, one doc per db slice; generic JSON differ writes only changed slices; onSnapshot live sync | SMC staging — real database, real-time, local-first mutations (~ms) |
+| Platform (fallback) | Google Apps Script Web App | Drive JSON + Cache + Lock | Superseded; kept as backup |
 
 The frontend detects its runtime: `google.script.run` present → Apps Script RPC; Firebase config present → Firestore adapter; otherwise localStorage sandbox.
 
@@ -106,6 +106,7 @@ Apps Script endpoint → Google Sheet ("GRMP Feedback") → `AISMC/feedback_admi
 node tests/backend_test.js        # 50  — domain
 python tests/e2e_test.py          # 35  — sandbox UI
 python tests/e2e_full_cycle.py    # 43  — lifecycle + branches
-python tests/e2e_platform.py      # 13  — live shared platform
+python tests/e2e_platform.py      # 13  — Apps Script platform (fallback)
+python tests/e2e_firestore.py     # 11  — LIVE Firestore platform incl. real-time sync
 ```
 All green = safe to deploy. The manual's numbered steps are the test cases.

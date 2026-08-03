@@ -1,0 +1,11 @@
+rules_version = '2';
+// STAGING rules: fictional sample data; app-level login/roles; open read-write.
+// PRODUCTION TODO: Firebase Auth + role-based rules / move writes behind Functions.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /state/{doc} {
+      allow read, write: if true;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
