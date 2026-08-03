@@ -8,6 +8,7 @@ const REMOTE = (typeof google!=='undefined' && google.script && google.script.ru
 let SESSION = null;
 try{ SESSION = JSON.parse(localStorage.getItem('grmp_session')||'null'); }catch(e){}
 let db = REMOTE ? null : GRMP.Store.load();
+window.SESSION_TOKEN_FN = ()=> SESSION && SESSION.token;
 
 function busy(on){
   let el=document.getElementById('rpc-busy');
@@ -43,7 +44,7 @@ const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>'
 function act(fn){ const out = fn(db); GRMP.Store.save(db); render(); return out; }
 
 /* ---------- email popup (the "this email would be sent" surface) ---------- */
-let lastEmailShown = db.emails.length;
+let lastEmailShown = db ? db.emails.length : 0;
 function showEmail(e){
   const root = document.getElementById('overlay-root');
   const el = document.createElement('div');
@@ -237,8 +238,8 @@ const routes = [
   {re:/^#\/console\/([^/]+)\/?([^/]*)$/, view:m=>Console.shell(decodeURIComponent(m[1]), m[2]||'')},
 ];
 function render(){
-  if(REMOTE && !db){ $app().innerHTML = `<div class="login-wrap"><div class="login-card" style="text-align:center"><h1>GRMP Platform</h1><div class="sub">Connecting to the shared database…</div></div></div>`; return; }
   if(REMOTE && !SESSION){ $app().innerHTML = renderLogin(); bindGlobal(); return; }
+  if(REMOTE && !db){ $app().innerHTML = `<div class="login-wrap"><div class="login-card" style="text-align:center"><h1>GRMP Platform</h1><div class="sub">Connecting to the shared database…</div></div></div>`; return; }
   const h = location.hash || '#/';
   let html = null;
   for(const r of routes){ const m = h.match(r.re); if(m){ html = r.view(m); break; } }
@@ -312,13 +313,13 @@ function bindGlobal(){
 window.addEventListener('hashchange', render);
 window.addEventListener('DOMContentLoaded', ()=>{
   if(!REMOTE){ render(); loadDecisions().then(()=>render()); return; }
-  render();                                   // connecting splash / login
-  rpc('boot', SESSION&&SESSION.token).then(r=>{
-    if(r.ok){ db=r.db; if(r.identity) SESSION={...(SESSION||{}), identity:r.identity};
+  if(!SESSION){ render(); return; }           // straight to login
+  render();                                   // splash while booting
+  rpc('boot', SESSION.token).then(r=>{
+    if(r.ok){ db=r.db; lastEmailShown=db.emails.length; if(r.identity) SESSION={...SESSION, identity:r.identity};
       render(); loadDecisions().then(()=>render()); }
-    else { SESSION=null; localStorage.removeItem('grmp_session'); db=r.db||null;
-      if(r.db){ render(); } else { rpc('boot', null).then(r2=>{ db=r2.db; render(); }); } }
-  }).catch(e=>{ $app().innerHTML='<div class="login-wrap"><div class="login-card"><h1>GRMP Platform</h1><div class="sub">Could not reach the server — refresh to retry.</div></div></div>'; });
+    else { SESSION=null; localStorage.removeItem('grmp_session'); render(); }
+  }).catch(e=>{ SESSION=null; render(); toast('Could not reach the server — sign in to retry.', false); });
 });
 
 /* ---------- action registry (wired from data-act attributes) ---------- */
@@ -332,7 +333,7 @@ const Actions = {
       if(!r.ok){ window.__loginErr=r.error||'Wrong account or passcode.'; render(); return; }
       window.__loginErr=null; SESSION={token:r.token, identity:r.identity};
       localStorage.setItem('grmp_session', JSON.stringify(SESSION));
-      db=r.db; render();
+      db=r.db; lastEmailShown=db.emails.length; render();
       toast('Signed in as '+r.identity.label+'. Everything you do here is shared with the team.');
       const id=r.identity;
       if(id.kind==='person') location.hash='#/me/'+id.personId;

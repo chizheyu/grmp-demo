@@ -15,6 +15,15 @@ const AI = {
   async gen(id, prompt){
     if(this.cache[id]) return this.cache[id];
     if(!this.enabled) return null;
+    if(typeof google!=='undefined' && google.script && google.script.run){
+      try{
+        const txt = await new Promise((res,rej)=>google.script.run
+          .withSuccessHandler(res).withFailureHandler(rej)
+          .aiGen((window.SESSION_TOKEN_FN&&window.SESSION_TOKEN_FN())||null, id, prompt));
+        if(txt){ this.cache[id]=txt; try{localStorage.setItem('grmp_ai_cache',JSON.stringify(this.cache));}catch(e){} }
+        return txt||null;
+      }catch(e){ return null; }
+    }
     try{
       const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 10000);
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`, {

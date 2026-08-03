@@ -1,0 +1,2036 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRMP Platform — SMC (staging)</title>
+<style>
+/* GRMP Demo — design system. Public microsite (SMC red) + console (ink) + personal pages. */
+:root{
+  --red:#C8102E; --red-deep:#A00C24; --red-wash:#FBEDEF;
+  --ink:#23272F; --ink-2:#4A515E; --ink-3:#8A919E;
+  --canvas:#F6F5F2; --surface:#FFFFFF; --surface-2:#FBFAF8;
+  --line:#E8E5DF; --line-2:#F1EFEA; --cream:#F5ECE0;
+  --ai:#6D5CF0; --ai-ink:#5B45E0; --ai-wash:#F4F1FF; --ai-line:#E2DAFF;
+  --ok:#2E9E6B; --ok-wash:#E8F5EE; --warn:#C77A16; --warn-wash:#FBF0DD;
+  --gold:#B8860B; --gold-wash:#FDF6E3;
+  --radius:14px; --radius-sm:10px;
+  --shadow-sm:0 1px 2px rgba(30,34,42,.06),0 1px 3px rgba(30,34,42,.04);
+  --shadow:0 4px 16px rgba(30,34,42,.08),0 1px 3px rgba(30,34,42,.05);
+  --shadow-lg:0 18px 50px rgba(30,34,42,.18);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  --display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;overflow-x:hidden;max-width:100%}
+body{font-family:var(--font);color:var(--ink);background:var(--canvas);font-size:14.5px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--red);text-decoration:none} a:hover{text-decoration:underline}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--ai);outline-offset:2px;border-radius:6px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+.hidden{display:none!important}
+
+/* ---------- badges & chips ---------- */
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.badge .d{width:6px;height:6px;border-radius:50%}
+.b-ok{color:var(--ok);background:var(--ok-wash)} .b-ok .d{background:var(--ok)}
+.b-warn{color:var(--warn);background:var(--warn-wash)} .b-warn .d{background:var(--warn)}
+.b-risk{color:var(--red);background:var(--red-wash)} .b-risk .d{background:var(--red)}
+.b-neut{color:var(--ink-2);background:var(--line-2)} .b-neut .d{background:var(--ink-3)}
+.b-ai{color:var(--ai-ink);background:var(--ai-wash);border:1px solid var(--ai-line)}
+.track-chip{font-size:11px;font-weight:700;padding:2px 9px;border-radius:6px}
+.track-general{background:#EAF1F8;color:#1A56A0}
+.track-entrepreneurship{background:#FDF0E6;color:#B85C1E}
+.track-ai{background:var(--ai-wash);color:var(--ai-ink)}
+
+/* inferred yellow card */
+.inferred{background:#FFFBEB;border:1px solid #F5E1A4;border-left:4px solid #E8B931;border-radius:10px;
+  padding:10px 14px;margin:12px 0;font-size:13px;color:#6B5310;display:flex;gap:10px;align-items:flex-start}
+.inferred b{color:#4A3A0A}
+.inferred .tag{flex:none;font-size:10px;font-weight:800;letter-spacing:.05em;background:#E8B931;color:#fff;
+  padding:2px 8px;border-radius:6px;margin-top:1px}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:650;padding:10px 18px;border-radius:10px;border:1px solid transparent;transition:.15s}
+.btn-primary{background:var(--red);color:#fff;box-shadow:0 2px 8px rgba(200,16,46,.28)}
+.btn-primary:hover{background:var(--red-deep);transform:translateY(-1px)}
+.btn-ghost{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.btn-ghost:hover{border-color:var(--ink-3)}
+.btn-ai{background:linear-gradient(120deg,#6D5CF0,#9B4DF5);color:#fff;box-shadow:0 6px 20px rgba(109,92,240,.25)}
+.btn-ai:hover{transform:translateY(-1px)}
+.btn-ok{background:var(--ok);color:#fff}
+.btn.sm{padding:6px 13px;font-size:12.5px;border-radius:8px}
+.btn:disabled{opacity:.5;cursor:default;transform:none!important}
+
+/* ---------- microsite ---------- */
+.ms-nav{background:var(--red);color:#fff;position:sticky;top:0;z-index:40}
+.ms-nav .row{display:flex;align-items:center;gap:22px;height:56px}
+.ms-logo{font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:-.3px;color:#fff}
+.ms-logo small{display:block;font-size:8.5px;letter-spacing:.18em;font-weight:700;opacity:.85}
+.ms-nav a{color:#fff;font-size:13px;font-weight:600;opacity:.92}
+.ms-nav a:hover{opacity:1;text-decoration:none}
+.ms-nav .spacer{flex:1}
+.ms-hero{background:linear-gradient(160deg,var(--red) 0%,#8F0C20 100%);color:#fff;padding:64px 0 56px}
+.ms-hero h1{font-family:var(--display);font-size:44px;font-weight:800;letter-spacing:-1.5px;margin:0 0 10px;max-width:640px;line-height:1.08}
+.ms-hero p{font-size:16.5px;opacity:.92;max-width:560px;margin:0 0 26px;line-height:1.6}
+.ms-hero .cta{display:flex;gap:12px;flex-wrap:wrap}
+.ms-hero .btn-light{background:#fff;color:var(--red)}
+.ms-hero .btn-line{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.65)}
+.ms-hero .eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;opacity:.8;margin-bottom:14px}
+.ms-strip{background:var(--cream);padding:14px 0;font-size:13px;color:#6b5d49;text-align:center;font-weight:600}
+.ms-section{padding:52px 0}
+.ms-section h2{font-family:var(--display);font-size:26px;font-weight:750;letter-spacing:-.6px;margin:0 0 6px}
+.ms-section .lede{color:var(--ink-2);margin:0 0 26px;max-width:620px}
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-sm)}
+.tcard h3{margin:8px 0 8px;font-size:17px;font-weight:750}
+.tcard p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.tcard .glyph{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff}
+.timeline{display:flex;gap:0;margin-top:8px;overflow-x:auto;padding-bottom:8px}
+.tl-node{flex:1;min-width:150px;position:relative;padding:0 10px 0 0}
+.tl-node::before{content:"";position:absolute;top:9px;left:0;right:0;height:2px;background:var(--line)}
+.tl-node .dot{position:relative;width:20px;height:20px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800;z-index:1}
+.tl-node h4{margin:10px 0 3px;font-size:13.5px}
+.tl-node p{margin:0;font-size:12px;color:var(--ink-3)}
+.ms-footer{background:var(--ink);color:#B7BEC9;padding:28px 0;font-size:12.5px;margin-top:20px}
+.ms-footer a{color:#fff}
+.doc-page{max-width:760px;margin:0 auto;padding:40px 22px 70px}
+.doc-page h1{font-family:var(--display);font-size:30px;font-weight:800;letter-spacing:-.8px;margin:0 0 8px}
+.doc-page .lede{color:var(--ink-2);font-size:15px;margin-bottom:24px}
+.doc-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+.doc-card h3{margin:0 0 8px;font-size:16px}
+.doc-card ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:13.5px}
+.doc-card li{margin:4px 0}
+.privacy-note{background:var(--ok-wash);border:1px solid #CBE8D8;border-radius:10px;padding:12px 16px;
+  font-size:13.5px;color:#1E5C40;font-weight:600;display:flex;gap:10px;align-items:flex-start;margin-bottom:20px}
+
+/* ---------- forms ---------- */
+.form{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow-sm)}
+.f-row{margin-bottom:15px}
+.f-row label{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:5px}
+.f-row label .req{color:var(--red)}
+.f-row input[type=text],.f-row input[type=email],.f-row select,.f-row textarea{
+  width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:14px;background:var(--surface-2);color:var(--ink)}
+.f-row textarea{min-height:74px;resize:vertical}
+.f-row input:focus,.f-row select:focus,.f-row textarea:focus{outline:2px solid var(--ai);outline-offset:0;border-color:transparent}
+.f-check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--ink-2)}
+.f-check input{margin-top:3px;width:16px;height:16px;accent-color:var(--red)}
+.f-grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.track-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px}
+.track-opt{border:1.5px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;background:var(--surface-2)}
+.track-opt.sel{border-color:var(--red);background:var(--red-wash)}
+.track-opt h4{margin:0 0 3px;font-size:13.5px}
+.track-opt p{margin:0;font-size:11.5px;color:var(--ink-3)}
+
+/* ---------- email toast/modal ---------- */
+.email-pop{position:fixed;right:20px;bottom:20px;width:420px;max-width:92vw;background:var(--surface);border:1px solid var(--line);
+  border-radius:14px;box-shadow:var(--shadow-lg);z-index:90;overflow:hidden;animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.email-pop .head{background:var(--ink);color:#fff;padding:10px 16px;font-size:11.5px;font-weight:700;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.email-pop .head .x{margin-left:auto;background:none;border:0;color:#fff;font-size:16px;opacity:.7}
+.email-pop .body{padding:14px 16px}
+.email-pop .subj{font-weight:700;font-size:14px;margin-bottom:4px}
+.email-pop .meta{font-size:11.5px;color:var(--ink-3);margin-bottom:8px}
+.email-pop .txt{font-size:13px;color:var(--ink-2)}
+
+/* ---------- personal page ---------- */
+.pp-shell{max-width:720px;margin:0 auto;padding:30px 20px 70px}
+.pp-head{display:flex;gap:16px;align-items:center;margin-bottom:22px}
+.avatar{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff;flex:none}
+.av-mentor{background:linear-gradient(135deg,#C8102E,#8F0C20)}
+.av-mentee{background:linear-gradient(135deg,#3A4150,#282D37)}
+.pp-head h1{font-family:var(--display);font-size:24px;font-weight:800;margin:0;letter-spacing:-.5px}
+.pp-head .sub{font-size:13px;color:var(--ink-2)}
+.steps{display:flex;gap:0;margin:6px 0 24px;overflow-x:auto;padding-bottom:6px}
+.step{flex:1;min-width:86px;text-align:center;position:relative}
+.step::before{content:"";position:absolute;top:10px;left:-50%;width:100%;height:2px;background:var(--line)}
+.step:first-child::before{display:none}
+.step.done::before,.step.cur::before{background:var(--red)}
+.step .dot{position:relative;width:21px;height:21px;margin:0 auto;border-radius:50%;border:2px solid var(--line);background:var(--surface);z-index:1;display:grid;place-items:center;font-size:10px;font-weight:800;color:var(--ink-3)}
+.step.done .dot{background:var(--red);border-color:var(--red);color:#fff}
+.step.cur .dot{border-color:var(--red);color:var(--red);box-shadow:0 0 0 4px rgba(200,16,46,.15)}
+.step span{display:block;font-size:10.5px;font-weight:650;color:var(--ink-3);margin-top:6px}
+.step.done span,.step.cur span{color:var(--ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-sm);margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:9px}
+.acklist{display:flex;flex-direction:column;gap:8px}
+.ackrow{display:flex;align-items:center;gap:12px;border:1px solid var(--line-2);border-radius:10px;padding:10px 14px;background:var(--surface-2)}
+.ackrow .nm{font-size:13.5px;font-weight:650;flex:1}
+.ackrow .ver{font-size:11px;color:var(--ink-3)}
+.mentor-card{display:flex;gap:14px;align-items:flex-start;background:var(--ai-wash);border:1px solid var(--ai-line);border-radius:12px;padding:14px 16px}
+.cert{background:linear-gradient(160deg,#FFFDF5,#FDF6E3);border:1.5px solid #E5D9A9;border-radius:14px;padding:28px;text-align:center}
+.cert h2{font-family:var(--display);font-size:22px;margin:8px 0 4px;letter-spacing:-.4px}
+.cert .nm{font-size:26px;font-weight:800;color:var(--red);margin:10px 0}
+.cert .meta{font-size:12px;color:var(--ink-3)}
+
+/* ---------- console ---------- */
+.co-shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+.co-side{background:#1E222A;color:#AEB6C2;padding:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.co-brand{padding:18px;border-bottom:1px solid #343B46;color:#fff;font-weight:800;font-family:var(--display)}
+.co-brand small{display:block;font-size:9px;letter-spacing:.16em;color:#7C8494;font-weight:700}
+.co-nav{padding:10px;flex:1;overflow-y:auto}
+.co-nav .lab{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#6B7280;font-weight:800;padding:10px 10px 4px}
+.co-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 11px;border-radius:8px;border:0;background:transparent;color:#AEB6C2;font-size:13px;font-weight:600}
+.co-item:hover{background:#272C36;color:#fff}
+.co-item.on{background:var(--red);color:#fff}
+.co-item .n{margin-left:auto;font-size:10.5px;font-weight:800;background:rgba(255,255,255,.14);color:#fff;padding:1px 7px;border-radius:12px}
+.co-user{padding:13px 16px;border-top:1px solid #343B46;font-size:12px}
+.co-user b{color:#fff;display:block;font-size:13px}
+.co-main{min-width:0;padding:26px 30px 70px;max-width:1100px}
+.co-title{font-family:var(--display);font-size:23px;font-weight:800;letter-spacing:-.5px;margin:0 0 4px}
+.co-sub{color:var(--ink-2);font-size:13px;margin:0 0 20px;max-width:640px}
+table.tb{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.tb th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);text-align:left;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.tb td{padding:11px 14px;border-bottom:1px solid var(--line-2);font-size:13px;vertical-align:middle}
+.tb tr:last-child td{border-bottom:0}
+.funnel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow-sm)}
+.stat .n{font-family:var(--display);font-size:24px;font-weight:800;letter-spacing:-.5px}
+.stat .l{font-size:11px;color:var(--ink-3);font-weight:650;margin-top:2px}
+.qcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
+.ai-block{background:linear-gradient(180deg,var(--ai-wash),var(--surface) 70%);border:1px solid var(--ai-line);border-radius:10px;padding:11px 13px;font-size:12.5px;margin:10px 0}
+.ai-block .t{font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--ai-ink);text-transform:uppercase;margin-bottom:4px;display:flex;gap:6px;align-items:center}
+.pair-row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-bottom:10px;box-shadow:var(--shadow-sm);flex-wrap:wrap}
+.pair-row .who{flex:1;min-width:230px}
+.pair-row .who b{font-size:13.5px}
+.pair-row .who .sub{font-size:11.5px;color:var(--ink-3)}
+.why{width:100%;background:var(--ai-wash);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--ink-2)}
+.why li{margin:2px 0}
+.login-wrap{min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#1E222A,#2A2F3A)}
+.login-card{background:var(--surface);border-radius:18px;box-shadow:var(--shadow-lg);padding:34px;width:420px;max-width:92vw}
+.login-card h1{font-family:var(--display);font-size:20px;margin:0 0 4px}
+.login-card .sub{font-size:12.5px;color:var(--ink-3);margin-bottom:18px}
+.login-row{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line);background:var(--surface-2);border-radius:11px;padding:11px 14px;margin-bottom:8px;text-align:left}
+.login-row:hover{border-color:var(--red)}
+.login-row b{font-size:13.5px}
+.login-row .r{font-size:11.5px;color:var(--ink-3)}
+.sim-note{font-size:11px;color:var(--ink-3);text-align:center;margin-top:12px}
+
+/* ---------- rpc busy bar ---------- */
+.rpc-busy{position:fixed;top:0;left:0;right:0;height:3px;z-index:200;background:linear-gradient(90deg,var(--red),#F5A623,var(--red));background-size:200% 100%;animation:busySlide 1s linear infinite}
+@keyframes busySlide{from{background-position:0 0}to{background-position:200% 0}}
+
+/* ---------- feedback ---------- */
+.fb-btn{position:fixed;right:16px;bottom:16px;z-index:80;background:var(--red);color:#fff;border:0;border-radius:24px;
+  padding:10px 18px;font-size:12.5px;font-weight:700;box-shadow:var(--shadow-lg)}
+.fb-btn:hover{background:var(--red-deep)}
+.fb-wrap{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:20px}
+.fb-bg{position:absolute;inset:0;background:rgba(20,23,29,.55)}
+.fb-modal{position:relative;background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);padding:22px;width:440px;max-width:94vw}
+
+/* ---------- open-as switcher ---------- */
+.openas{position:fixed;left:16px;bottom:16px;z-index:80}
+.openas-btn{background:var(--ink);color:#fff;border:0;border-radius:24px;padding:10px 18px;font-size:12.5px;font-weight:700;box-shadow:var(--shadow-lg);display:flex;gap:8px;align-items:center}
+.openas-menu{position:absolute;bottom:52px;left:0;width:330px;max-height:60vh;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-lg);padding:10px}
+.openas-menu .sec{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:var(--ink-3);padding:8px 10px 3px}
+.openas-menu button{display:flex;gap:9px;align-items:center;width:100%;border:0;background:none;padding:7px 10px;border-radius:8px;font-size:12.5px;text-align:left}
+.openas-menu button:hover{background:var(--surface-2)}
+.demo-banner{background:#FFF8E1;border-bottom:1px solid #F0E2B6;color:#6B5310;font-size:12px;font-weight:650;text-align:center;padding:7px 12px}
+.demo-banner a{color:#6B5310;text-decoration:underline}
+
+@media(max-width:900px){.cards3{grid-template-columns:1fr}.co-shell{grid-template-columns:1fr}
+ .co-side{position:relative;height:auto}.funnel-grid{grid-template-columns:repeat(2,1fr)}
+ .ms-hero h1{font-size:32px}.f-grid2{grid-template-columns:1fr}}
+
+</style>
+<div id="app"></div>
+<div id="overlay-root"></div>
+<script>
+/* GRMP Demo — state engine + seeded cohort.
+   Single source of truth in localStorage. Deterministic seed (mulberry32) so tests are stable.
+   Demo date is fixed at 2026-12-15 (mid-cycle: R1 closed, R2 running) so every view has life. */
+
+const DB_KEY = 'grmp_demo_v4';   // bumped: cohort model + accounts
+const TODAY = '2026-12-15';
+
+/* Node compatibility: same file runs headless for CLI backend tests (localStorage shim). */
+if (typeof localStorage === 'undefined') {
+  globalThis.__mem = {};
+  globalThis.localStorage = {
+    getItem: k => (k in globalThis.__mem ? globalThis.__mem[k] : null),
+    setItem: (k,v) => { globalThis.__mem[k] = String(v); },
+    removeItem: k => { delete globalThis.__mem[k]; },
+  };
+}
+
+/* ---------- deterministic PRNG ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = mulberry32(20261215);
+const pick = arr => arr[Math.floor(rnd()*arr.length)];
+const pickN = (arr,n)=>{const c=[...arr],out=[];while(out.length<n&&c.length)out.push(c.splice(Math.floor(rnd()*c.length),1)[0]);return out};
+
+/* ---------- name pools (SG mix) ---------- */
+const FIRST = ['Wei Jie','Jun Kai','Zhi Hao','Kai Xin','Hui Ling','Mei Yi','Jia Hui','Yu Xuan','Zi Yang','Cheng Han','Xin Yi','Li Ting','Nur Aisyah','Siti Nurul','Muhammad Danish','Ahmad Irfan','Farah','Nadia','Arjun','Priya','Kavya','Rohan','Divya','Karthik','Meera','Rajiv','Daniel','Marcus','Chloe','Grace','Ryan','Sophie','Ethan','Rachel','Nicholas','Amanda','Bryan','Michelle','Isaac','Clara'];
+const LAST  = ['Tan','Lim','Lee','Ng','Wong','Chua','Goh','Ong','Teo','Koh','Chen','Low','Ho','Yeo','Sim','Toh','Chan','Loh','Bin Rahman','Binte Hassan','Menon','Pillai','Nair','Sharma','Krishnan','Raj','Kumar','s/o Suresh'];
+const uname = (used)=>{let n;do{n=pick(FIRST)+' '+pick(LAST)}while(used.has(n));used.add(n);return n};
+
+/* ---------- track content pools ---------- */
+const TRACKS = {
+  general:        {label:'General',          industries:['Finance','Technology','Communications','Human Resources','Education','Healthcare','Consulting']},
+  entrepreneurship:{label:'Entrepreneurship', industries:['Startups','Venture Building','E-commerce','Climate Tech','FoodTech']},
+  ai:             {label:'AI',               industries:['AI Products','Data & ML','AI in Finance','AI in Marketing','AI Operations']},
+};
+const MENTOR_ORGS = {general:['DBS','OCBC','Grab','Singtel','Shopee','MOE','SPH Media','EDB','McKinsey','PwC','Sea Group','ST Engineering'],
+  entrepreneurship:['GreenLoop (founder)','Carousell (early team)','own venture (2x founder)','Antler SG','Glife','Stealth startup'],
+  ai:['TikTok','Google','Microsoft','AI Singapore','Databricks','OpenGov']};
+const MENTOR_ROLES = {general:['Vice President','Director','Senior Manager','Head of Department','Partner','Regional Lead'],
+  entrepreneurship:['Founder & CEO','Co-founder','Founding Partner','Venture Builder'],
+  ai:['ML Engineering Lead','AI Product Manager','Head of Data Science','Applied AI Lead','Senior AI Engineer']};
+const COURSES = ['Business Management','Accountancy','Economics','Information Systems','Computer Science','Law','Social Sciences','Psychology'];
+const GOALS = {general:['clarify my career direction in my industry','build confidence for my first job search','learn how leaders think about career growth','navigate from school into the corporate world'],
+  entrepreneurship:['test whether founding a startup suits me','learn how to validate and launch an idea','understand fundraising and early operations'],
+  ai:['understand how AI is changing my target industry','build a career that combines my degree with AI skills','learn practical AI adoption from a practitioner']};
+const DEVNEEDS = ['communication and presence','networking and building professional relationships','structured thinking and prioritisation','confidence and self-belief','industry knowledge and career mapping','leadership and taking initiative'];
+const MOTIVES = ['give back to the next generation','share lessons I wish someone had told me earlier','stay connected with young perspectives','strengthen Singapore’s talent pipeline'];
+
+/* ---------- seed builder ---------- */
+function buildSeed(){
+  const used = new Set();
+  const people = [];
+  let seq = 1;
+  const mk = (kind, track, appStatus) => {
+    const name = uname(used);
+    const id = (kind==='mentor'?'M':'E') + String(seq++).padStart(3,'0');
+    const ind = pick(TRACKS[track].industries);
+    const p = {id, kind, track, name,
+      email: name.toLowerCase().replace(/[^a-z ]/g,'').replace(/ +/g,'.') + (kind==='mentor'?'@example.com':'@smu.example.edu'),
+      mobile: '+65 9'+String(100+Math.floor(rnd()*900))+' '+String(1000+Math.floor(rnd()*9000)),
+      appStatus, submittedAt:'2026-08-'+String(20+Math.floor(rnd()*10)),
+      ack:null, orientation:null, source:'form'};
+    if(kind==='mentor'){
+      Object.assign(p,{org:pick(MENTOR_ORGS[track]), role:pick(MENTOR_ROLES[track]), industry:ind,
+        background:`${12+Math.floor(rnd()*18)} years in ${ind.toLowerCase()}`,
+        leadership:pick(['leads a team of '+(4+Math.floor(rnd()*30)),'built and managed regional teams','mentored juniors throughout career']),
+        xcultural:pick(['worked across SEA markets','led projects in 3+ countries','studied and worked overseas']),
+        languages:pickN(['English','Mandarin','Malay','Tamil','Cantonese','Hindi'],1+Math.floor(rnd()*2)),
+        motivation:pick(MOTIVES)});
+    }else{
+      Object.assign(p,{university:'SMU', course:pick(COURSES), year:String(2+Math.floor(rnd()*3)),
+        goals:pick(GOALS[track]), devNeeds:pickN(DEVNEEDS,2).join('; '),
+        industryInterest:ind, expectations:'a mentor who is honest, generous with stories, and challenges me',
+        readiness:'I journal regularly and am ready to reflect after each meeting'});
+    }
+    people.push(p); return p;
+  };
+
+  // Mentors: 60 accepted (incl. 6 reserve bench) + 3 waitlist + 3 declined
+  const mentors = [];
+  const mtracks = [...Array(36).fill('general'),...Array(12).fill('entrepreneurship'),...Array(12).fill('ai')];
+  mtracks.forEach(t=>mentors.push(mk('mentor',t,'accepted')));
+  pickN(mentors,6).forEach(m=>m.appStatus='reserve_bench');
+  for(let i=0;i<3;i++) mk('mentor',pick(['general','ai']),'waitlisted');
+  for(let i=0;i<3;i++) mk('mentor','general','declined');
+
+  // Mentees: 60 accepted + 8 waitlist + 4 declined + 2 fresh submitted (screening demo)
+  const mentees = [];
+  const etracks = [...Array(36).fill('general'),...Array(12).fill('entrepreneurship'),...Array(12).fill('ai')];
+  etracks.forEach(t=>mentees.push(mk('mentee',t,'accepted')));
+  for(let i=0;i<8;i++) mk('mentee',pick(['general','entrepreneurship','ai']),'waitlisted');
+  for(let i=0;i<4;i++) mk('mentee',pick(['general','ai']),'declined');
+  for(let i=0;i<2;i++) mk('mentee',pick(['general','ai']),'submitted');   // still in screening
+
+  /* acknowledgement + orientation: all accepted done EXCEPT 2 late mentees (gate demo) */
+  const DOCS = ['rules','charter','governance','pdpa','coi'];
+  const lateAck = pickN(mentees.filter(e=>e.appStatus==='accepted'),2);
+  people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus)).forEach(p=>{
+    if(lateAck.includes(p)){ p.ack = {rules:'2026-09-08'}; p.orientation=null; return; }   // partial ack, blocked
+    p.ack = Object.fromEntries(DOCS.map(d=>[d,'2026-09-0'+(2+Math.floor(rnd()*7))]));
+    p.orientation = {mode: rnd()<0.7?'live':'recorded', at:'2026-09-'+String(15+Math.floor(rnd()*10))};
+  });
+
+  /* reviews: every non-new applicant has 2 reviewer scores */
+  const REVIEWERS = {mentor:['Esther','Wei Kiat','Kenzie','Yu Tong'], mentee:['Esther','Wei Kiat','Portia','Sapranshu']};
+  const reviews = [];
+  people.forEach(p=>{
+    if(p.appStatus==='submitted') return;                     // fresh ones: not yet scored (live demo material)
+    pickN(REVIEWERS[p.kind],2).forEach(r=>reviews.push({personId:p.id,reviewer:r,score:3+Math.floor(rnd()*3),comment:pick(['Strong fit','Thoughtful application','Clear goals','Good energy, some vagueness','Solid, keep an eye on commitment'])}));
+  });
+
+  /* pairs — R1 (closed) + R2 (running). Track-pure, ≤2 mentees/mentor, no repeat mentor. */
+  const activeMentors = mentors.filter(m=>m.appStatus==='accepted');
+  const activeMentees = mentees.filter(e=>e.appStatus==='accepted');
+  const pairs=[]; let pid=1;
+  const capUsed = {};                                          // rotation -> mentorId -> count
+  const history = {};                                          // menteeId -> Set(mentorId)
+  function pairUp(rotation, mentee, statusPlan){
+    const cands = activeMentors.filter(m=>m.track===mentee.track
+      && (capUsed[rotation]?.[m.id]||0) < 2
+      && !(history[mentee.id]?.has(m.id)));
+    if(!cands.length) return null;
+    const mentor = cands[Math.floor(rnd()*cands.length)];
+    capUsed[rotation]=capUsed[rotation]||{}; capUsed[rotation][mentor.id]=(capUsed[rotation][mentor.id]||0)+1;
+    history[mentee.id]=history[mentee.id]||new Set(); history[mentee.id].add(mentor.id);
+    const pr={id:'P'+String(pid++).padStart(3,'0'), rotation, mentorId:mentor.id, menteeId:mentee.id,
+      status:statusPlan, approvedAt: rotation===1?'2026-09-28':'2026-11-30',
+      rationale:[`Same track (${TRACKS[mentee.track].label}) and mentee's development needs match the mentor's background`,
+                 `Mentee aims to ${mentee.goals}; mentor brings ${mentor.background}`,
+                 `Capacity and no-repeat checks passed`]};
+    pairs.push(pr); return pr;
+  }
+  // R1: everyone paired EXCEPT the gate-blocked (no acknowledgement → never matched, per the binding rule)
+  const r1=[]; activeMentees.filter(e=>!lateAck.includes(e)).forEach(e=>{const p=pairUp(1,e,'approved'); if(p)r1.push(p)});
+  const r1Missing = pickN(r1,3);
+  r1.forEach(p=>{ if(!r1Missing.includes(p)){ p.status='closed';
+      p.closeoff={metTwice:true,reflectionDone:true,at:'2026-11-'+String(25+Math.floor(rnd()*5)),comment:pick(['Great pairing.','Learned a lot.','We clicked well.',''])};}});
+  // R2: most paired; 8 mentees left unmatched (live matching demo); 1 mentor dropout staged
+  const unmatchedR2 = pickN(activeMentees.filter(e=>!lateAck.includes(e)),6).concat(lateAck); // 8 total, incl. 2 gate-blocked
+  activeMentees.forEach(e=>{ if(!unmatchedR2.includes(e)) pairUp(2,e,'approved'); });
+  // dropout: pick a mentor with 2 R2 pairs
+  const byMentor={}; pairs.filter(p=>p.rotation===2).forEach(p=>{(byMentor[p.mentorId]=byMentor[p.mentorId]||[]).push(p)});
+  const dropMentorId = Object.keys(byMentor).find(k=>byMentor[k].length===2) || Object.keys(byMentor)[0];
+  const dropped = people.find(p=>p.id===dropMentorId);
+  dropped.droppedOut = {at:'2026-12-10', reason:'work relocation'};
+  byMentor[dropMentorId].forEach(p=>{p.status='rematch_needed'});
+
+  /* fast-forward previews: 2 mentees with all 3 rotations closed (certificate/builder-reflection demo) */
+  const preview = pickN(activeMentees.filter(e=>!unmatchedR2.includes(e)),2);
+  preview.forEach(e=>{
+    const pr2 = pairs.find(p=>p.rotation===2 && p.menteeId===e.id);
+    if(pr2){pr2.status='closed'; pr2.closeoff={metTwice:true,reflectionDone:true,at:'2026-12-14',comment:''};}
+    const p3=pairUp(3,e,'closed'); if(p3){p3.approvedAt='2027-02-01';p3.closeoff={metTwice:true,reflectionDone:true,at:'2027-03-10',comment:''};p3.preview=true;}
+    e.previewFastForward = true;
+  });
+
+  /* events */
+  const attendedKickoff = people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus) && p.orientation).map(p=>p.id);
+  const events = {
+    kickoff:      {name:'Kickoff Night', date:'2026-10-03', attendance:pickN(attendedKickoff, Math.floor(attendedKickoff.length*0.9))},
+    appreciation: {name:'Appreciation Night', date:'2027-03-27', attendance:[]},
+  };
+
+  /* concerns: 1 sample referral */
+  const concerns = [{id:'C001', at:'2026-11-18', from:'(mentee — identity visible to Escalation Owner only)',
+    summary:'Raised a concern about repeated last-minute cancellations', status:'referred to SMC Grievance process'}];
+
+  /* email log (what would have been sent) */
+  const emails = [
+    {at:'2026-09-01', to:'all accepted', subject:'Welcome to GRMP 2026 — please acknowledge the Programme Rules', kind:'ack_notify'},
+    {at:'2026-09-08', to:'12 outstanding', subject:'Reminder: acknowledgement outstanding', kind:'ack_remind'},
+    {at:'2026-09-15', to:'4 outstanding', subject:'Final reminder: acknowledgement required to be matched', kind:'ack_final'},
+    {at:'2026-09-28', to:'all matched pairs', subject:'Your Rotation 1 match — Know Yourself', kind:'match'},
+    {at:'2026-11-25', to:'mentees', subject:'Rotation 1 close-off — two quick confirmations', kind:'closeoff'},
+    {at:'2026-11-30', to:'all matched pairs', subject:'Your Rotation 2 match — Know Your World', kind:'match'},
+  ];
+
+  /* preset accounts: 6 admins + 5 participant personas (picked deterministically) */
+  const DOCS5=['rules','charter','governance','pdpa','coi'];
+  const acctGate = people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&!(p.ack&&DOCS5.every(k=>p.ack[k])));
+  const acctFF   = people.find(p=>p.previewFastForward);
+  const acctMid  = (pairs.find(x=>x.rotation===2&&x.status==='approved'&&!people.find(pp=>pp.id===x.menteeId).previewFastForward)||{}).menteeId;
+  const acctMentor = (pairs.find(x=>x.rotation===2&&x.status==='approved')||{}).mentorId;
+  const acctBench  = people.find(p=>p.appStatus==='reserve_bench');
+  const accounts = [
+    {u:'esther',   pass:'grmp2026', kind:'admin', name:'Esther',    label:'Programme Lead'},
+    {u:'weikiat',  pass:'grmp2026', kind:'admin', name:'Wei Kiat',  label:'Programme Coordinator'},
+    {u:'kenzie',   pass:'grmp2026', kind:'admin', name:'Kenzie',    label:'Mentor Reviewer (SMU)'},
+    {u:'yutong',   pass:'grmp2026', kind:'admin', name:'Yu Tong',   label:'Mentor Reviewer (SMU)'},
+    {u:'portia',   pass:'grmp2026', kind:'admin', name:'Portia',    label:'Mentee Reviewer (SMU)'},
+    {u:'sapranshu',pass:'grmp2026', kind:'admin', name:'Sapranshu', label:'Mentee Reviewer (SMU)'},
+    {u:'mentee.new',  pass:'grmp2026', kind:'person', personId:acctGate.id,  label:'Mentee — start of journey (gates ahead)'},
+    {u:'mentee.mid',  pass:'grmp2026', kind:'person', personId:acctMid,      label:'Mentee — mid-cycle (close-off due)'},
+    {u:'mentee.done', pass:'grmp2026', kind:'person', personId:acctFF.id,    label:'Mentee — end of journey (certificate path)'},
+    {u:'mentor.active',pass:'grmp2026',kind:'person', personId:acctMentor,   label:'Mentor — active with mentees'},
+    {u:'mentor.bench', pass:'grmp2026',kind:'person', personId:acctBench.id, label:'Mentor — reserve bench'},
+  ];
+
+  return {
+    version:1, today:TODAY,
+    archives:[], aiCache:{}, sessions:{},
+    config:{
+      cohort:{id:'C2026', label:'GRMP 2026 (SMU pilot)'},
+      accounts,
+      cycle:'GRMP 2026 (SMU pilot)',
+      rotations:[{n:1,label:'Know Yourself',start:'2026-10-01',end:'2026-11-30'},
+                 {n:2,label:'Know Your World',start:'2026-12-01',end:'2027-01-31'},
+                 {n:3,label:'Know Your Path',start:'2027-02-01',end:'2027-03-31'}],
+      ackLadder:[{week:'Sept W1',date:'2026-09-01',what:'Acknowledgement notification'},
+                 {week:'Sept W2',date:'2026-09-08',what:'First reminder'},
+                 {week:'Sept W3',date:'2026-09-15',what:'Final reminder'}],
+      admins:[{name:'Esther', role:'Programme Lead', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
+              {name:'Wei Kiat', role:'Programme Coordinator', roles:['coordinator','mentor_reviewer','mentee_reviewer']},
+              {name:'Kenzie', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer']},
+              {name:'Yu Tong', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer','dashboard_viewer']},
+              {name:'Portia', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']},
+              {name:'Sapranshu', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']}],
+      openItems:{
+        Q1:{title:'Reflection Sheet lives on the microsite; system records close-offs only', inferred:true},
+        Q2:{title:'Certificate after all 3 rotations (mentee: 3 close-offs + Builder Reflection; mentor: all rotations + mid-programme review)', inferred:true},
+        Q3:{title:'One track per mentee; matching strictly within track; priority = development-need fit → industry → diversity', inferred:true},
+        Q4:{title:'Form fields follow Working Design §3 until Joanne’s final form arrives', inferred:true},
+        Q5:{title:'No acknowledgement after the final reminder → treated as withdrawn, seat freed', inferred:true},
+        Q6:{title:'Concern link on microsite + acknowledgement page; Esther is sole recipient', inferred:true},
+        Q7:{title:'Lean scope: no pair/meeting/availability tracking, no kickoff-goals form, no reflection content stored', inferred:true},
+        Q8:{title:'Placeholder dates: registration early Sept · Kickoff early Oct · microsite live before registration', inferred:true},
+      },
+    },
+    people, reviews, pairs, events, concerns, emails,
+    midreviews:[], builderReflections:[], certificates:[], audit:[],
+  };
+}
+
+/* ---------- store API ---------- */
+const Store = {
+  load(){
+    try{ const raw = localStorage.getItem(DB_KEY); if(raw){ const db=JSON.parse(raw); if(db.version===1) return db; } }catch(e){}
+    const db = buildSeed(); localStorage.setItem(DB_KEY, JSON.stringify(db)); return db;
+  },
+  save(db){ localStorage.setItem(DB_KEY, JSON.stringify(db)); },
+  reset(){ localStorage.removeItem(DB_KEY); return Store.load(); },
+};
+
+/* ---------- domain helpers (shared by views + tests) ---------- */
+const D = {
+  person:(db,id)=>db.people.find(p=>p.id===id),
+  mentors:db=>db.people.filter(p=>p.kind==='mentor'),
+  mentees:db=>db.people.filter(p=>p.kind==='mentee'),
+  ackComplete:p=>p.ack && ['rules','charter','governance','pdpa','coi'].every(d=>p.ack[d]),
+  gateBlocked:p=>['accepted'].includes(p.appStatus) && !(D.ackComplete(p) && p.orientation),
+  currentRotation:db=>{const t=db.today;return db.config.rotations.find(r=>t>=r.start&&t<=r.end)||null},
+  pairsFor:(db,personId)=>db.pairs.filter(p=>p.mentorId===personId||p.menteeId===personId),
+  capacityLeft:(db,mentorId,rotation)=>2 - db.pairs.filter(p=>p.rotation===rotation&&p.mentorId===mentorId&&p.status!=='rejected').length,
+  repeatMentor:(db,menteeId,mentorId)=>db.pairs.some(p=>p.menteeId===menteeId&&p.mentorId===mentorId&&p.status!=='rejected'),
+  menteeCloseoffs:(db,menteeId)=>db.pairs.filter(p=>p.menteeId===menteeId&&p.status==='closed'&&p.closeoff),
+  certEligible:(db,p)=>{
+    if(p.kind==='mentee'){
+      return D.menteeCloseoffs(db,p.id).length>=3 && db.builderReflections.some(b=>b.menteeId===p.id);
+    }
+    const served = db.pairs.some(x=>x.mentorId===p.id&&['approved','closed'].includes(x.status));
+    const earlyServed = db.pairs.some(x=>x.mentorId===p.id&&x.rotation<=2&&['approved','closed','replaced'].includes(x.status));
+    return served && (!earlyServed || db.midreviews.some(m=>m.mentorId===p.id));
+  },
+  aiSummary:p=>{                                   // simulated AI output, clearly labelled in UI
+    if(p.kind==='mentor')
+      return `${p.role} at ${p.org} (${p.background}). ${p.xcultural}; ${p.leadership}. Track: ${p.track}. Motivation: ${p.motivation}. No flags.`;
+    return `${p.university} ${p.course}, year ${p.year}. Goal: ${p.goals}. Development needs: ${p.devNeeds}. Track: ${p.track}. Ready to reflect. No flags.`;
+  },
+  aiRationale:(mentor,mentee)=>[
+    `Same ${TRACKS[mentee.track].label} track; mentee's needs (${mentee.devNeeds.split(';')[0].trim()}) match the mentor's strengths`,
+    `Mentee aims to ${mentee.goals}; mentor offers ${mentor.background} at ${mentor.org}`,
+    `Constraint checks passed: capacity, no conflict, no repeat mentor`,
+  ],
+  /* actions (all mutations go through here — the demo's "backend") */
+  submitApplication(db, kind, fields){
+    const required = kind==='mentee' ? ['name','email','track','course','goals','consent'] : ['name','email','track','org','role','consent'];
+    const missing = required.filter(k=>!fields[k]);
+    const id=(kind==='mentor'?'M':'E')+String(900+db.people.filter(p=>p.id[0]===(kind==='mentor'?'M':'E')).length);
+    const p={id,kind,track:fields.track||null,name:fields.name||'(no name)',email:fields.email||'',mobile:fields.mobile||'',
+      appStatus:missing.length?'incomplete':'submitted',submittedAt:db.today,ack:null,orientation:null,source:'form',...fields};
+    db.people.push(p);
+    db.emails.push({at:db.today,to:p.email||'(applicant)',kind:missing.length?'missing_info':'confirm',
+      subject:missing.length?`Your GRMP application is missing: ${missing.join(', ')}`:`GRMP: application received — thank you, ${p.name}`});
+    db.audit.push({at:db.today,actor:'system',action:missing.length?'application_incomplete':'application_submitted',entity:id});
+    return {person:p,missing};
+  },
+  score(db, personId, reviewer, score, comment){
+    db.reviews.push({personId,reviewer,score,comment});
+    db.audit.push({at:db.today,actor:reviewer,action:'scored',entity:personId});
+  },
+  decide(db, personId, decision, actor){
+    const p=D.person(db,personId); p.appStatus=decision;
+    const subj={accepted:'You’re in! Next: acknowledge the Programme Rules',reserve_bench:'You’re on our mentor reserve bench',
+      waitlisted:'GRMP: you’re on the waitlist',declined:'GRMP: application outcome'}[decision];
+    db.emails.push({at:db.today,to:p.email,kind:'decision',subject:subj});
+    db.audit.push({at:db.today,actor,action:'decision:'+decision,entity:personId});
+  },
+  acknowledge(db, personId, docKey){
+    const p=D.person(db,personId); p.ack=p.ack||{}; p.ack[docKey]=db.today;
+    db.audit.push({at:db.today,actor:personId,action:'acknowledged:'+docKey,entity:personId});
+  },
+  completeOrientation(db, personId, mode){
+    const p=D.person(db,personId); p.orientation={mode,at:db.today};
+    db.audit.push({at:db.today,actor:personId,action:'orientation:'+mode,entity:personId});
+  },
+  suggestMatches(db, rotation, track){
+    const mentees=db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&p.track===track
+      && !D.gateBlocked(p) && !db.pairs.some(x=>x.rotation===rotation&&x.menteeId===p.id&&['proposed','approved','closed'].includes(x.status)));
+    const out=[];
+    mentees.forEach(e=>{
+      const cands=db.people.filter(m=>m.kind==='mentor'&&['accepted'].includes(m.appStatus)&&!m.droppedOut&&m.track===track
+        && D.capacityLeft(db,m.id,rotation)>0 && !D.repeatMentor(db,e.id,m.id));
+      if(cands.length){
+        const m=cands[0];
+        const pr={id:'P'+String(db.pairs.length+1).padStart(3,'0'),rotation,mentorId:m.id,menteeId:e.id,
+          status:'proposed',rationale:D.aiRationale(m,e)};
+        db.pairs.push(pr); out.push(pr);
+      }
+    });
+    db.audit.push({at:db.today,actor:'AI',action:`suggested ${out.length} pairs (R${rotation}/${track})`,entity:'matching'});
+    return out;
+  },
+  approvePair(db, pairId, actor){
+    const pr=db.pairs.find(p=>p.id===pairId); pr.status='approved'; pr.approvedAt=db.today;
+    const m=D.person(db,pr.mentorId), e=D.person(db,pr.menteeId);
+    db.emails.push({at:db.today,to:`${m.email}, ${e.email}`,kind:'match',subject:`Your Rotation ${pr.rotation} match: ${m.name} ↔ ${e.name}`});
+    db.audit.push({at:db.today,actor,action:'pair_approved',entity:pairId});
+  },
+  closeoff(db, pairId, metTwice, reflectionDone, comment){
+    const pr=db.pairs.find(p=>p.id===pairId);
+    pr.status='closed'; pr.closeoff={metTwice,reflectionDone,comment:comment||'',at:db.today};
+    db.audit.push({at:db.today,actor:pr.menteeId,action:'closeoff',entity:pairId});
+  },
+  submitMidReview(db, mentorId, text){
+    db.midreviews.push({mentorId,text,at:db.today});
+    db.audit.push({at:db.today,actor:mentorId,action:'mid_review',entity:mentorId});
+  },
+  submitBuilderReflection(db, menteeId, text){
+    db.builderReflections.push({menteeId,text,at:db.today});
+    db.audit.push({at:db.today,actor:menteeId,action:'builder_reflection',entity:menteeId});
+  },
+  issueCertificates(db, actor){
+    const issued=[];
+    db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus)).forEach(p=>{
+      if(D.certEligible(db,p) && !db.certificates.some(c=>c.personId===p.id)){
+        db.certificates.push({personId:p.id,at:db.today}); issued.push(p);
+        db.emails.push({at:db.today,to:p.email,kind:'certificate',subject:`Your GRMP 2026 completion certificate, ${p.name}`});
+      }
+    });
+    db.audit.push({at:db.today,actor,action:`certificates_issued:${issued.length}`,entity:'certificates'});
+    return issued;
+  },
+  promoteWaitlist(db, personId, actor){
+    const p=D.person(db,personId); p.appStatus='accepted';
+    db.emails.push({at:db.today,to:p.email,kind:'decision',subject:'Good news — a place has opened up for you in GRMP'});
+    db.audit.push({at:db.today,actor,action:'waitlist_promoted',entity:personId});
+  },
+  replaceMentor(db, pairId, benchMentorId, actor){
+    const old=db.pairs.find(p=>p.id===pairId);
+    const bench=D.person(db,benchMentorId); bench.appStatus='accepted';
+    const pr={id:'P'+String(db.pairs.length+1).padStart(3,'0'),rotation:old.rotation,mentorId:benchMentorId,menteeId:old.menteeId,
+      status:'approved',approvedAt:db.today,rationale:['Reserve-bench replacement after mentor dropout',...D.aiRationale(bench,D.person(db,old.menteeId)).slice(0,1)]};
+    old.status='replaced';
+    db.pairs.push(pr);
+    const e=D.person(db,old.menteeId);
+    db.emails.push({at:db.today,to:e.email,kind:'match',subject:`Your new mentor for Rotation ${old.rotation}: ${bench.name}`});
+    db.audit.push({at:db.today,actor,action:'mentor_replaced',entity:pairId});
+    return pr;
+  },
+  toggleAttendance(db, eventKey, personId){
+    const ev = db.events[eventKey]; if(!ev) return;
+    const i = ev.attendance.indexOf(personId);
+    if(i>=0) ev.attendance.splice(i,1); else ev.attendance.push(personId);
+    db.audit.push({at:db.today,actor:'coordinator',action:'attendance:'+eventKey,entity:personId});
+  },
+  remindCloseoff(db, email){
+    db.emails.push({at:db.today,to:email,kind:'closeoff',subject:'Reminder: please close off your rotation (two quick confirmations)'});
+  },
+  confirmReturn(db, personId){
+    const p = D.person(db, personId);
+    if(!p || p.appStatus!=='invited') return false;
+    p.appStatus='accepted';
+    db.emails.push({at:db.today,to:p.email,kind:'decision',subject:`Welcome back to ${db.config.cohort.label}, ${p.name}!`});
+    db.audit.push({at:db.today,actor:personId,action:'returning_mentor_confirmed',entity:personId});
+    return true;
+  },
+  startNewCycle(db, opts){
+    // opts: {label, rotations:[{n,label,start,end}x3], ackLadder?, today, actor, carryOverMentors=true}
+    const old = db.config.cohort;
+    const closed = n=>db.pairs.filter(x=>x.rotation===n&&x.status==='closed').length;
+    db.archives.push({id:old.id, label:old.label, archivedAt:db.today,
+      stats:{mentors:db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length,
+             mentees:db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length,
+             r1:closed(1), r2:closed(2), r3:closed(3),
+             certificates:db.certificates.length,
+             kickoff:db.events.kickoff.attendance.length}});
+    const carry = opts.carryOverMentors!==false;
+    const keep = carry ? db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)) : [];
+    keep.forEach(m=>{ m.appStatus='invited'; m.ack=null; m.orientation=null; delete m.droppedOut; });
+    db.people = keep;
+    db.reviews=[]; db.pairs=[]; db.midreviews=[]; db.builderReflections=[]; db.certificates=[]; db.concerns=[];
+    db.emails=[{at:opts.today,to:carry?keep.length+' returning mentors':'—',kind:'decision',
+      subject:`${opts.label}: invitation to return as a mentor`}];
+    const newId = 'C'+(opts.rotations[0].start||'').slice(0,4);
+    db.events = {kickoff:{name:'Kickoff Night', date:opts.kickoffDate||opts.rotations[0].start, attendance:[]},
+                 appreciation:{name:'Appreciation Night', date:opts.appreciationDate||opts.rotations[2].end, attendance:[]}};
+    db.config.cohort = {id:newId, label:opts.label};
+    db.config.cycle = opts.label;
+    db.config.rotations = opts.rotations;
+    if(opts.ackLadder) db.config.ackLadder = opts.ackLadder;
+    db.today = opts.today;
+    db.audit.push({at:opts.today,actor:opts.actor||'lead',action:'new_cycle_started:'+newId+' (archived '+old.id+')',entity:'config'});
+    return newId;
+  },
+  setToday(db, dateStr){
+    db.today = dateStr;
+    db.audit.push({at:dateStr,actor:'demo',action:'clock_set:'+dateStr,entity:'config'});
+  },
+  raiseConcern(db, summary){
+    const c={id:'C'+String(db.concerns.length+1).padStart(3,'0'),at:db.today,from:'(identity visible to Escalation Owner only)',
+      summary,status:'referred to SMC Grievance process'};
+    db.concerns.push(c);
+    db.audit.push({at:db.today,actor:'(private)',action:'concern_referred',entity:c.id});
+    return c;
+  },
+};
+const GRMP_EXPORT = {Store, D, TRACKS, DB_KEY, buildSeed};
+if (typeof window !== 'undefined') window.GRMP = GRMP_EXPORT;
+if (typeof module !== 'undefined' && module.exports) module.exports = GRMP_EXPORT;
+
+</script>
+<script>
+/* GRMP Demo — live AI layer (Gemini free tier), with graceful degradation.
+   Design: pages render instantly with the simulated text, then upgrade in place
+   when Gemini responds. Any failure (timeout / quota / offline) silently keeps
+   the simulated version — the demo can never break because of the AI.
+   The key is a free-tier demo key by deliberate choice; responses are cached
+   per browser so each summary is generated once. Automated test runs
+   (navigator.webdriver) skip live calls entirely. */
+
+const AI = {
+  key: 'AIzaSyB6OATmFTq1xAZvkAqA1Ch_FJUQHNSoFsw',
+  model: 'gemini-flash-latest',
+  enabled: (typeof navigator!=='undefined' && !navigator.webdriver),
+  cache: (()=>{ try{ return JSON.parse(localStorage.getItem('grmp_ai_cache')||'{}'); }catch(e){ return {}; } })(),
+
+  async gen(id, prompt){
+    if(this.cache[id]) return this.cache[id];
+    if(!this.enabled) return null;
+    if(typeof google!=='undefined' && google.script && google.script.run){
+      try{
+        const txt = await new Promise((res,rej)=>google.script.run
+          .withSuccessHandler(res).withFailureHandler(rej)
+          .aiGen((window.SESSION_TOKEN_FN&&window.SESSION_TOKEN_FN())||null, id, prompt));
+        if(txt){ this.cache[id]=txt; try{localStorage.setItem('grmp_ai_cache',JSON.stringify(this.cache));}catch(e){} }
+        return txt||null;
+      }catch(e){ return null; }
+    }
+    try{
+      const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 10000);
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-goog-api-key':this.key},
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}]}),
+        signal:ctl.signal});
+      clearTimeout(t);
+      if(!r.ok) return null;
+      const j = await r.json();
+      const txt = ((((j.candidates||[])[0]||{}).content||{}).parts||[]).map(p=>p.text||'').join('').trim();
+      if(!txt) return null;
+      this.cache[id]=txt;
+      try{ localStorage.setItem('grmp_ai_cache', JSON.stringify(this.cache)); }catch(e){}
+      return txt;
+    }catch(e){ return null; }
+  },
+
+  summaryPrompt(p){
+    const data = p.kind==='mentor'
+      ? {role:p.role, organisation:p.org, industry:p.industry, background:p.background,
+         leadership:p.leadership, crossCultural:p.xcultural, languages:p.languages,
+         motivation:p.motivation, track:p.track}
+      : {university:p.university, course:p.course, year:p.year, goals:p.goals,
+         developmentNeeds:p.devNeeds, industryInterest:p.industryInterest,
+         expectations:p.expectations, readinessToReflect:p.readiness, track:p.track};
+    return `You are assisting volunteer reviewers of GRMP, a Singapore mentorship programme.
+Summarise this ${p.kind} application in 3 short factual sentences a busy reviewer can scan.
+Do NOT recommend accepting or rejecting. No greetings, no markdown, plain text only.
+Application data: ${JSON.stringify(data)}`;
+  },
+
+  rationalePrompt(mentor, mentee){
+    return `A Singapore mentorship programme pairs mentees with mentors inside the same track.
+In exactly 3 short plain-language lines (one reason per line, no markdown, no numbering),
+explain why this pairing could work well. Be specific to the data.
+Mentee: ${JSON.stringify({course:mentee.course, year:mentee.year, goals:mentee.goals, needs:mentee.devNeeds, industryInterest:mentee.industryInterest, track:mentee.track})}
+Mentor: ${JSON.stringify({role:mentor.role, organisation:mentor.org, industry:mentor.industry, background:mentor.background, motivation:mentor.motivation, track:mentor.track})}`;
+  },
+};
+if (typeof window!=='undefined') window.AI = AI;
+
+</script>
+<script>
+/* GRMP Demo — public views: microsite (manual ch.1) + personal pages (ch.2–3). */
+
+const Views = {
+
+/* ---------- shared microsite chrome ---------- */
+msNav(){
+  return `<nav class="ms-nav"><div class="wrap row">
+    <a href="#/" class="ms-logo" style="text-decoration:none">SMC · GRMP<small>GLOBAL READY MENTORSHIP</small></a>
+    <span class="spacer"></span>
+    <a href="#/guide/mentee">For Mentees</a>
+    <a href="#/guide/mentor">For Mentors</a>
+    <a href="#/reflection">Reflection Sheet</a>
+    <a href="#/apply/mentee" class="btn sm" style="background:#fff;color:var(--red);border-radius:8px">Apply</a>
+  </div></nav>`;
+},
+msFooter(){
+  return `<footer class="ms-footer"><div class="wrap" style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+    <span>Singapore Mentorship Committee · GRMP 2026 (SMU pilot)</span>
+    <span class="spacer" style="flex:1"></span>
+    <a href="#/concern">Raise a concern (private)</a>
+  </div></footer>`;
+},
+
+/* ---------- 1.1 landing ---------- */
+landing(){
+  const t = GRMP.TRACKS;
+  return this.msNav() + `
+  <header class="ms-hero"><div class="wrap">
+    <div class="eyebrow">Singapore Mentorship Committee · Global Ready for SG100</div>
+    <h1>Six months. Three mentors. A global-ready you.</h1>
+    <p>The Global Ready Mentorship Programme pairs SMU students and young professionals with senior
+       leaders across three rotations — October 2026 to March 2027. One hour with the right mentor
+       can reframe a career.</p>
+    <div class="cta">
+      <a class="btn btn-light" href="#/apply/mentee" style="text-decoration:none">Apply as Mentee</a>
+      <a class="btn btn-line" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+    </div>
+  </div></header>
+  <div class="ms-strip">Cycle 1 is piloted with SMU · 60 mentors · 60 mentees · applications reviewed by the programme team</div>
+
+  <section class="ms-section"><div class="wrap">
+    <h2>Three tracks, one journey</h2>
+    <p class="lede">Choose the track that matches where you want to grow. You'll be matched with a different mentor from your track in each rotation.</p>
+    <div class="cards3">
+      <div class="tcard"><div class="glyph" style="background:#1A56A0">G</div><h3>General</h3>
+        <p>Mentors from Finance, Tech, Communications, HR, Education and more — for building a strong career foundation.</p></div>
+      <div class="tcard"><div class="glyph" style="background:#B85C1E">E</div><h3>Entrepreneurship</h3>
+        <p>Builders and founders — for those testing whether the founder's path is theirs.</p></div>
+      <div class="tcard"><div class="glyph" style="background:#6D5CF0">AI</div><h3>AI</h3>
+        <p>Practitioners applying AI in real workplaces — for careers that ride the wave instead of watching it.</p></div>
+    </div>
+  </div></section>
+
+  <section class="ms-section" style="padding-top:0"><div class="wrap">
+    <h2>How the six months run</h2>
+    <p class="lede">Every step below is handled on this platform — no forms lost in inboxes, no chasing.</p>
+    <div class="timeline">
+      <div class="tl-node"><div class="dot">1</div><h4>Apply · Sept</h4><p>One form, reviewed by the programme team</p></div>
+      <div class="tl-node"><div class="dot">2</div><h4>Acknowledge</h4><p>Programme Rules, PDPA & conduct — digital, timestamped</p></div>
+      <div class="tl-node"><div class="dot">3</div><h4>Orientation & Kickoff · Oct</h4><p>Required before Rotation 1</p></div>
+      <div class="tl-node"><div class="dot">4</div><h4>3 rotations · Oct–Mar</h4><p>Know Yourself · Know Your World · Know Your Path</p></div>
+      <div class="tl-node"><div class="dot">5</div><h4>Close-off each rotation</h4><p>Two meetings + your private reflection</p></div>
+      <div class="tl-node"><div class="dot">6</div><h4>Certificate · Mar</h4><p>Complete all three rotations</p></div>
+    </div>
+  </div></section>
+
+  <section class="ms-section" style="background:var(--surface);border-top:1px solid var(--line)"><div class="wrap" style="display:flex;gap:26px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:260px">
+      <h2 style="margin-bottom:8px">Mentors: two hours a month that change a trajectory</h2>
+      <p class="lede" style="margin:0">Meet your mentee at least twice per two-month rotation, at times you both choose.
+      No admin burden — the platform handles everything except the conversation.</p>
+    </div>
+    <a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+  </div></section>` + this.msFooter();
+},
+
+/* ---------- 1.2 guides ---------- */
+guideMentee(){
+  return this.msNav() + `<div class="doc-page">
+    <h1>Mentee Guide</h1>
+    <p class="lede">What's expected of you, and what you can expect from GRMP.</p>
+    <div class="doc-card"><h3>Your role</h3><ul>
+      <li>You own the relationship: reach out first, propose times, come prepared.</li>
+      <li>Meet your mentor at least twice per rotation.</li>
+      <li>Write your private reflection after each rotation, then close off on your personal page.</li></ul></div>
+    <div class="doc-card"><h3>Preparation expectations</h3><ul>
+      <li>Before each meeting: one topic you want to explore, one question you can't answer alone.</li>
+      <li>After: capture what shifted in your Reflection Sheet.</li></ul></div>
+    <div class="doc-card"><h3>Conduct</h3><ul>
+      <li>Respect your mentor's time and confidentiality. Mentorship is guidance, not job placement.</li>
+      <li>Concerns can be raised privately via the link in the footer.</li></ul></div>
+    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — final wording comes from the programme team's mentee guide.</p>
+  </div>` + this.msFooter();
+},
+guideMentor(){
+  return this.msNav() + `<div class="doc-page">
+    <h1>Mentor Brief</h1>
+    <p class="lede">Thank you for volunteering. Here's the shape of the commitment.</p>
+    <div class="doc-card"><h3>Role expectations</h3><ul>
+      <li>Up to two mentees per rotation; at least two meetings with each per rotation.</li>
+      <li>Share honestly — your career's real turns are the curriculum.</li></ul></div>
+    <div class="doc-card"><h3>Boundaries & confidentiality</h3><ul>
+      <li>What your mentee shares stays between you, except safety concerns (use the private concern link).</li>
+      <li>Mentorship is not recruitment; avoid conflicts of interest.</li></ul></div>
+    <div class="doc-card"><h3>Your one checkpoint</h3><ul>
+      <li>A single short mid-programme review in January — two minutes, on your personal page.</li></ul></div>
+    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — final wording comes from the programme team's mentor brief.</p>
+  </div>` + this.msFooter();
+},
+
+/* ---------- 1.3 reflection sheet ---------- */
+reflection(){
+  return this.msNav() + `<div class="doc-page">
+    <h1>Reflection Sheet</h1>
+    <div class="privacy-note">🔒 <span>This reflection is <b>yours</b>. The platform never stores what you write here —
+      it records only your end-of-rotation close-off. Keep this document anywhere private (your notes app, a doc, paper).</span></div>
+    ${inferred('Q1')}
+    <div class="doc-card"><h3>Rotation 1 — Know Yourself</h3><ul>
+      <li>What did I learn about my strengths that I didn't know in September?</li>
+      <li>Which assumption about my career did this rotation challenge?</li>
+      <li>One thing my mentor said that I keep thinking about.</li></ul></div>
+    <div class="doc-card"><h3>Rotation 2 — Know Your World</h3><ul>
+      <li>How does my target industry actually work, beyond what I imagined?</li>
+      <li>Where does my track (General / Entrepreneurship / AI) fit into that world?</li></ul></div>
+    <div class="doc-card"><h3>Rotation 3 — Know Your Path</h3><ul>
+      <li>What path am I now considering that I wasn't before?</li>
+      <li>What would I tell September-me?</li></ul></div>
+    <p style="font-size:13px;color:var(--ink-2)">When you've reflected, go to your personal page (from your email link) and complete the one-minute close-off.</p>
+  </div>` + this.msFooter();
+},
+
+/* ---------- 1.4 concern ---------- */
+concern(){
+  return this.msNav() + `<div class="doc-page" style="max-width:560px">
+    <h1>Raise a concern</h1>
+    <p class="lede">If something in your mentoring experience isn't right — for example inappropriate behaviour —
+      tell us here, privately.</p>
+    <div class="privacy-note">🔒 <span>Your report goes <b>only</b> to the designated Escalation Owner (Esther).
+      Coordinators, reviewers and IT support cannot see it. The case is handled under SMC's Grievance &amp;
+      Misconduct process — this platform records only that a referral was made.</span></div>
+    ${inferred('Q6')}
+    <div class="form">
+      <div class="f-row"><label>What happened? <span class="req">*</span></label>
+        <textarea id="cn-text" placeholder="Describe the concern in your own words"></textarea></div>
+      <button class="btn btn-primary" data-act="raiseConcern">Submit privately</button>
+    </div>
+  </div>` + this.msFooter();
+},
+
+/* ---------- 1.5/1.6 apply forms ---------- */
+apply(kind){
+  const mentee = kind==='mentee';
+  return this.msNav() + `<div class="doc-page" style="max-width:640px">
+    <h1>${mentee?'Apply as a Mentee':'Register as a Mentor'}</h1>
+    <p class="lede">${mentee?'GRMP 2026 · October to March · reviewed by the programme team.':'Welcome — this is the registration linked from your invitation.'}</p>
+    ${inferred('Q4')}
+    <div class="form" id="apply-form">
+      <div class="f-grid2">
+        <div class="f-row"><label>Full name <span class="req">*</span></label><input type="text" id="f-name" placeholder="Your name"></div>
+        <div class="f-row"><label>Email <span class="req">*</span></label><input type="email" id="f-email" placeholder="you@example.com"></div>
+      </div>
+      <div class="f-grid2">
+        <div class="f-row"><label>Mobile</label><input type="text" id="f-mobile" placeholder="+65"></div>
+        ${mentee
+          ? `<div class="f-row"><label>Course at SMU <span class="req">*</span></label><input type="text" id="f-course" placeholder="e.g. Business Management"></div>`
+          : `<div class="f-row"><label>Organisation <span class="req">*</span></label><input type="text" id="f-org" placeholder="Company / venture"></div>`}
+      </div>
+      ${mentee ? `
+      <div class="f-grid2">
+        <div class="f-row"><label>Year of study</label><select id="f-year"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>Postgraduate</option></select></div>
+        <div class="f-row"><label>Industry interest</label><input type="text" id="f-ind" placeholder="e.g. Finance"></div>
+      </div>
+      <div class="f-row"><label>Your goals for GRMP <span class="req">*</span></label><textarea id="f-goals" placeholder="What do you want out of these six months?"></textarea></div>
+      <div class="f-row"><label>Development needs</label><input type="text" id="f-dev" placeholder="e.g. confidence; networking"></div>
+      <div class="f-row"><label>What do you expect from a mentor?</label><input type="text" id="f-exp"></div>
+      <div class="f-row"><label>Readiness to reflect</label><input type="text" id="f-read" placeholder="How do you usually reflect on experiences?"></div>`
+      : `
+      <div class="f-grid2">
+        <div class="f-row"><label>Role / title <span class="req">*</span></label><input type="text" id="f-role" placeholder="e.g. Director"></div>
+        <div class="f-row"><label>Industry</label><input type="text" id="f-ind" placeholder="e.g. Technology"></div>
+      </div>
+      <div class="f-row"><label>Professional background</label><textarea id="f-bg" placeholder="A few lines on your experience"></textarea></div>
+      <div class="f-grid2">
+        <div class="f-row"><label>Leadership experience</label><input type="text" id="f-lead"></div>
+        <div class="f-row"><label>Global / cross-cultural exposure</label><input type="text" id="f-x"></div>
+      </div>
+      <div class="f-grid2">
+        <div class="f-row"><label>Languages</label><input type="text" id="f-lang" placeholder="English, ..."></div>
+        <div class="f-row"><label>Why mentor with GRMP?</label><input type="text" id="f-mot"></div>
+      </div>
+      <div class="inferred" style="margin:6px 0 14px"><span class="tag">RULE</span><div>Every mentor is allocated <b>up to two mentees</b> — fixed by the programme, so we don't ask. We also don't collect weekly availability: meeting times are yours and your mentee's to arrange.</div></div>`}
+      <div class="f-row"><label>Choose your track <span class="req">*</span></label>
+        <div class="track-pick">
+          <div class="track-opt" data-track="general" data-act="pickTrack"><h4>General</h4><p>Finance · Tech · Comms · HR · Education</p></div>
+          <div class="track-opt" data-track="entrepreneurship" data-act="pickTrack"><h4>Entrepreneurship</h4><p>Founders & builders</p></div>
+          <div class="track-opt" data-track="ai" data-act="pickTrack"><h4>AI</h4><p>AI applied in the workplace</p></div>
+        </div>${inferred('Q3')}</div>
+      <label class="f-row f-check" style="display:flex"><input type="checkbox" id="f-consent">
+        <span>I consent to SMC collecting and using this information to run GRMP, per the PDPA consent statement. <span class="req">*</span></span></label>
+      <button class="btn btn-primary" data-act="submitApply" data-kind="${kind}">Submit ${mentee?'application':'registration'}</button>
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Submitting with missing required fields saves your application as
+        <b>incomplete</b> and sends a reminder — try it: that behaviour is part of the demo.</p>
+    </div>
+  </div>` + this.msFooter();
+},
+
+/* ---------- applied confirmation ---------- */
+applied(personId){
+  const p = GRMP.D.person(__demo.db, personId);
+  if(!p) return this.landing();
+  const ok = p.appStatus==='submitted';
+  return this.msNav() + `<div class="doc-page" style="max-width:560px;text-align:center">
+    <div style="font-size:44px;margin:16px 0">${ok?'✅':'🟡'}</div>
+    <h1 style="font-size:24px">${ok?'Application received':'Saved — but incomplete'}</h1>
+    <p class="lede">${ok
+      ? `Thank you, ${esc(p.name)}. A confirmation email is on its way. The programme team reviews applications and you'll hear the outcome by email — every next step will arrive as a personal link, no account needed.`
+      : `We saved what you entered, ${esc(p.name)}, and emailed you a reminder listing what's missing. Your application enters review once it's complete.`}</p>
+    <div class="card" style="text-align:left"><h3>What happens behind the scenes</h3>
+      <p style="font-size:13px;color:var(--ink-2);margin:0">Your application is now in the master tracker with status
+      <b>${esc(p.appStatus)}</b> — visible to reviewers in the admin console. Open the console from the
+      <b>Open as…</b> switcher (bottom-left) to see the other side of this demo.</p></div>
+    <a class="btn btn-ghost" href="#/" style="text-decoration:none">Back to the microsite</a>
+  </div>` + this.msFooter();
+},
+
+/* ---------- manual pointer ---------- */
+manual(){
+  return this.msNav() + `<div class="doc-page">
+    <h1>User manual</h1>
+    <p class="lede">The full manual (also the build spec and test script) ships in the repository:
+      <b>USER_MANUAL.md</b>. Chapters: 1 Microsite · 2 Mentee · 3 Mentor · 4 Reviewer · 5 Programme Lead ·
+      6 Coordinator · 7 Escalation Owner · 8 Admin.</p>
+    <p><a href="USER_MANUAL.md" target="_blank" rel="noopener">Open the manual ↗</a></p>
+  </div>` + this.msFooter();
+},
+
+/* ---------- changelog (acceptance loop, public) ---------- */
+changelog(){
+  setTimeout(async ()=>{
+    const box = document.getElementById('cl-body');
+    if(!box) return;
+    const url = (typeof FEEDBACK_URL!=='undefined') && FEEDBACK_URL;
+    if(!url){ box.innerHTML = '<p style="color:var(--ink-3)">The feedback channel is being connected — check back shortly.</p>'; return; }
+    try{
+      const r = await fetch(url+'?list=1'); const j = await r.json();
+      j.items = (j.items||[]).filter(it=>!String(it.page||'').startsWith('DECISION:'));
+      if(!j.ok || !j.items.length){ box.innerHTML='<p style="color:var(--ink-3)">No feedback yet — be the first: every screen has a 💬 Feedback button.</p>'; return; }
+      const chip = s => s==='fixed' ? '<span class="badge b-ok"><span class="d"></span>Fixed</span>'
+        : s==='in_progress' ? '<span class="badge b-warn"><span class="d"></span>In progress</span>'
+        : s==='wont_fix' ? '<span class="badge b-neut"><span class="d"></span>Not planned</span>'
+        : '<span class="badge b-ai">New</span>';
+      box.innerHTML = j.items.map(it=>`<div class="doc-card" style="padding:14px 18px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${chip(it.status)}
+          <b style="font-size:13px">${it.author&&it.author!=='anonymous'?it.author:'Someone'}</b>
+          <span style="font-size:11.5px;color:var(--ink-3)">${it.ts} · on ${it.page} · as ${it.role}</span></div>
+        <p style="font-size:13.5px;margin:8px 0 0">${it.text}</p>
+        ${it.note?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--ok);background:var(--ok-wash);border-radius:8px;padding:8px 12px"><b>Build team:</b> ${it.note}${it.resolvedAt?' · '+it.resolvedAt:''}</p>`:''}
+      </div>`).join('');
+    }catch(e){ box.innerHTML='<p style="color:var(--ink-3)">Could not load right now — refresh in a minute.</p>'; }
+  }, 50);
+  return this.msNav() + `<div class="doc-page">
+    <h1>Changelog — your feedback, our fixes</h1>
+    <p class="lede">Every screen has a 💬 Feedback button. What you send lands here with a status; small fixes usually ship within a day.</p>
+    <div id="cl-body"><p style="color:var(--ink-3)">Loading…</p></div>
+  </div>` + this.msFooter();
+},
+
+/* ---------- decisions register (replaces the Round 2 sheet) ---------- */
+decisions(){
+  setTimeout(async ()=>{
+    await loadDecisions();
+    const box=document.getElementById('dc-body'); if(!box) return;
+    const items = Object.entries(__demo.db.config.openItems).map(([q,it])=>{
+      const dec = decisionCache && decisionCache[q];
+      const chip = dec ? (dec.kind==='confirm'
+        ? `<span class="badge b-ok"><span class="d"></span>Confirmed · ${dec.author} · ${dec.ts}</span>`
+        : `<span class="badge b-warn"><span class="d"></span>Change requested · ${dec.author}</span>`)
+        : '<span class="badge b-ai">Awaiting confirmation</span>';
+      return `<div class="doc-card" style="padding:14px 18px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${q}</b>${chip}</div>
+        <p style="font-size:13.5px;margin:6px 0 0">${it.title}</p>
+        ${dec&&dec.kind==='change'?`<p style="font-size:12.5px;margin:6px 0 0;color:var(--warn)">Requested: “${dec.text}”</p>`:''}
+      </div>`;
+    }).join('');
+    box.innerHTML = items;
+  },50);
+  return this.msNav() + `<div class="doc-page">
+    <h1>Decisions register</h1>
+    <p class="lede">The eight inferred defaults running in this system. Confirm or request a change right where you see each yellow card — Q1 and Q2 are Esther's calls. This register replaces the Round-2 sheet.</p>
+    <div id="dc-body"><p style="color:var(--ink-3)">Loading…</p></div>
+  </div>` + this.msFooter();
+},
+
+/* ---------- 2/3 personal pages ---------- */
+personal(personId){
+  const db = __demo.db, D = GRMP.D;
+  const p = D.person(db, personId);
+  if(!p) return this.landing();
+  const mentee = p.kind==='mentee';
+  const ackDone = D.ackComplete(p);
+  const rotNow = D.currentRotation(db);
+  const myPairs = D.pairsFor(db, personId).filter(x=>['approved','closed','rematch_needed','replaced'].includes(x.status));
+  const closed = mentee ? D.menteeCloseoffs(db, personId).length : null;
+  const hasBR = db.builderReflections.some(b=>b.menteeId===personId);
+  const hasMR = db.midreviews.some(m=>m.mentorId===personId);
+  const cert = db.certificates.some(c=>c.personId===personId);
+  const eligible = D.certEligible(db, p);
+
+  /* timeline model */
+  const steps = mentee
+    ? [['Applied',true],['Accepted',['accepted','reserve_bench'].includes(p.appStatus)],['Acknowledged',ackDone],
+       ['Orientation',!!p.orientation],['R1',closed>=1],['R2',closed>=2],['R3',closed>=3],
+       ['Builder Reflection',hasBR],['Certificate',cert||eligible]]
+    : [['Registered',true],['Accepted',['accepted','reserve_bench'].includes(p.appStatus)],['Acknowledged',ackDone],
+       ['Orientation',!!p.orientation],['Matched',myPairs.length>0],['Mid-programme review',hasMR],['Certificate',cert||eligible]];
+  let curIdx = steps.findIndex(s=>!s[1]); if(curIdx<0) curIdx = steps.length-1;
+
+  /* --- next-step card --- */
+  let nextCard = '';
+  if(p.appStatus==='invited'){
+    nextCard = `<div class="card"><h3>👋 Welcome back — ${esc(db.config.cohort.label)}</h3>
+      <p style="font-size:13px;color:var(--ink-2)">You mentored in a previous cycle and the programme team has invited you to return.
+      Confirm below — then re-acknowledge the programme documents (they may have changed) and complete this cycle's orientation.</p>
+      <button class="btn btn-primary" data-act="confirmReturn" data-person="${p.id}">Yes — I'm returning as a mentor</button></div>`;
+    return `<div class="pp-shell">
+      <div class="pp-head">
+        <div class="avatar av-mentor">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
+        <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
+          <div class="sub">Returning mentor · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}</div></div>
+      </div>
+      ${nextCard}
+    </div>`;
+  }
+  const DOCS = [['rules','GRMP Programme Rules','v2.0'],['charter','SMC Charter','v1.3'],['governance','Governance Guidelines','v1.1'],['pdpa','PDPA Consent','v1.0'],['coi','Conflict-of-Interest Declaration','v1.0']];
+  if(!ackDone){
+    nextCard = `<div class="card"><h3>📄 Acknowledge the programme documents</h3>
+      <p style="font-size:13px;color:var(--ink-2)">Five documents, each recorded with a timestamp and version.
+      <b>You can't be matched until all five are done.</b></p>
+      <div class="acklist">${DOCS.map(([k,nm,ver])=>{
+        const done = p.ack && p.ack[k];
+        return `<div class="ackrow"><span class="nm">${nm}</span><span class="ver">${ver}</span>
+          ${done?`<span class="badge b-ok"><span class="d"></span>Acknowledged ${done}</span>`
+                :`<button class="btn sm btn-primary" data-act="ack" data-person="${p.id}" data-doc="${k}">Read & acknowledge</button>`}</div>`;
+      }).join('')}</div>
+      ${inferred('Q5')}
+      <div style="margin-top:10px"><button class="btn sm btn-ghost" data-act="ackAll" data-person="${p.id}">Acknowledge all (demo shortcut)</button></div></div>`;
+  } else if(!p.orientation){
+    nextCard = `<div class="card"><h3>🎓 Complete your orientation</h3>
+      <p style="font-size:13px;color:var(--ink-2)">Attend the live session, or watch the recorded module —
+      <b>required before Rotation 1, no exceptions.</b></p>
+      <div style="background:#14171d;border-radius:12px;aspect-ratio:16/7;display:grid;place-items:center;margin:4px 0 10px;cursor:pointer" data-act="orient" data-person="${p.id}" data-mode="recorded" role="button" tabindex="0" aria-label="Play orientation recording">
+        <div style="text-align:center;color:#fff"><div style="width:54px;height:54px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin:0 auto 8px;font-size:20px">▶</div>
+        <div style="font-size:13px;font-weight:700">GRMP Orientation 2026 — session recording</div>
+        <div style="font-size:11px;opacity:.7">sent to everyone after the live session · opening it records your completion</div></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" data-act="orient" data-person="${p.id}" data-mode="recorded">▶ Watch recorded module (marks complete)</button>
+        <span class="badge b-neut" style="align-self:center">live attendance is marked by the coordinator (Events)</span>
+      </div></div>`;
+  } else if(mentee){
+    const openPair = myPairs.find(x=>x.status==='approved' && x.rotation===(rotNow?rotNow.n:2));
+    const needRematch = myPairs.find(x=>x.status==='rematch_needed');
+    if(needRematch){
+      nextCard = `<div class="card"><h3>⏳ Your mentor changed jobs — replacement on the way</h3>
+        <p style="font-size:13px;color:var(--ink-2)">Your Rotation ${needRematch.rotation} mentor had to step away.
+        The coordinator is arranging a reserve-bench mentor within 7 days; you'll get a hand-over email.</p></div>`;
+    } else if(openPair){
+      const rotEnded = rotNow && db.today >= rotNow.end;
+      nextCard = `<div class="card"><h3>✅ Close off Rotation ${openPair.rotation} (one minute)</h3>
+        <p style="font-size:13px;color:var(--ink-2)">At the end of the rotation, confirm two things. The platform tracks nothing else about your meetings — it's on the two of you.</p>
+        <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-met"><span>We met at least <b>twice</b> this rotation</span></label>
+        <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-ref"><span>I completed my private reflection</span></label>
+        <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px 26px"><a href="#/reflection">Open the Reflection Sheet ↗</a></div>
+        <div class="f-row"><input type="text" id="co-comment" placeholder="Optional comment"></div>
+        <button class="btn btn-primary" data-act="closeoff" data-pair="${openPair.id}">Submit close-off</button>
+        ${rotEnded?'':`<p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Rotation ${openPair.rotation} runs until ${rotNow.end} — in the demo you can close off early.</p>`}</div>`;
+    } else if(closed>=3 && !hasBR){
+      nextCard = `<div class="card"><h3>🏗 Your Builder Reflection</h3>
+        <p style="font-size:13px;color:var(--ink-2)">You've completed all three rotations. Close the programme with a free-text
+        reflection: how will you contribute back to the ecosystem that mentored you?</p>
+        <div class="f-row"><textarea id="br-text" placeholder="Write freely — there are no categories to pick (deferred to Cycle 2)"></textarea></div>
+        <button class="btn btn-primary" data-act="builder" data-person="${p.id}">Submit Builder Reflection</button></div>`;
+    } else if(eligible && !cert){
+      nextCard = `<div class="card"><h3>🎉 You qualify for your certificate</h3>
+        <p style="font-size:13px;color:var(--ink-2)">All three rotations closed + Builder Reflection submitted.
+        The Programme Lead issues certificates from the console — yours will arrive by email.</p></div>`;
+    } else if(!myPairs.length){
+      nextCard = `<div class="card"><h3>🤝 Matching in progress</h3>
+        <p style="font-size:13px;color:var(--ink-2)">You're cleared (acknowledged + orientated). The programme team is preparing
+        Rotation ${rotNow?rotNow.n:2} matches — you'll get one email with your mentor, the dates and the guide.</p></div>`;
+    }
+  } else {                                     /* mentor next-steps */
+    const servedEarly = GRMP.D.pairsFor(db,personId).some(x=>x.rotation<=2 && x.status!=='rejected');
+    if(!hasMR && servedEarly){
+      nextCard = `<div class="card"><h3>📝 Mid-programme review (your one checkpoint)</h3>
+        <p style="font-size:13px;color:var(--ink-2)">Two minutes in January: how is the pairing going, anything the team should know?
+        (The demo lets you submit early.)</p>
+        <div class="f-row"><textarea id="mr-text" placeholder="How is it going with your mentee(s)?"></textarea></div>
+        <button class="btn btn-primary" data-act="midreview" data-person="${p.id}">Submit review</button></div>`;
+    }
+  }
+
+  /* --- pairs display --- */
+  const pairCards = myPairs.filter(x=>x.status!=='replaced').map(x=>{
+    const other = D.person(db, mentee? x.mentorId : x.menteeId);
+    const rot = db.config.rotations.find(r=>r.n===x.rotation);
+    return `<div class="card"><h3>Rotation ${x.rotation} — ${rot.label}
+        ${x.status==='closed'?'<span class="badge b-ok"><span class="d"></span>Closed off</span>'
+          : x.status==='rematch_needed'?'<span class="badge b-warn"><span class="d"></span>Replacement pending</span>'
+          : '<span class="badge b-neut"><span class="d"></span>Running · Dec–Jan</span>'}</h3>
+      <div class="mentor-card">
+        <div class="avatar ${mentee?'av-mentor':'av-mentee'}" style="width:44px;height:44px;font-size:14px">${esc(other.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
+        <div style="flex:1">
+          <b>${esc(other.name)}</b> <span class="track-chip track-${other.track}">${esc(GRMP.TRACKS[other.track].label)}</span>
+          <div style="font-size:12.5px;color:var(--ink-2)">${mentee?esc(other.role+' · '+other.org):esc(other.university+' · '+other.course+', year '+other.year)}</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+other.background):esc('Goal: '+other.goals)}</div>
+        </div></div>
+      ${x.status==='closed'&&x.closeoff&&x.closeoff.comment&&mentee?`<div style="margin-top:10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Your close-off note</b><br>“${esc(x.closeoff.comment)}”</div>`:''}
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>
+    </div>`;
+  }).join('');
+
+  const myBR = db.builderReflections.find(b=>b.menteeId===personId);
+  const myMR = db.midreviews.find(m=>m.mentorId===personId);
+  const brCard = (mentee&&myBR)?`<div class="card"><h3>🏗 Your Builder Reflection <span class="badge b-ok"><span class="d"></span>submitted ${myBR.at}</span></h3>
+      <p style="font-size:13.5px;margin:0">“${esc(myBR.text)}”</p></div>`:'';
+  const mrCard = (!mentee&&myMR)?`<div class="card"><h3>📝 Your mid-programme review <span class="badge b-ok"><span class="d"></span>submitted ${myMR.at}</span></h3>
+      <p style="font-size:13.5px;margin:0">“${esc(myMR.text)}”</p></div>`:'';
+  const certCard = cert ? `<div class="cert"><div style="font-size:11px;letter-spacing:.18em;font-weight:800;color:var(--gold)">SINGAPORE MENTORSHIP COMMITTEE</div>
+      <h2>Certificate of Completion</h2><div class="nm">${esc(p.name)}</div>
+      <div class="meta">Global Ready Mentorship Programme 2026 · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
+
+  return `<div class="pp-shell">
+    <div class="pp-head">
+      <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
+      <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
+        <div class="sub">${mentee?'Mentee':'Mentor'} · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}
+        ${p.previewFastForward?' · <b style="color:var(--ai-ink)">demo fast-forwarded to March</b>':''}</div></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — no account, no password. That's by design.</div>
+    <div class="steps">${steps.map((s,i)=>`<div class="step ${s[1]?'done':(i===curIdx?'cur':'')}"><div class="dot">${s[1]?'✓':i+1}</div><span>${s[0]}</span></div>`).join('')}</div>
+    ${nextCard}${certCard}${brCard}${mrCard}${pairCards}
+    ${inferred('Q2')}
+  </div>`;
+},
+};
+
+</script>
+<script>
+/* GRMP Demo — admin console views (manual ch.4–8). Sign-in simulated; role-scoped. */
+
+const Console = {
+
+/* ---------- 4.0 login ---------- */
+login(){
+  const db = __demo.db;
+  return `<div class="login-wrap"><div class="login-card">
+    <h1>GRMP Console</h1>
+    <div class="sub">Programme team sign-in · GRMP 2026 (SMU pilot)</div>
+    ${db.config.admins.map(a=>`
+      <button class="login-row" data-goto="#/console/${encodeURIComponent(a.name)}">
+        <div class="avatar av-mentor" style="width:36px;height:36px;font-size:12px;border-radius:10px">${a.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+        <div style="flex:1"><b>${a.name}</b><div class="r">${a.role}</div></div>
+        <span style="color:var(--ink-3)">→</span>
+      </button>`).join('')}
+    <div class="sim-note">🔐 In production this is Google sign-in. The demo simulates it — click a person to enter with their permissions.</div>
+  </div></div>`;
+},
+
+/* ---------- console shell + routing ---------- */
+shell(name, view){
+  const db = __demo.db;
+  const admin = db.config.admins.find(a=>a.name===name);
+  if(!admin) return this.login();
+  const R = admin.roles;
+  const items = [];
+  if(R.includes('coordinator')||R.includes('lead')||R.includes('dashboard_viewer')) items.push(['dashboard','📊 Dashboard']);
+  if(R.includes('mentor_reviewer')) items.push(['review-mentors','🎓 Review mentors', db.people.filter(p=>p.kind==='mentor'&&p.appStatus==='submitted').length]);
+  if(R.includes('mentee_reviewer')) items.push(['review-mentees','👤 Review mentees', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='submitted').length]);
+  if(R.includes('lead')) items.push(['decisions','⚖ Decisions', db.people.filter(p=>p.appStatus==='submitted'&&db.reviews.some(v=>v.personId===p.id)).length]);
+  if(R.includes('lead')||R.includes('coordinator')) items.push(['matching','🤝 Matching', db.pairs.filter(p=>p.status==='proposed').length]);
+  if(R.includes('lead')||R.includes('coordinator')) items.push(['submissions','📝 Submissions', db.midreviews.length+db.builderReflections.length]);
+  if(R.includes('coordinator')) items.push(['reminders','⏰ Reminders']);
+  if(R.includes('coordinator')) items.push(['waitlist','📋 Waitlist', db.people.filter(p=>p.appStatus==='waitlisted').length]);
+  const pastR = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
+  if(R.includes('coordinator')) items.push(['exceptions','⚠ Exceptions', db.pairs.filter(p=>['rematch_needed'].includes(p.status)).length + db.pairs.filter(p=>pastR.includes(p.rotation)&&p.status==='approved').length]);
+  if(R.includes('coordinator')) items.push(['events','🎪 Events']);
+  if(R.includes('lead')) items.push(['certificates','🏅 Certificates']);
+  if(R.includes('escalation')) items.push(['concerns','🔒 Concern inbox', db.concerns.length]);
+  items.push(['emails','✉ Email log', db.emails.length]);
+  items.push(['config','⚙ Configuration']);
+  const cur = view || items[0][0];
+  const body = this['v_'+cur.replace(/-/g,'_')] ? this['v_'+cur.replace(/-/g,'_')](admin) :
+    `<p>View not available for your role.</p>`;
+  return `<div class="co-shell">
+    <aside class="co-side">
+      <div class="co-brand">GRMP Console<small>${db.config.cohort.label.toUpperCase()}</small></div>
+      <nav class="co-nav">
+        <div class="lab">${admin.role}</div>
+        ${items.map(([k,label,n])=>`<button class="co-item ${k===cur?'on':''}" data-goto="#/console/${encodeURIComponent(name)}/${k}">${label}${n?`<span class="n">${n}</span>`:''}</button>`).join('')}
+      </nav>
+      <div class="co-user"><b>${admin.name}</b>${admin.role}<br>
+        ${(typeof REMOTE!=='undefined'&&REMOTE)?'<button data-act="logout" style="background:none;border:0;color:#8b93a1;font-size:11px;padding:0;cursor:pointer">Sign out</button>':'<a href="#/console" style="color:#8b93a1;font-size:11px">Switch user</a>'}</div>
+    </aside>
+    <main class="co-main">${body}</main>
+  </div>`;
+},
+
+/* ---------- 6.1 dashboard ---------- */
+v_dashboard(admin){
+  const db = __demo.db, D = GRMP.D;
+  const acc = db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus));
+  const ackDone = acc.filter(D.ackComplete).length;
+  const orient = acc.filter(p=>p.orientation).length;
+  const r1closed = db.pairs.filter(p=>p.rotation===1&&p.status==='closed').length;
+  const curN = D.currentRotation(db)?D.currentRotation(db).n:3;
+  const r2 = db.pairs.filter(p=>p.rotation===curN&&['approved','closed'].includes(p.status)).length;
+  const blocked = db.people.filter(p=>p.appStatus==='accepted'&&D.gateBlocked(p));
+  const pastRd = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
+  const exceptions = db.pairs.filter(p=>p.status==='rematch_needed').length + db.pairs.filter(p=>pastRd.includes(p.rotation)&&p.status==='approved').length;
+  const track = t => db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&p.track===t).length;
+  return `<h1 class="co-title">Dashboard</h1>
+  <p class="co-sub">Single source of truth · simulated today: ${db.today}${D.currentRotation(db)?` · Rotation ${D.currentRotation(db).n} (${D.currentRotation(db).label}) is running`:' · closing phase'}.</p>
+  <div class="funnel-grid">
+    <div class="stat"><div class="n">${db.people.filter(p=>p.kind==='mentee').length} / ${db.people.filter(p=>p.kind==='mentor').length}</div><div class="l">Mentee / mentor applications</div></div>
+    <div class="stat"><div class="n">60 + 60</div><div class="l">Accepted (incl. 6 bench mentors)</div></div>
+    <div class="stat"><div class="n">${ackDone}<span style="font-size:13px;color:var(--ink-3)">/${acc.length}</span></div><div class="l">Acknowledged (binding gate)</div></div>
+    <div class="stat"><div class="n">${orient}<span style="font-size:13px;color:var(--ink-3)">/${acc.length}</span></div><div class="l">Orientation complete</div></div>
+    <div class="stat"><div class="n">${r1closed}/60</div><div class="l">R1 closed off</div></div>
+    <div class="stat"><div class="n">${r2}</div><div class="l">R${D.currentRotation(db)?D.currentRotation(db).n:3} pairs</div></div>
+    <div class="stat"><div class="n" style="color:${exceptions?'var(--warn)':'var(--ok)'}">${exceptions}</div><div class="l">Open exceptions</div></div>
+    <div class="stat"><div class="n">${track('general')}·${track('entrepreneurship')}·${track('ai')}</div><div class="l">Mentees by track (G·E·AI)</div></div>
+    <div class="stat"><div class="n">${db.midreviews.length}</div><div class="l">Mid-programme reviews in</div></div>
+    <div class="stat"><div class="n">${db.builderReflections.length}</div><div class="l">Builder Reflections in</div></div>
+    <div class="stat"><div class="n">${db.certificates.length}</div><div class="l">Certificates issued</div></div>
+    <div class="stat"><div class="n">${db.events.kickoff.attendance.length}</div><div class="l">Kickoff attendance</div></div>
+  </div>
+  ${admin.roles.includes('lead')?`<div style="margin:-6px 0 14px"><button class="btn sm btn-ghost" data-act="exportReport">⬇ Export cohort report (CSV)</button>
+    <span style="font-size:11px;color:var(--ink-3);margin-left:8px">export restricted to Programme Lead + System Administrator</span></div>`:''}
+  ${blocked.length?`<div class="qcard"><b style="font-size:13.5px">⛔ Blocked at the gates (${blocked.length})</b>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 8px">Accepted but not yet matchable — acknowledgement or orientation outstanding. The system will not let these into matching.</p>
+    ${blocked.map(p=>`<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line-2);font-size:13px">
+      <b>${p.name}</b><span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+      <span style="color:var(--ink-3);font-size:12px">${D.ackComplete(p)?'✓ acknowledged':'✗ acknowledgement'} · ${p.orientation?'✓ orientation':'✗ orientation'}</span>
+      <a style="margin-left:auto;font-size:12px" href="#/me/${p.id}">open their page →</a></div>`).join('')}</div>`:''}
+  ${inferred('Q7')}`;
+},
+
+/* ---------- 4.1 reviewer queues ---------- */
+v_review_mentors(admin){ return this._review(admin,'mentor'); },
+v_review_mentees(admin){ return this._review(admin,'mentee'); },
+_review(admin, kind){
+  const db = __demo.db, D = GRMP.D;
+  const queue = db.people.filter(p=>p.kind===kind && p.appStatus==='submitted');
+  const scored = db.people.filter(p=>p.kind===kind && p.appStatus!=='submitted' && db.reviews.some(v=>v.personId===p.id)).slice(0,4);
+  return `<h1 class="co-title">Review ${kind}s</h1>
+  <p class="co-sub">Score lightly (1–5) and comment. You recommend — the Programme Lead decides. The AI summary speeds reading; it never recommends an outcome.</p>
+  ${queue.length? queue.map(p=>`
+    <div class="qcard" id="q-${p.id}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <b style="font-size:14.5px">${p.name}</b>
+        <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+        <span class="badge b-neut"><span class="d"></span>submitted ${p.submittedAt}</span>
+      </div>
+      <div class="ai-block" data-ai-sum="${p.id}"><div class="t">✦ AI summary — <span class="ai-src">${(window.AI&&AI.cache['sum:'+p.id])?'Gemini (live)':'simulated · upgrading to Gemini…'}</span></div><div class="ai-txt">${(window.AI&&AI.cache['sum:'+p.id])||D.aiSummary(p)}</div></div>
+      <div style="font-size:12.5px;color:var(--ink-2)">
+        ${kind==='mentee' ? `Goals: ${p.goals||'—'} · Needs: ${p.devNeeds||'—'} · ${p.course||''} yr ${p.year||''}`
+                          : `${p.role||''} @ ${p.org||''} · ${p.background||''}`}</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+        <select id="sc-${p.id}" style="border:1px solid var(--line);border-radius:8px;padding:7px 10px">
+          <option value="5">5 — outstanding</option><option value="4" selected>4 — strong</option>
+          <option value="3">3 — adequate</option><option value="2">2 — weak</option><option value="1">1 — not ready</option></select>
+        <input id="cm-${p.id}" type="text" placeholder="Comment (optional)" style="flex:1;min-width:180px;border:1px solid var(--line);border-radius:8px;padding:7px 10px">
+        <button class="btn sm btn-primary" data-act="score" data-person="${p.id}" data-reviewer="${admin.name}">Submit score</button>
+      </div>
+      ${db.reviews.filter(v=>v.personId===p.id).map(v=>`<div style="font-size:12px;color:var(--ink-3);margin-top:6px">✓ ${v.reviewer}: ${v.score}/5 ${v.comment?('— '+v.comment):''}</div>`).join('')}
+    </div>`).join('')
+  : `<div class="qcard">Queue clear — no new ${kind} applications awaiting review. (Submit one from the microsite to see it appear here.)</div>`}
+  <h3 style="margin:20px 0 8px;font-size:14px;color:var(--ink-2)">Recently scored (sample)</h3>
+  ${scored.map(p=>`<div class="qcard" style="padding:10px 16px;font-size:13px;display:flex;gap:10px;align-items:center">
+    <b>${p.name}</b><span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+    <span style="color:var(--ink-3)">${db.reviews.filter(v=>v.personId===p.id).map(v=>`${v.reviewer} ${v.score}/5`).join(' · ')}</span>
+    <span class="badge b-neut" style="margin-left:auto">${p.appStatus}</span></div>`).join('')}`;
+},
+
+/* ---------- 5.1 decisions ---------- */
+v_decisions(admin){
+  const db = __demo.db, D = GRMP.D;
+  const ready = db.people.filter(p=>p.appStatus==='submitted' && db.reviews.some(v=>v.personId===p.id));
+  const noScores = db.people.filter(p=>p.appStatus==='submitted' && !db.reviews.some(v=>v.personId===p.id));
+  return `<h1 class="co-title">Decisions</h1>
+  <p class="co-sub">Single decision authority: you. Reviewers recommend; every acceptance, bench placement, waitlist and decline is yours, logged and auditable. Each decision sends the outcome email automatically.</p>
+  ${ready.length? ready.map(p=>`
+    <div class="qcard">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <b style="font-size:14.5px">${p.name}</b>
+        <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+        <span style="font-size:12.5px;color:var(--ink-2)">${db.reviews.filter(v=>v.personId===p.id).map(v=>`${v.reviewer}: <b>${v.score}/5</b>`).join(' · ')}</span>
+      </div>
+      <div class="ai-block" data-ai-sum="${p.id}"><div class="t">✦ AI summary — <span class="ai-src">${(window.AI&&AI.cache['sum:'+p.id])?'Gemini (live)':'simulated · upgrading to Gemini…'}</span></div><div class="ai-txt">${(window.AI&&AI.cache['sum:'+p.id])||D.aiSummary(p)}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn sm btn-ok" data-act="decide" data-person="${p.id}" data-decision="accepted" data-actor="${admin.name}">Accept</button>
+        ${p.kind==='mentor'?`<button class="btn sm btn-ghost" data-act="decide" data-person="${p.id}" data-decision="reserve_bench" data-actor="${admin.name}">Reserve bench</button>`:''}
+        <button class="btn sm btn-ghost" data-act="decide" data-person="${p.id}" data-decision="waitlisted" data-actor="${admin.name}">Waitlist</button>
+        <button class="btn sm btn-ghost" style="color:var(--red)" data-act="decide" data-person="${p.id}" data-decision="declined" data-actor="${admin.name}">Decline</button>
+      </div></div>`).join('')
+  : `<div class="qcard">No applications ready for decision. ${noScores.length? noScores.length+' submitted application(s) are still awaiting reviewer scores.':''}
+     (Submit one on the microsite, score it in a reviewer queue, and it appears here — the full pipeline works end-to-end in this demo.)</div>`}`;
+},
+
+/* ---------- 5.2 matching board ---------- */
+v_matching(admin){
+  const db = __demo.db, D = GRMP.D;
+  const rotNow = D.currentRotation(db);
+  const rot = rotNow ? rotNow.n : 3;
+  const tracks = ['general','entrepreneurship','ai'];
+  const unmatched = t => db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&p.track===t
+    && !D.gateBlocked(p)
+    && !db.pairs.some(x=>x.rotation===rot&&x.menteeId===p.id&&['proposed','approved','closed'].includes(x.status)));
+  const proposed = db.pairs.filter(p=>p.rotation===rot&&p.status==='proposed');
+  const rotLabel = db.config.rotations.find(r=>r.n===rot).label;
+  return `<h1 class="co-title">Matching — Rotation ${rot} (${rotLabel})</h1>
+  <p class="co-sub">Strictly within track. Hard constraints enforced: ≤2 mentees per mentor · no conflict · no repeat mentor.
+  AI proposes with rationale; nothing is matched until you approve it.</p>
+  ${inferred('Q3')}
+  <div class="funnel-grid" style="grid-template-columns:repeat(3,1fr)">
+    ${tracks.map(t=>`<div class="stat"><div class="n">${unmatched(t).length}</div>
+      <div class="l">${GRMP.TRACKS[t].label} mentees unmatched</div>
+      <button class="btn sm btn-ai" style="margin-top:8px" data-act="suggest" data-rotation="${rot}" data-track="${t}">✦ Suggest matches (AI)</button></div>`).join('')}
+  </div>
+  ${proposed.length? `<h3 style="margin:8px 0 10px;font-size:14.5px">Proposed — awaiting your approval (${proposed.length})</h3>`:''}
+  ${proposed.map(x=>{
+    const m=D.person(db,x.mentorId), e=D.person(db,x.menteeId);
+    return `<div class="pair-row" data-ai-pair="${x.id}">
+      <div class="who"><b>${e.name}</b> <span class="track-chip track-${e.track}">${GRMP.TRACKS[e.track].label}</span>
+        <div class="sub">${e.course}, yr ${e.year} · wants: ${(e.goals||'').slice(0,60)}…</div></div>
+      <div style="color:var(--ai);font-weight:800">→</div>
+      <div class="who"><b>${m.name}</b><div class="sub">${m.role} · ${m.org}</div></div>
+      ${admin.roles.includes('lead')?`<button class="btn sm btn-primary" data-act="approvePair" data-pair="${x.id}" data-actor="${admin.name}">Approve match</button>`:`<span class="badge b-warn"><span class="d"></span>awaiting Programme Lead approval</span>`}
+      <ul class="why">${x.rationale.map(r=>`<li>${r}</li>`).join('')}
+        <li style="color:var(--ai-ink);font-weight:650">AI-suggested (simulated in demo) — the decision above is yours.</li></ul>
+    </div>`;}).join('')}
+  ${db.pairs.filter(p=>p.rotation===rot&&p.status==='approved').length?
+    `<h3 style="margin:16px 0 8px;font-size:14px;color:var(--ink-2)">Approved this rotation: ${db.pairs.filter(p=>p.rotation===rot&&p.status==='approved').length} pairs</h3>`:''}`;
+},
+
+/* ---------- 6.2 reminders ---------- */
+v_reminders(admin){
+  const db = __demo.db;
+  return `<h1 class="co-title">Reminders — the machine chases, not you</h1>
+  <p class="co-sub">Every reminder is rule-triggered from the tracker. This September's acknowledgement ladder already fired (history below); rotation and checkpoint reminders continue automatically.</p>
+  ${inferred('Q5')}
+  <table class="tb"><tr><th>When</th><th>What</th><th>Who receives it</th><th>Status</th></tr>
+    ${db.config.ackLadder.map(l=>`<tr><td>${l.date} (${l.week})</td><td>${l.what}</td><td>outstanding acknowledgements only</td>
+      <td><span class="badge b-ok"><span class="d"></span>fired</span></td></tr>`).join('')}
+    <tr><td>rotation end −7d</td><td>Close-off reminder</td><td>mentees with open close-off</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
+    <tr><td>rotation end +1d</td><td>Close-off escalation</td><td>coordinator queue</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
+    <tr><td>January window</td><td>Mid-programme review request</td><td>mentors</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
+    <tr><td>March window</td><td>Builder Reflection request</td><td>mentees</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
+  </table>`;
+},
+
+/* ---------- 6.3 waitlist ---------- */
+v_waitlist(admin){
+  const db = __demo.db;
+  const wl = db.people.filter(p=>p.appStatus==='waitlisted')
+    .map(p=>({p, score: db.reviews.filter(v=>v.personId===p.id).reduce((s,v)=>s+v.score,0)/Math.max(1,db.reviews.filter(v=>v.personId===p.id).length)}))
+    .sort((a,b)=>b.score-a.score);
+  return `<h1 class="co-title">Waitlist</h1>
+  <p class="co-sub">Ranked by reviewer score. When capacity opens, promote the top — one click moves them into the accepted flow (acknowledgement, orientation, matching).</p>
+  <table class="tb"><tr><th>#</th><th>Name</th><th>Kind</th><th>Track</th><th>Avg score</th><th></th></tr>
+  ${wl.map((r,i)=>`<tr><td>${i+1}</td><td><b>${r.p.name}</b></td><td>${r.p.kind}</td>
+    <td><span class="track-chip track-${r.p.track}">${GRMP.TRACKS[r.p.track].label}</span></td>
+    <td>${r.score.toFixed(1)}</td>
+    <td><button class="btn sm btn-primary" data-act="promote" data-person="${r.p.id}" data-actor="${admin.name}">Promote</button></td></tr>`).join('')}
+  </table>`;
+},
+
+/* ---------- 6.4/6.6 exceptions ---------- */
+v_exceptions(admin){
+  const db = __demo.db, D = GRMP.D;
+  const pastRots = db.config.rotations.filter(r=>db.today>r.end).map(r=>r.n);
+  const missing = db.pairs.filter(p=>pastRots.includes(p.rotation)&&p.status==='approved');
+  const rematch = db.pairs.filter(p=>p.status==='rematch_needed');
+  const bench = t => db.people.filter(p=>p.appStatus==='reserve_bench'&&p.track===t);
+  return `<h1 class="co-title">Exceptions</h1>
+  <p class="co-sub">The only things the system escalates: a close-off not completed after a rotation, and a mentor dropout. Everything else, the pair manages themselves.</p>
+  <h3 style="font-size:14.5px;margin:6px 0 8px">Rotation 1 close-off missing (${missing.length})</h3>
+  ${missing.map(x=>{const e=D.person(db,x.menteeId), m=D.person(db,x.mentorId);
+    return `<div class="pair-row"><div class="who"><b>${e.name}</b><div class="sub">paired with ${m.name} · R${x.rotation} ended · <b style="color:var(--warn)">close-off overdue</b></div></div>
+      <button class="btn sm btn-ghost" data-act="remindCloseoff" data-email="${e.email}">Remind again</button>
+      <a class="btn sm btn-ghost" href="#/me/${e.id}" style="text-decoration:none">Open their page</a></div>`;}).join('')||'<p style="color:var(--ink-3)">None.</p>'}
+  <h3 style="font-size:14.5px;margin:18px 0 8px">Mentor dropout — replacement needed (${rematch.length})</h3>
+  ${rematch.map(x=>{const e=D.person(db,x.menteeId); const old=D.person(db,x.mentorId); const b=bench(old.track);
+    return `<div class="pair-row"><div class="who"><b>${e.name}</b><div class="sub">${old.name} dropped out ${old.droppedOut.at} (${old.droppedOut.reason}) · replace from same-track reserve bench within 7 days</div></div>
+      ${b.length? `<select id="bench-${x.id}" style="border:1px solid var(--line);border-radius:8px;padding:7px 10px">
+          ${b.map(bm=>`<option value="${bm.id}">${bm.name} — ${bm.role}, ${bm.org}</option>`).join('')}</select>
+        <button class="btn sm btn-primary" data-act="replaceMentorSel" data-pair="${x.id}" data-actor="${admin.name}">Assign replacement</button>`
+        : '<span class="badge b-risk"><span class="d"></span>no same-track bench mentor left</span>'}</div>`;}).join('')||'<p style="color:var(--ink-3)">None.</p>'}`;
+},
+
+/* ---------- 6.5 events ---------- */
+v_events(admin){
+  const db = __demo.db;
+  const acc = db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus));
+  const ev = db.events;
+  const row = (key,e)=>`<div class="qcard"><b style="font-size:14px">${e.name}</b>
+    <span style="font-size:12px;color:var(--ink-3)"> · ${e.date} · ${e.attendance.length}/${acc.length} checked in</span>
+    <div style="max-height:220px;overflow-y:auto;margin-top:10px;border-top:1px solid var(--line-2)">
+    ${acc.slice(0,30).map(p=>`<div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line-2);font-size:13px">
+      <span style="flex:1"><b>${p.name}</b> <span style="color:var(--ink-3);font-size:11.5px">${p.kind}</span></span>
+      <button class="btn sm ${e.attendance.includes(p.id)?'btn-ok':'btn-ghost'}" data-act="checkin" data-event="${key}" data-person="${p.id}">
+        ${e.attendance.includes(p.id)?'✓ Present':'Check in'}</button></div>`).join('')}
+    <div style="font-size:11.5px;color:var(--ink-3);padding:6px 0">…list truncated in demo (showing 30 of ${acc.length}); search comes with the real build.</div></div></div>`;
+  const noOrient = acc.filter(p=>!p.orientation);
+  const orientRow = `<div class="qcard"><b style="font-size:14px">Orientation — live session</b>
+    <span style="font-size:12px;color:var(--ink-3)"> · mark in-person attendance (per your rule: live = tracked in person) · ${acc.length-noOrient.length}/${acc.length} complete</span>
+    ${noOrient.length? `<div style="margin-top:10px;border-top:1px solid var(--line-2)">
+      ${noOrient.slice(0,20).map(p=>`<div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line-2);font-size:13px">
+        <span style="flex:1"><b>${p.name}</b> <span style="color:var(--ink-3);font-size:11.5px">${p.kind}</span></span>
+        <button class="btn sm btn-ghost" data-act="orient" data-person="${p.id}" data-mode="live">Mark attended</button></div>`).join('')}
+      </div>` : '<div style="font-size:12.5px;color:var(--ok);margin-top:8px">Everyone has completed orientation (live or recorded).</div>'}</div>`;
+  return `<h1 class="co-title">Events check-in</h1>
+  <p class="co-sub">Built for a phone at the door. Attendance feeds completion recognition (Kickoff) and the cohort report (Appreciation Night). SMC Hikes are a separate programme — not tracked here.</p>
+  ${orientRow}${row('kickoff',ev.kickoff)}${row('appreciation',ev.appreciation)}`;
+},
+
+/* ---------- 5.4 certificates ---------- */
+v_certificates(admin){
+  const db = __demo.db, D = GRMP.D;
+  const acc = db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus));
+  const rows = acc.map(p=>{
+    const closeoffs = p.kind==='mentee'? D.menteeCloseoffs(db,p.id).length : null;
+    const br = db.builderReflections.some(b=>b.menteeId===p.id);
+    const mr = db.midreviews.some(m=>m.mentorId===p.id);
+    const has = db.certificates.some(c=>c.personId===p.id);
+    const eligible = D.certEligible(db,p);
+    return {p,closeoffs,br,mr,has,eligible};
+  }).sort((a,b)=>(b.eligible?1:0)-(a.eligible?1:0));
+  const eligibleN = rows.filter(r=>r.eligible&&!r.has).length;
+  return `<h1 class="co-title">Certificates</h1>
+  <p class="co-sub">The rule runs itself — you press one button and everyone who qualifies gets their certificate by email, logged.</p>
+  ${inferred('Q2')}
+  <div style="margin:0 0 14px"><button class="btn btn-primary" data-act="issueCerts" data-actor="${admin.name}">Issue all qualifying certificates (${eligibleN} ready)</button></div>
+  <table class="tb"><tr><th>Name</th><th>Kind</th><th>Progress against the rule</th><th>Status</th></tr>
+  ${rows.slice(0,25).map(r=>`<tr><td><b>${r.p.name}</b>${r.p.previewFastForward?' <span class="badge b-ai">fast-forward preview</span>':''}</td><td>${r.p.kind}</td>
+    <td style="font-size:12px">${r.p.kind==='mentee' ? `${r.closeoffs}/3 close-offs · Builder Reflection ${r.br?'✓':'✗'}` : `serving rotations ✓ · mid-review ${r.mr?'✓':'✗'}`}</td>
+    <td>${r.has?'<span class="badge b-ok"><span class="d"></span>Issued</span>' : r.eligible?'<span class="badge b-warn"><span class="d"></span>Ready to issue</span>':'<span class="badge b-neut"><span class="d"></span>In progress</span>'}</td></tr>`).join('')}
+  </table>
+  <p style="font-size:11.5px;color:var(--ink-3);margin-top:8px">Showing 25 of ${rows.length} — most of the cohort is naturally “in progress” on 15 Dec; the two fast-forward preview mentees exist so you can see the full path today.</p>`;
+},
+
+/* ---------- submissions: reviews, reflections, close-off notes ---------- */
+v_submissions(admin){
+  const db = __demo.db, D = GRMP.D;
+  const notes = db.pairs.filter(p=>p.status==='closed'&&p.closeoff&&p.closeoff.comment).slice(-12).reverse();
+  return `<h1 class="co-title">Submissions</h1>
+  <p class="co-sub">Everything participants have written, in one place — visible to the Programme Lead and Coordinator only. (Private reflections are never here: they live outside the system by design.)</p>
+  <h3 style="font-size:14.5px;margin:6px 0 8px">Mid-programme reviews — mentors (${db.midreviews.length})</h3>
+  ${db.midreviews.map(m=>{const p=D.person(db,m.mentorId);return `<div class="qcard" style="padding:12px 16px">
+    <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+    <span style="font-size:11.5px;color:var(--ink-3)"> · ${m.at}</span>
+    <p style="font-size:13px;margin:6px 0 0">${m.text}</p></div>`}).join('')||'<p style="color:var(--ink-3);font-size:13px">None yet — mentors submit these in the January window.</p>'}
+  <h3 style="font-size:14.5px;margin:16px 0 8px">Builder Reflections — mentees (${db.builderReflections.length})</h3>
+  ${db.builderReflections.map(b=>{const p=D.person(db,b.menteeId);return `<div class="qcard" style="padding:12px 16px">
+    <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+    <span style="font-size:11.5px;color:var(--ink-3)"> · ${b.at}</span>
+    <p style="font-size:13px;margin:6px 0 0">${b.text}</p></div>`}).join('')||'<p style="color:var(--ink-3);font-size:13px">None yet — mentees submit these at closing (March).</p>'}
+  <h3 style="font-size:14.5px;margin:16px 0 8px">Close-off notes — optional comments (latest ${notes.length})</h3>
+  ${notes.map(x=>{const e=D.person(db,x.menteeId);return `<div class="qcard" style="padding:10px 16px;font-size:13px">
+    <b>${e.name}</b> <span style="color:var(--ink-3);font-size:11.5px">R${x.rotation} · ${x.closeoff.at}</span>
+    <span style="margin-left:8px">“${x.closeoff.comment}”</span></div>`}).join('')||'<p style="color:var(--ink-3);font-size:13px">No comments yet.</p>'}`;
+},
+
+/* ---------- 7 concern inbox ---------- */
+v_concerns(admin){
+  const db = __demo.db;
+  return `<h1 class="co-title">Concern inbox 🔒</h1>
+  <p class="co-sub">Visible to you alone as Escalation Owner. The platform stores the referral record only —
+  the case itself is handled in SMC's Grievance &amp; Misconduct process. AI never reads this store.</p>
+  ${inferred('Q6')}
+  ${db.concerns.map(c=>`<div class="qcard" style="border-left:3px solid var(--red)">
+    <b style="font-size:13.5px">${c.id}</b> <span style="font-size:12px;color:var(--ink-3)">· ${c.at} · ${c.from}</span>
+    <p style="font-size:13px;margin:6px 0 4px">${c.summary}</p>
+    <span class="badge b-neut"><span class="d"></span>${c.status}</span></div>`).join('')||'<p>No referrals.</p>'}`;
+},
+
+/* ---------- email log ---------- */
+v_emails(admin){
+  const db = __demo.db;
+  return `<h1 class="co-title">Email log</h1>
+  <p class="co-sub">Every message the system has sent (in the demo: would have sent). Copy is drafted by the build team and approved by the programme team before launch.</p>
+  <table class="tb"><tr><th>Date</th><th>To</th><th>Subject</th></tr>
+  ${[...db.emails].reverse().map(e=>`<tr><td style="white-space:nowrap">${e.at}</td><td style="font-size:12px">${e.to}</td><td>${e.subject}</td></tr>`).join('')}
+  </table>`;
+},
+
+/* ---------- 8 config ---------- */
+v_config(admin){
+  const db = __demo.db;
+  return `<h1 class="co-title">Configuration</h1>
+  <p class="co-sub">Everything a new cycle needs — dates, windows, reminders, roles — is configuration, not code. Cycle 2 or another university launches by editing this page.</p>
+  ${inferred('Q8')}
+  <div class="qcard"><b>Cycle</b><table class="tb" style="margin-top:8px"><tr><th>Rotation</th><th>Theme</th><th>Window</th></tr>
+    ${db.config.rotations.map(r=>`<tr><td>R${r.n}</td><td>${r.label}</td><td>${r.start} → ${r.end}</td></tr>`).join('')}</table></div>
+  <div class="qcard"><b>Roles (SMU pilot)</b>
+    ${db.config.admins.map(a=>`<div style="font-size:13px;padding:5px 0;border-bottom:1px solid var(--line-2)"><b>${a.name}</b> — ${a.role}</div>`).join('')}
+    <div style="font-size:12px;color:var(--ink-3);margin-top:6px">Data Protection owner: Tracy. Roles are assignable per cohort/institution.</div></div>
+  <div class="qcard"><b>Open items (the yellow cards)</b>
+    <p style="font-size:12.5px;color:var(--ink-2)">Eight inferred defaults are running in this demo. Each is marked where it lives, and listed in Round 2 for one-tap confirmation.</p>
+    ${Object.entries(db.config.openItems).map(([k,v])=>`<div style="font-size:12.5px;padding:4px 0;border-top:1px solid var(--line-2)"><b>${k}</b> — ${v.title}</div>`).join('')}</div>
+  <div class="qcard"><b>Demo clock</b>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 8px">Advance the simulated date to walk the full cycle to the end — Rotation 3 matching, final close-offs, Builder Reflections and certificates.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn sm ${db.today==='2026-12-15'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2026-12-15">15 Dec 2026 · Rotation 2</button>
+      <button class="btn sm ${db.today==='2027-02-01'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2027-02-01">1 Feb 2027 · Rotation 3 begins</button>
+      <button class="btn sm ${db.today==='2027-03-20'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2027-03-20">20 Mar 2027 · closing week</button>
+    </div></div>
+  ${admin.roles.includes('lead')?`<div class="qcard"><b>Start a new cycle</b>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 10px">Run the programme again next year without redevelopment: the current cycle is archived (stats kept), returning mentors carry over as <b>invited</b> (gates re-apply automatically), and everything else resets. Configuration, not code.</p>
+    <div class="f-grid2">
+      <div class="f-row"><label>Cycle label</label><input type="text" id="cy-label" value="GRMP 2027 (SMU)"></div>
+      <div class="f-row"><label>Working start date (system clock)</label><input type="text" id="cy-today" value="2027-09-01"></div>
+    </div>
+    <div class="f-grid2">
+      <div class="f-row"><label>Rotation 1 start / end</label><div style="display:flex;gap:6px"><input type="text" id="cy-r1s" value="2027-10-01"><input type="text" id="cy-r1e" value="2027-11-30"></div></div>
+      <div class="f-row"><label>Rotation 2 start / end</label><div style="display:flex;gap:6px"><input type="text" id="cy-r2s" value="2027-12-01"><input type="text" id="cy-r2e" value="2028-01-31"></div></div>
+    </div>
+    <div class="f-grid2">
+      <div class="f-row"><label>Rotation 3 start / end</label><div style="display:flex;gap:6px"><input type="text" id="cy-r3s" value="2028-02-01"><input type="text" id="cy-r3e" value="2028-03-31"></div></div>
+      <div class="f-row" style="display:flex;align-items:flex-end"><label class="f-check" style="margin-bottom:10px"><input type="checkbox" id="cy-carry" checked><span>Carry mentors over as invited returning mentors</span></label></div>
+    </div>
+    <button class="btn btn-primary" data-act="startNewCycle">Archive current cycle & start new one</button></div>`:''}
+  ${db.archives.length?`<div class="qcard"><b>Archived cycles</b>
+    ${db.archives.map(ar=>`<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line-2);font-size:13px;flex-wrap:wrap">
+      <b>${ar.label}</b><span class="badge b-neut"><span class="d"></span>archived ${ar.archivedAt}</span>
+      <span style="color:var(--ink-3);font-size:12px">${ar.stats.mentors} mentors · ${ar.stats.mentees} mentees · close-offs ${ar.stats.r1}/${ar.stats.r2}/${ar.stats.r3} · ${ar.stats.certificates} certificates · kickoff ${ar.stats.kickoff}</span></div>`).join('')}</div>`:''}
+  <div class="qcard"><b>Demo controls</b><br>
+    <button class="btn sm btn-ghost" style="margin-top:8px" data-act="reset">↺ Reset ${(typeof REMOTE!=='undefined'&&REMOTE)?'the SHARED database':'demo data'} to seeded state</button></div>`;
+},
+};
+
+/* selector-based replacement action (needs the select value) */
+Actions_replaceMentorSel_init = false;
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-act="replaceMentorSel"]');
+  if(!b) return;
+  const sel = document.getElementById('bench-'+b.dataset.pair);
+  if(sel) window.__demo.Actions.replaceMentor({pair:b.dataset.pair, bench:sel.value, actor:b.dataset.actor});
+});
+
+</script>
+<script>
+/* GRMP Demo — core: router, shell, open-as switcher, email popups.
+   Views live in views_public.js (microsite + personal) and views_console.js (admin). */
+
+/* ---------- runtime mode ----------
+   REMOTE: served from Apps Script (google.script.run available) — shared database, real accounts.
+   local : GitHub Pages / file — per-browser sandbox (kept for tests and public demo). */
+const REMOTE = (typeof google!=='undefined' && google.script && google.script.run);
+let SESSION = null;
+try{ SESSION = JSON.parse(localStorage.getItem('grmp_session')||'null'); }catch(e){}
+let db = REMOTE ? null : GRMP.Store.load();
+window.SESSION_TOKEN_FN = ()=> SESSION && SESSION.token;
+
+function busy(on){
+  let el=document.getElementById('rpc-busy');
+  if(on){ if(!el){ el=document.createElement('div'); el.id='rpc-busy'; el.className='rpc-busy'; document.body.appendChild(el);} }
+  else if(el) el.remove();
+}
+/* every mutation goes through call(): local = apply directly; remote = server applies + returns new db */
+function call(fn, ...args){
+  if(!REMOTE){
+    const out = GRMP.D[fn](db, ...args);
+    GRMP.Store.save(db); render(); return Promise.resolve(out);
+  }
+  busy(true);
+  return new Promise((res,rej)=>google.script.run
+    .withSuccessHandler(r=>{ busy(false);
+      if(!r.ok){ toast(r.error||'Not permitted.', false); rej(r); return; }
+      db=r.db; render(); res(r.out); })
+    .withFailureHandler(e=>{ busy(false); toast('Server error — try again. '+(e&&e.message||''), false); rej(e); })
+    .applyAction(SESSION&&SESSION.token, fn, args));
+}
+function rpc(name, ...args){
+  return new Promise((res,rej)=>google.script.run
+    .withSuccessHandler(res).withFailureHandler(rej)[name](...args));
+}
+
+/* Feedback channel — filled in once the Apps Script backend is deployed.
+   Empty string = button hidden, demo unaffected. */
+const FEEDBACK_URL = 'https://script.google.com/macros/s/AKfycbwvothqM0XvOFOE_HxzkcoZS0v9kSmiEiP_D3FmdJEZOOGz4L46QHD7jvP00PyGdo3v/exec';
+const $app = () => document.getElementById('app');
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- local-only persistence wrapper (sandbox mode) ---------- */
+function act(fn){ const out = fn(db); GRMP.Store.save(db); render(); return out; }
+
+/* ---------- email popup (the "this email would be sent" surface) ---------- */
+let lastEmailShown = db ? db.emails.length : 0;
+function showEmail(e){
+  const root = document.getElementById('overlay-root');
+  const el = document.createElement('div');
+  el.className = 'email-pop';
+  el.innerHTML = `<div class="head">✉ EMAIL — sent by the system <button class="x" aria-label="close">×</button></div>
+    <div class="body"><div class="subj">${esc(e.subject)}</div>
+    <div class="meta">To: ${esc(e.to)} · ${esc(e.at)}</div>
+    <div class="txt">In production this email is delivered automatically. The demo shows it here instead.</div></div>`;
+  el.querySelector('.x').onclick = () => el.remove();
+  root.appendChild(el);
+  setTimeout(()=>el.remove(), 9000);
+}
+function flushEmails(){
+  while(lastEmailShown < db.emails.length){ showEmail(db.emails[lastEmailShown]); lastEmailShown++; }
+}
+
+/* ---------- non-blocking toast (replaces alert — never blocks the page or automation) ---------- */
+function toast(msg, ok=true){
+  const root = document.getElementById('overlay-root');
+  const el = document.createElement('div');
+  el.className='email-pop'; el.style.width='360px';
+  el.innerHTML = `<div class="head" style="background:${ok?'#2E9E6B':'#C8102E'}">${ok?'✓':'!'} ${ok?'DONE':'CHECK'}
+      <button class="x" aria-label="close">×</button></div>
+    <div class="body"><div class="txt" style="font-size:13.5px;color:var(--ink)">${esc(msg)}</div></div>`;
+  el.querySelector('.x').onclick=()=>el.remove();
+  root.appendChild(el);
+  setTimeout(()=>el.remove(), 5000);
+}
+
+/* ---------- yellow card helper (in-product decision confirmation) ---------- */
+let decisionCache = null;
+function inferred(qid){
+  const it = db.config.openItems[qid]; if(!it) return '';
+  const dec = decisionCache && decisionCache[qid];
+  const status = dec ? (dec.kind==='confirm'
+      ? `<span class="badge b-ok" style="flex:none"><span class="d"></span>Confirmed by ${esc(dec.author)}</span>`
+      : `<span class="badge b-warn" style="flex:none"><span class="d"></span>Change requested by ${esc(dec.author)}</span>`) : '';
+  return `<div class="inferred" data-inferred="${qid}"><span class="tag">INFERRED · ${qid}</span>
+    <div style="flex:1"><b>Running as the default.</b> ${esc(it.title)}
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+        ${status || `<button class="btn sm btn-ok" data-act="decideDefault" data-q="${qid}" data-kind="confirm">✓ Confirm</button>
+        <button class="btn sm btn-ghost" data-act="decideDefault" data-q="${qid}" data-kind="change">✎ Request a change</button>`}
+        <a href="#/decisions" style="font-size:11.5px">all decisions →</a>
+      </div></div></div>`;
+}
+async function loadDecisions(){
+  if(!FEEDBACK_URL) return;
+  try{
+    const r = await fetch(FEEDBACK_URL+'?list=1'); const j = await r.json();
+    const map = {};
+    [...j.items].reverse().forEach(it=>{                       // oldest→newest so latest wins
+      if(it.status==='wont_fix') return;                       // voided decisions (admin) don't count
+      const m = (it.page||'').match(/^DECISION:(Q\d+):(confirm|change)$/);
+      if(m) map[m[1]] = {kind:m[2], author:it.author, text:it.text, ts:it.ts, status:it.status, note:it.note};
+    });
+    decisionCache = map;
+  }catch(e){}
+}
+
+/* ---------- open-as switcher ---------- */
+let openasOpen = false;
+function renderOpenAs(){
+  if(REMOTE) return '';
+  const mentees = db.people.filter(p=>p.kind==='mentee' && ['accepted','reserve_bench'].includes(p.appStatus)).slice(0,6);
+  const mentors = db.people.filter(p=>p.kind==='mentor' && p.appStatus==='accepted' && !p.droppedOut).slice(0,4);
+  const preview = db.people.filter(p=>p.previewFastForward);
+  return `<div class="openas">
+    ${openasOpen?`<div class="openas-menu">
+      <div class="sec">Admin console (sign in)</div>
+      <button data-goto="#/console">⚙ Console sign-in page</button>
+      <div class="sec">Open a mentee's personal link</div>
+      ${preview.map(p=>`<button data-goto="#/me/${p.id}">👤 ${esc(p.name)} <span class="badge b-ai" style="margin-left:auto">fast-forwarded to March</span></button>`).join('')}
+      ${mentees.filter(p=>!p.previewFastForward).map(p=>`<button data-goto="#/me/${p.id}">👤 ${esc(p.name)} <span class="track-chip track-${p.track}" style="margin-left:auto">${esc(GRMP.TRACKS[p.track].label)}</span></button>`).join('')}
+      <div class="sec">Open a mentor's personal link</div>
+      ${mentors.map(p=>`<button data-goto="#/me/${p.id}">🎓 ${esc(p.name)} <span class="track-chip track-${p.track}" style="margin-left:auto">${esc(GRMP.TRACKS[p.track].label)}</span></button>`).join('')}
+      <div class="sec">Microsite</div>
+      <button data-goto="#/">🏠 Public landing page</button>
+    </div>`:''}
+    <button class="openas-btn" id="openas-toggle">⇄ Open as… <span style="opacity:.6;font-weight:600">roles & links</span></button>
+  </div>`;
+}
+
+/* ---------- feedback (acceptance loop) ---------- */
+function feedbackContext(){
+  const h = location.hash||'#/';
+  let role = 'visitor';
+  let m;
+  if((m=h.match(/^#\/console\/([^/]+)/))) role = 'console: '+decodeURIComponent(m[1]);
+  else if((m=h.match(/^#\/me\/(.+)$/))){ const p=GRMP.D.person(db,m[1]); role = p? (p.kind+': '+p.name) : 'personal page'; }
+  return {page:h, role};
+}
+function renderFeedbackBtn(){
+  if(!FEEDBACK_URL) return '';
+  return `<button class="fb-btn" data-act="openFeedback">💬 Feedback</button>`;
+}
+function openFeedbackModal(){
+  const ctx = feedbackContext();
+  const root = document.getElementById('overlay-root');
+  const wrap = document.createElement('div');
+  wrap.className='fb-wrap';
+  wrap.innerHTML = `<div class="fb-bg"></div>
+   <div class="fb-modal">
+     <h3 style="margin:0 0 4px;font-size:16px">Feedback on this screen</h3>
+     <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:10px">Attached automatically: <b>${esc(ctx.page)}</b> · viewing as <b>${esc(ctx.role)}</b></div>
+     <div class="f-row"><label>Your name (optional)</label><input type="text" id="fb-name" placeholder="so we can follow up"></div>
+     <div class="f-row"><label>What should change? <span class="req">*</span></label><textarea id="fb-text" placeholder="Describe what you expected, what you saw, or what's missing"></textarea></div>
+     <div style="display:flex;gap:8px;justify-content:flex-end">
+       <button class="btn sm btn-ghost" id="fb-cancel">Cancel</button>
+       <button class="btn sm btn-primary" id="fb-send">Send feedback</button>
+     </div>
+     <div style="font-size:11px;color:var(--ink-3);margin-top:8px">Feedback lands with the build team; status appears on the <a href="#/changelog">changelog</a>.</div>
+   </div>`;
+  root.appendChild(wrap);
+  wrap.querySelector('.fb-bg').onclick = ()=>wrap.remove();
+  wrap.querySelector('#fb-cancel').onclick = ()=>wrap.remove();
+  wrap.querySelector('#fb-send').onclick = async ()=>{
+    const text = wrap.querySelector('#fb-text').value.trim();
+    if(!text){ toast('Please describe the change first.', false); return; }
+    const payload = {page:ctx.page, role:ctx.role, author:wrap.querySelector('#fb-name').value.trim()||'anonymous', text};
+    wrap.querySelector('#fb-send').disabled = true;
+    try{
+      const r = await fetch(FEEDBACK_URL, {method:'POST', body: JSON.stringify(payload)});
+      const j = await r.json();
+      if(!j.ok) throw 0;
+      wrap.remove();
+      toast('Feedback sent — thank you. Track it on the changelog.');
+    }catch(e){
+      wrap.querySelector('#fb-send').disabled = false;
+      toast('Could not send right now — please try again in a minute.', false);
+    }
+  };
+}
+
+/* ---------- decision modal (extracted) ---------- */
+function __decideDefault(d){
+  const it = db.config.openItems[d.q]; if(!it || !FEEDBACK_URL) return;
+  const confirm_ = d.kind==='confirm';
+  const root = document.getElementById('overlay-root');
+  const wrap = document.createElement('div');
+  wrap.className='fb-wrap';
+  wrap.innerHTML = `<div class="fb-bg"></div>
+   <div class="fb-modal">
+     <h3 style="margin:0 0 4px;font-size:16px">${confirm_?'Confirm this default':'Request a change'}</h3>
+     <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px;background:var(--surface-2);border-radius:8px;padding:9px 12px"><b>${d.q}</b> · ${esc(it.title)}</div>
+     <div class="f-row"><label>Your name (for the decision record) <span class="req">*</span></label><input type="text" id="dc-name" placeholder="e.g. Esther" value="${SESSION&&SESSION.identity?esc(SESSION.identity.name||SESSION.identity.label||''):''}"></div>
+     ${confirm_?'':`<div class="f-row"><label>What should it be instead? <span class="req">*</span></label><textarea id="dc-text"></textarea></div>`}
+     <div style="display:flex;gap:8px;justify-content:flex-end">
+       <button class="btn sm btn-ghost" id="dc-cancel">Cancel</button>
+       <button class="btn sm ${confirm_?'btn-ok':'btn-primary'}" id="dc-send">${confirm_?'✓ Confirm':'Send change request'}</button>
+     </div></div>`;
+  root.appendChild(wrap);
+  wrap.querySelector('.fb-bg').onclick=()=>wrap.remove();
+  wrap.querySelector('#dc-cancel').onclick=()=>wrap.remove();
+  wrap.querySelector('#dc-send').onclick=async ()=>{
+    const name=wrap.querySelector('#dc-name').value.trim();
+    if(!name){ toast('Please add your name — decisions need an owner.', false); return; }
+    const text=confirm_?'Confirmed as running.':(wrap.querySelector('#dc-text').value.trim());
+    if(!text){ toast('Please describe the change.', false); return; }
+    wrap.querySelector('#dc-send').disabled=true;
+    try{
+      await fetch(FEEDBACK_URL,{method:'POST',body:JSON.stringify({page:'DECISION:'+d.q+':'+d.kind,role:'decision',author:name,text})});
+      wrap.remove();
+      toast(confirm_?'Decision recorded — thank you, '+name+'.':'Change request recorded — the build team will follow up.');
+      await loadDecisions(); render();
+    }catch(e){ wrap.querySelector('#dc-send').disabled=false; toast('Could not record right now — try again in a minute.', false); }
+  };
+}
+
+/* ---------- banner ---------- */
+function demoBanner(){
+  const rot = GRMP.D.currentRotation(db);
+  const phase = rot ? `Rotation ${rot.n} · ${rot.label}` : (db.today>'2027-03-31'?'after the cycle':'closing weeks');
+  return `<div class="demo-banner">Requirements demo · sample data only · simulated today: <b>${db.today}</b> (${phase}) ·
+    advance the demo clock in <a href="#/console/Esther/config">Configuration</a> · yellow boxes are inferred defaults · <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a></div>`;
+}
+
+/* ---------- router ---------- */
+const routes = [
+  {re:/^#\/$/,                view:()=>Views.landing()},
+  {re:/^#\/guide\/mentee$/,   view:()=>Views.guideMentee()},
+  {re:/^#\/guide\/mentor$/,   view:()=>Views.guideMentor()},
+  {re:/^#\/reflection$/,      view:()=>Views.reflection()},
+  {re:/^#\/concern$/,         view:()=>Views.concern()},
+  {re:/^#\/apply\/(mentee|mentor)$/, view:m=>Views.apply(m[1])},
+  {re:/^#\/applied\/(.+)$/,   view:m=>Views.applied(m[1])},
+  {re:/^#\/me\/(.+)$/,        view:m=>Views.personal(m[1])},
+  {re:/^#\/manual$/,          view:()=>Views.manual()},
+  {re:/^#\/changelog$/,       view:()=>Views.changelog()},
+  {re:/^#\/decisions$/,       view:()=>Views.decisions()},
+  {re:/^#\/console$/,         view:()=>Console.login()},
+  {re:/^#\/console\/([^/]+)\/?([^/]*)$/, view:m=>Console.shell(decodeURIComponent(m[1]), m[2]||'')},
+];
+function render(){
+  if(REMOTE && !SESSION){ $app().innerHTML = renderLogin(); bindGlobal(); return; }
+  if(REMOTE && !db){ $app().innerHTML = `<div class="login-wrap"><div class="login-card" style="text-align:center"><h1>GRMP Platform</h1><div class="sub">Connecting to the shared database…</div></div></div>`; return; }
+  const h = location.hash || '#/';
+  let html = null;
+  for(const r of routes){ const m = h.match(r.re); if(m){ html = r.view(m); break; } }
+  if(html===null){ location.hash = '#/'; return; }
+  $app().innerHTML = demoBanner() + html + renderOpenAs() + renderFeedbackBtn();
+  bindGlobal();
+  flushEmails();
+  upgradeAI();
+  window.scrollTo(0,0);
+}
+
+/* ---------- login (remote mode) ---------- */
+function renderLogin(){
+  const err = window.__loginErr ? `<div style="color:var(--red);font-size:12.5px;margin-bottom:10px">${esc(window.__loginErr)}</div>` : '';
+  return `<div class="login-wrap"><div class="login-card">
+    <h1>GRMP Platform</h1>
+    <div class="sub">Shared staging environment · sign in with a demo account</div>
+    ${err}
+    <div class="f-row"><label>Account</label><input type="text" id="lg-u" placeholder="e.g. esther · mentee.new · mentor.active" autocomplete="off"></div>
+    <div class="f-row"><label>Passcode</label><input type="password" id="lg-p" placeholder="shared demo passcode" autocomplete="off"></div>
+    <button class="btn btn-primary" style="width:100%" data-act="doLogin">Sign in</button>
+    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--ink-3);text-transform:uppercase;margin-bottom:6px">Demo accounts (passcode in the group message)</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.7">
+        <b>Admins:</b> esther · weikiat · kenzie · yutong · portia · sapranshu<br>
+        <b>Participants:</b> mentee.new · mentee.mid · mentee.done · mentor.active · mentor.bench</div>
+    </div>
+    <div class="sim-note">Fictional sample data · every action is shared with everyone signed in — that's the point.</div>
+  </div></div>`;
+}
+
+/* ---------- progressive AI upgrade: simulated → Gemini, in place ---------- */
+async function upgradeAI(){
+  if(!window.AI || !AI.enabled) return;
+  document.querySelectorAll('[data-ai-sum]').forEach(async el=>{
+    const id = el.dataset.aiSum, ck = 'sum:'+id;
+    if(AI.cache[ck]) return;                                  // rendered from cache already
+    const p = GRMP.D.person(db, id); if(!p) return;
+    const txt = await AI.gen(ck, AI.summaryPrompt(p));
+    if(txt && el.isConnected){
+      const tx=el.querySelector('.ai-txt'), src=el.querySelector('.ai-src');
+      if(tx) tx.textContent = txt;
+      if(src) src.textContent = 'Gemini (live)';
+    } else if(el.isConnected){
+      const src=el.querySelector('.ai-src'); if(src) src.textContent='simulated in demo';
+    }
+  });
+  document.querySelectorAll('[data-ai-pair]').forEach(async el=>{
+    const id = el.dataset.aiPair, ck = 'pair:'+id;
+    const pr = db.pairs.find(x=>x.id===id); if(!pr || pr.status!=='proposed') return;
+    const apply = lines=>{
+      pr.rationale = lines; pr.aiLive = true; GRMP.Store.save(db);
+      const ul = el.querySelector('ul.why');
+      if(ul) ul.innerHTML = lines.map(l=>`<li>${esc(l)}</li>`).join('')
+        + `<li style="color:var(--ai-ink);font-weight:650">Generated live by Gemini — the decision above is yours.</li>`;
+    };
+    if(AI.cache[ck]){ if(!pr.aiLive) apply(AI.cache[ck].split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,3)); return; }
+    const m = GRMP.D.person(db, pr.mentorId), e = GRMP.D.person(db, pr.menteeId);
+    const txt = await AI.gen(ck, AI.rationalePrompt(m, e));
+    if(txt && el.isConnected) apply(txt.split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,3));
+  });
+}
+function bindGlobal(){
+  const t = document.getElementById('openas-toggle');
+  if(t) t.onclick = ()=>{ openasOpen = !openasOpen; render(); };
+  document.querySelectorAll('[data-goto]').forEach(b=>b.onclick = ()=>{ openasOpen=false; location.hash = b.dataset.goto; });
+  document.querySelectorAll('[data-act]').forEach(b=>b.onclick = ()=>{
+    const fn = Actions[b.dataset.act]; if(fn) fn(b.dataset);
+  });
+}
+window.addEventListener('hashchange', render);
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(!REMOTE){ render(); loadDecisions().then(()=>render()); return; }
+  if(!SESSION){ render(); return; }           // straight to login
+  render();                                   // splash while booting
+  rpc('boot', SESSION.token).then(r=>{
+    if(r.ok){ db=r.db; lastEmailShown=db.emails.length; if(r.identity) SESSION={...SESSION, identity:r.identity};
+      render(); loadDecisions().then(()=>render()); }
+    else { SESSION=null; localStorage.removeItem('grmp_session'); render(); }
+  }).catch(e=>{ SESSION=null; render(); toast('Could not reach the server — sign in to retry.', false); });
+});
+
+/* ---------- action registry (wired from data-act attributes) ---------- */
+const Actions = {
+  doLogin(){
+    const u=(document.getElementById('lg-u')||{}).value?.trim().toLowerCase();
+    const p=(document.getElementById('lg-p')||{}).value?.trim();
+    if(!u||!p){ window.__loginErr='Enter the account and passcode.'; render(); return; }
+    busy(true);
+    rpc('login', u, p).then(r=>{ busy(false);
+      if(!r.ok){ window.__loginErr=r.error||'Wrong account or passcode.'; render(); return; }
+      window.__loginErr=null; SESSION={token:r.token, identity:r.identity};
+      localStorage.setItem('grmp_session', JSON.stringify(SESSION));
+      db=r.db; lastEmailShown=db.emails.length; render();
+      toast('Signed in as '+r.identity.label+'. Everything you do here is shared with the team.');
+      const id=r.identity;
+      if(id.kind==='person') location.hash='#/me/'+id.personId;
+      else location.hash='#/console/'+encodeURIComponent(id.name);
+    }).catch(e=>{ busy(false); window.__loginErr='Server unreachable — try again.'; render(); });
+  },
+  logout(){
+    if(REMOTE && SESSION) rpc('logout', SESSION.token).catch(()=>{});
+    SESSION=null; localStorage.removeItem('grmp_session'); location.hash='#/'; render();
+  },
+  reset(){
+    if(REMOTE){ if(confirm('Reset the SHARED database to the seeded state for everyone?')) call('adminReset'); return; }
+    if(confirm('Reset all demo data to the seeded state?')){ db = GRMP.Store.reset(); lastEmailShown = db.emails.length; render(); }
+  },
+  ack(d){ call('acknowledge', d.person, d.doc); },
+  ackAll(d){ if(REMOTE){ call('ackAllDocs', d.person); } else { act(x=>{['rules','charter','governance','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); } },
+  orient(d){ call('completeOrientation', d.person, d.mode).then(()=>toast(d.mode==='recorded'?'Recording opened — your completion has been recorded.':'Live attendance marked — orientation complete.')); },
+  confirmReturn(d){ call('confirmReturn', d.person).then(()=>toast('Welcome back! Please re-acknowledge the programme documents below.')); },
+  closeoff(d){
+    const met = document.getElementById('co-met').checked;
+    const ref = document.getElementById('co-ref').checked;
+    if(!met || !ref){ toast('Both confirmations are required to close off the rotation.', false); return; }
+    const c = document.getElementById('co-comment').value;
+    call('closeoff', d.pair, true, true, c);
+  },
+  midreview(d){
+    const t = document.getElementById('mr-text').value.trim();
+    if(!t){ toast('Please write a short review first.', false); return; }
+    call('submitMidReview', d.person, t);
+  },
+  builder(d){
+    const t = document.getElementById('br-text').value.trim();
+    if(!t){ toast('Please write your Builder Reflection first.', false); return; }
+    call('submitBuilderReflection', d.person, t);
+  },
+  score(d){
+    const s = document.getElementById('sc-'+d.person).value;
+    const c = document.getElementById('cm-'+d.person).value;
+    call('score', d.person, d.reviewer, Number(s), c);
+  },
+  decide(d){ call('decide', d.person, d.decision, d.actor); },
+  suggest(d){ call('suggestMatches', Number(d.rotation), d.track).then(n=>{ if(!n||!n.length) toast('No unmatched mentees (or no capacity) in this track right now.', false); }); },
+  approvePair(d){ call('approvePair', d.pair, d.actor); },
+  promote(d){ call('promoteWaitlist', d.person, d.actor); },
+  replaceMentor(d){ call('replaceMentor', d.pair, d.bench, d.actor); },
+  issueCerts(d){ call('issueCertificates', d.actor).then(out=>toast((out&&out.length)? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.', !!(out&&out.length))); },
+  remindCloseoff(d){ call('remindCloseoff', d.email).then(()=>toast('Reminder queued.')); },
+  checkin(d){ call('toggleAttendance', d.event, d.person); },
+  setToday(d){ call('setToday', d.date); },
+  startNewCycle(){
+    const g=id=>(document.getElementById(id)||{}).value?.trim();
+    const label=g('cy-label');
+    const rot=[{n:1,label:'Know Yourself',start:g('cy-r1s'),end:g('cy-r1e')},
+               {n:2,label:'Know Your World',start:g('cy-r2s'),end:g('cy-r2e')},
+               {n:3,label:'Know Your Path',start:g('cy-r3s'),end:g('cy-r3e')}];
+    const today=g('cy-today');
+    const carry=(document.getElementById('cy-carry')||{}).checked;
+    if(!label||rot.some(r=>!r.start||!r.end)||!today){ toast('Fill in the cycle label, all six rotation dates and the start date.', false); return; }
+    if(!confirm('Start "'+label+'"? The current cycle will be archived; mentors '+(carry?'carry over as invited':'are NOT carried over')+'; mentees, pairs and certificates reset.')) return;
+    call('startNewCycle', {label, rotations:rot, today, actor:(SESSION&&SESSION.identity&&SESSION.identity.name)||'lead', carryOverMentors:carry})
+      .then(id=>{ toast('New cycle '+id+' started — previous cycle archived.'); location.hash='#/console/'+encodeURIComponent((SESSION&&SESSION.identity&&SESSION.identity.name)||'Esther'); });
+  },
+  exportReport(){
+    const D=GRMP.D;
+    const rows=[['id','name','kind','track','status','acknowledged','orientation','closeoffs','mid_review','builder_reflection','certificate']];
+    db.people.filter(p=>['accepted','reserve_bench','invited'].includes(p.appStatus)).forEach(p=>{
+      rows.push([p.id,p.name,p.kind,p.track,p.appStatus,D.ackComplete(p)?'yes':'no',p.orientation?'yes':'no',
+        p.kind==='mentee'?D.menteeCloseoffs(db,p.id).length:'-',
+        p.kind==='mentor'?(db.midreviews.some(m=>m.mentorId===p.id)?'yes':'no'):'-',
+        p.kind==='mentee'?(db.builderReflections.some(b=>b.menteeId===p.id)?'yes':'no'):'-',
+        db.certificates.some(c=>c.personId===p.id)?'yes':'no']);
+    });
+    const csv=rows.map(r=>r.join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download='grmp_cohort_report.csv'; aEl.click();
+    toast('Cohort report downloaded ('+(rows.length-1)+' rows).');
+  },
+  openFeedback(){ openFeedbackModal(); },
+  decideDefault(d){ __decideDefault(d); },
+  submitApply(d){
+    const kind = d.kind;
+    const get = id => (document.getElementById(id)||{}).value || '';
+    const consent = (document.getElementById('f-consent')||{}).checked;
+    const track = (document.querySelector('.track-opt.sel')||{}).dataset?.track;
+    const fields = kind==='mentee'
+      ? {name:get('f-name'),email:get('f-email'),mobile:get('f-mobile'),track,university:'SMU',course:get('f-course'),
+         year:get('f-year'),goals:get('f-goals'),devNeeds:get('f-dev'),industryInterest:get('f-ind'),
+         expectations:get('f-exp'),readiness:get('f-read'),consent}
+      : {name:get('f-name'),email:get('f-email'),mobile:get('f-mobile'),track,org:get('f-org'),role:get('f-role'),
+         industry:get('f-ind'),background:get('f-bg'),leadership:get('f-lead'),xcultural:get('f-x'),
+         languages:[get('f-lang')],motivation:get('f-mot'),consent};
+    call('submitApplication', kind, fields).then(res=>{ location.hash = '#/applied/'+res.person.id; });
+  },
+  pickTrack(d){
+    document.querySelectorAll('.track-opt').forEach(el=>el.classList.remove('sel'));
+    document.querySelector(`.track-opt[data-track="${d.track}"]`).classList.add('sel');
+  },
+  raiseConcern(){
+    const t = document.getElementById('cn-text').value.trim();
+    if(!t){ toast('Please describe the concern first.', false); return; }
+    call('raiseConcern', t).then(()=>{
+      location.hash = '#/';
+      toast('Submitted privately. Only the Escalation Owner can see this; it is referred to the SMC Grievance & Misconduct process.');
+    });
+  },
+};
+window.__demo = {get db(){return db}, act, Actions};   // exposed for Playwright tests
+
+</script>
