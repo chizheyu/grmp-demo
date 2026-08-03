@@ -256,6 +256,7 @@ const Actions = {
     document.querySelectorAll('.track-opt').forEach(el=>el.classList.remove('sel'));
     document.querySelector(`.track-opt[data-track="${d.track}"]`).classList.add('sel');
   },
+  openFeedback(){ openFeedbackModal(); },
   setToday(d){ act(x=>GRMP.D.setToday(x, d.date)); },
   exportReport(){
     const D=GRMP.D;
