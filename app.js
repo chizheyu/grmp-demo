@@ -2,6 +2,10 @@
    Views live in views_public.js (microsite + personal) and views_console.js (admin). */
 
 let db = GRMP.Store.load();
+
+/* Feedback channel — filled in once the Apps Script backend is deployed.
+   Empty string = button hidden, demo unaffected. */
+const FEEDBACK_URL = '';
 const $app = () => document.getElementById('app');
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -68,12 +72,63 @@ function renderOpenAs(){
   </div>`;
 }
 
+/* ---------- feedback (acceptance loop) ---------- */
+function feedbackContext(){
+  const h = location.hash||'#/';
+  let role = 'visitor';
+  let m;
+  if((m=h.match(/^#\/console\/([^/]+)/))) role = 'console: '+decodeURIComponent(m[1]);
+  else if((m=h.match(/^#\/me\/(.+)$/))){ const p=GRMP.D.person(db,m[1]); role = p? (p.kind+': '+p.name) : 'personal page'; }
+  return {page:h, role};
+}
+function renderFeedbackBtn(){
+  if(!FEEDBACK_URL) return '';
+  return `<button class="fb-btn" data-act="openFeedback">💬 Feedback</button>`;
+}
+function openFeedbackModal(){
+  const ctx = feedbackContext();
+  const root = document.getElementById('overlay-root');
+  const wrap = document.createElement('div');
+  wrap.className='fb-wrap';
+  wrap.innerHTML = `<div class="fb-bg"></div>
+   <div class="fb-modal">
+     <h3 style="margin:0 0 4px;font-size:16px">Feedback on this screen</h3>
+     <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:10px">Attached automatically: <b>${esc(ctx.page)}</b> · viewing as <b>${esc(ctx.role)}</b></div>
+     <div class="f-row"><label>Your name (optional)</label><input type="text" id="fb-name" placeholder="so we can follow up"></div>
+     <div class="f-row"><label>What should change? <span class="req">*</span></label><textarea id="fb-text" placeholder="Describe what you expected, what you saw, or what's missing"></textarea></div>
+     <div style="display:flex;gap:8px;justify-content:flex-end">
+       <button class="btn sm btn-ghost" id="fb-cancel">Cancel</button>
+       <button class="btn sm btn-primary" id="fb-send">Send feedback</button>
+     </div>
+     <div style="font-size:11px;color:var(--ink-3);margin-top:8px">Feedback lands with the build team; status appears on the <a href="#/changelog">changelog</a>.</div>
+   </div>`;
+  root.appendChild(wrap);
+  wrap.querySelector('.fb-bg').onclick = ()=>wrap.remove();
+  wrap.querySelector('#fb-cancel').onclick = ()=>wrap.remove();
+  wrap.querySelector('#fb-send').onclick = async ()=>{
+    const text = wrap.querySelector('#fb-text').value.trim();
+    if(!text){ toast('Please describe the change first.', false); return; }
+    const payload = {page:ctx.page, role:ctx.role, author:wrap.querySelector('#fb-name').value.trim()||'anonymous', text};
+    wrap.querySelector('#fb-send').disabled = true;
+    try{
+      const r = await fetch(FEEDBACK_URL, {method:'POST', body: JSON.stringify(payload)});
+      const j = await r.json();
+      if(!j.ok) throw 0;
+      wrap.remove();
+      toast('Feedback sent — thank you. Track it on the changelog.');
+    }catch(e){
+      wrap.querySelector('#fb-send').disabled = false;
+      toast('Could not send right now — please try again in a minute.', false);
+    }
+  };
+}
+
 /* ---------- banner ---------- */
 function demoBanner(){
   const rot = GRMP.D.currentRotation(db);
   const phase = rot ? `Rotation ${rot.n} · ${rot.label}` : (db.today>'2027-03-31'?'after the cycle':'closing weeks');
   return `<div class="demo-banner">Requirements demo · sample data only · simulated today: <b>${db.today}</b> (${phase}) ·
-    advance the demo clock in <a href="#/console/Esther/config">Configuration</a> · yellow boxes are inferred defaults · <a href="#/manual">user manual</a></div>`;
+    advance the demo clock in <a href="#/console/Esther/config">Configuration</a> · yellow boxes are inferred defaults · <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a></div>`;
 }
 
 /* ---------- router ---------- */
@@ -87,6 +142,7 @@ const routes = [
   {re:/^#\/applied\/(.+)$/,   view:m=>Views.applied(m[1])},
   {re:/^#\/me\/(.+)$/,        view:m=>Views.personal(m[1])},
   {re:/^#\/manual$/,          view:()=>Views.manual()},
+  {re:/^#\/changelog$/,       view:()=>Views.changelog()},
   {re:/^#\/console$/,         view:()=>Console.login()},
   {re:/^#\/console\/([^/]+)\/?([^/]*)$/, view:m=>Console.shell(decodeURIComponent(m[1]), m[2]||'')},
 ];
@@ -95,7 +151,7 @@ function render(){
   let html = null;
   for(const r of routes){ const m = h.match(r.re); if(m){ html = r.view(m); break; } }
   if(html===null){ location.hash = '#/'; return; }
-  $app().innerHTML = demoBanner() + html + renderOpenAs();
+  $app().innerHTML = demoBanner() + html + renderOpenAs() + renderFeedbackBtn();
   bindGlobal();
   flushEmails();
   upgradeAI();

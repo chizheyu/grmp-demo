@@ -234,6 +234,36 @@ manual(){
   </div>` + this.msFooter();
 },
 
+/* ---------- changelog (acceptance loop, public) ---------- */
+changelog(){
+  setTimeout(async ()=>{
+    const box = document.getElementById('cl-body');
+    if(!box) return;
+    const url = (typeof FEEDBACK_URL!=='undefined') && FEEDBACK_URL;
+    if(!url){ box.innerHTML = '<p style="color:var(--ink-3)">The feedback channel is being connected — check back shortly.</p>'; return; }
+    try{
+      const r = await fetch(url+'?list=1'); const j = await r.json();
+      if(!j.ok || !j.items.length){ box.innerHTML='<p style="color:var(--ink-3)">No feedback yet — be the first: every screen has a 💬 Feedback button.</p>'; return; }
+      const chip = s => s==='fixed' ? '<span class="badge b-ok"><span class="d"></span>Fixed</span>'
+        : s==='in_progress' ? '<span class="badge b-warn"><span class="d"></span>In progress</span>'
+        : s==='wont_fix' ? '<span class="badge b-neut"><span class="d"></span>Not planned</span>'
+        : '<span class="badge b-ai">New</span>';
+      box.innerHTML = j.items.map(it=>`<div class="doc-card" style="padding:14px 18px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${chip(it.status)}
+          <b style="font-size:13px">${it.author&&it.author!=='anonymous'?it.author:'Someone'}</b>
+          <span style="font-size:11.5px;color:var(--ink-3)">${it.ts} · on ${it.page} · as ${it.role}</span></div>
+        <p style="font-size:13.5px;margin:8px 0 0">${it.text}</p>
+        ${it.note?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--ok);background:var(--ok-wash);border-radius:8px;padding:8px 12px"><b>Build team:</b> ${it.note}${it.resolvedAt?' · '+it.resolvedAt:''}</p>`:''}
+      </div>`).join('');
+    }catch(e){ box.innerHTML='<p style="color:var(--ink-3)">Could not load right now — refresh in a minute.</p>'; }
+  }, 50);
+  return this.msNav() + `<div class="doc-page">
+    <h1>Changelog — your feedback, our fixes</h1>
+    <p class="lede">Every screen has a 💬 Feedback button. What you send lands here with a status; small fixes usually ship within a day.</p>
+    <div id="cl-body"><p style="color:var(--ink-3)">Loading…</p></div>
+  </div>` + this.msFooter();
+},
+
 /* ---------- 2/3 personal pages ---------- */
 personal(personId){
   const db = __demo.db, D = GRMP.D;
