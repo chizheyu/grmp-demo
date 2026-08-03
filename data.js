@@ -2,7 +2,7 @@
    Single source of truth in localStorage. Deterministic seed (mulberry32) so tests are stable.
    Demo date is fixed at 2026-12-15 (mid-cycle: R1 closed, R2 running) so every view has life. */
 
-const DB_KEY = 'grmp_demo_v3';   // bumped: roles + submissions views
+const DB_KEY = 'grmp_demo_v4';   // bumped: cohort model + accounts
 const TODAY = '2026-12-15';
 
 /* Node compatibility: same file runs headless for CLI backend tests (localStorage shim). */
@@ -174,9 +174,33 @@ function buildSeed(){
     {at:'2026-11-30', to:'all matched pairs', subject:'Your Rotation 2 match — Know Your World', kind:'match'},
   ];
 
+  /* preset accounts: 6 admins + 5 participant personas (picked deterministically) */
+  const DOCS5=['rules','charter','governance','pdpa','coi'];
+  const acctGate = people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&!(p.ack&&DOCS5.every(k=>p.ack[k])));
+  const acctFF   = people.find(p=>p.previewFastForward);
+  const acctMid  = (pairs.find(x=>x.rotation===2&&x.status==='approved'&&!people.find(pp=>pp.id===x.menteeId).previewFastForward)||{}).menteeId;
+  const acctMentor = (pairs.find(x=>x.rotation===2&&x.status==='approved')||{}).mentorId;
+  const acctBench  = people.find(p=>p.appStatus==='reserve_bench');
+  const accounts = [
+    {u:'esther',   pass:'grmp2026', kind:'admin', name:'Esther',    label:'Programme Lead'},
+    {u:'weikiat',  pass:'grmp2026', kind:'admin', name:'Wei Kiat',  label:'Programme Coordinator'},
+    {u:'kenzie',   pass:'grmp2026', kind:'admin', name:'Kenzie',    label:'Mentor Reviewer (SMU)'},
+    {u:'yutong',   pass:'grmp2026', kind:'admin', name:'Yu Tong',   label:'Mentor Reviewer (SMU)'},
+    {u:'portia',   pass:'grmp2026', kind:'admin', name:'Portia',    label:'Mentee Reviewer (SMU)'},
+    {u:'sapranshu',pass:'grmp2026', kind:'admin', name:'Sapranshu', label:'Mentee Reviewer (SMU)'},
+    {u:'mentee.new',  pass:'grmp2026', kind:'person', personId:acctGate.id,  label:'Mentee — start of journey (gates ahead)'},
+    {u:'mentee.mid',  pass:'grmp2026', kind:'person', personId:acctMid,      label:'Mentee — mid-cycle (close-off due)'},
+    {u:'mentee.done', pass:'grmp2026', kind:'person', personId:acctFF.id,    label:'Mentee — end of journey (certificate path)'},
+    {u:'mentor.active',pass:'grmp2026',kind:'person', personId:acctMentor,   label:'Mentor — active with mentees'},
+    {u:'mentor.bench', pass:'grmp2026',kind:'person', personId:acctBench.id, label:'Mentor — reserve bench'},
+  ];
+
   return {
     version:1, today:TODAY,
+    archives:[], aiCache:{}, sessions:{},
     config:{
+      cohort:{id:'C2026', label:'GRMP 2026 (SMU pilot)'},
+      accounts,
       cycle:'GRMP 2026 (SMU pilot)',
       rotations:[{n:1,label:'Know Yourself',start:'2026-10-01',end:'2026-11-30'},
                  {n:2,label:'Know Your World',start:'2026-12-01',end:'2027-01-31'},
@@ -342,6 +366,51 @@ const D = {
     db.audit.push({at:db.today,actor,action:'mentor_replaced',entity:pairId});
     return pr;
   },
+  toggleAttendance(db, eventKey, personId){
+    const ev = db.events[eventKey]; if(!ev) return;
+    const i = ev.attendance.indexOf(personId);
+    if(i>=0) ev.attendance.splice(i,1); else ev.attendance.push(personId);
+    db.audit.push({at:db.today,actor:'coordinator',action:'attendance:'+eventKey,entity:personId});
+  },
+  remindCloseoff(db, email){
+    db.emails.push({at:db.today,to:email,kind:'closeoff',subject:'Reminder: please close off your rotation (two quick confirmations)'});
+  },
+  confirmReturn(db, personId){
+    const p = D.person(db, personId);
+    if(!p || p.appStatus!=='invited') return false;
+    p.appStatus='accepted';
+    db.emails.push({at:db.today,to:p.email,kind:'decision',subject:`Welcome back to ${db.config.cohort.label}, ${p.name}!`});
+    db.audit.push({at:db.today,actor:personId,action:'returning_mentor_confirmed',entity:personId});
+    return true;
+  },
+  startNewCycle(db, opts){
+    // opts: {label, rotations:[{n,label,start,end}x3], ackLadder?, today, actor, carryOverMentors=true}
+    const old = db.config.cohort;
+    const closed = n=>db.pairs.filter(x=>x.rotation===n&&x.status==='closed').length;
+    db.archives.push({id:old.id, label:old.label, archivedAt:db.today,
+      stats:{mentors:db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length,
+             mentees:db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length,
+             r1:closed(1), r2:closed(2), r3:closed(3),
+             certificates:db.certificates.length,
+             kickoff:db.events.kickoff.attendance.length}});
+    const carry = opts.carryOverMentors!==false;
+    const keep = carry ? db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)) : [];
+    keep.forEach(m=>{ m.appStatus='invited'; m.ack=null; m.orientation=null; delete m.droppedOut; });
+    db.people = keep;
+    db.reviews=[]; db.pairs=[]; db.midreviews=[]; db.builderReflections=[]; db.certificates=[]; db.concerns=[];
+    db.emails=[{at:opts.today,to:carry?keep.length+' returning mentors':'—',kind:'decision',
+      subject:`${opts.label}: invitation to return as a mentor`}];
+    const newId = 'C'+(opts.rotations[0].start||'').slice(0,4);
+    db.events = {kickoff:{name:'Kickoff Night', date:opts.kickoffDate||opts.rotations[0].start, attendance:[]},
+                 appreciation:{name:'Appreciation Night', date:opts.appreciationDate||opts.rotations[2].end, attendance:[]}};
+    db.config.cohort = {id:newId, label:opts.label};
+    db.config.cycle = opts.label;
+    db.config.rotations = opts.rotations;
+    if(opts.ackLadder) db.config.ackLadder = opts.ackLadder;
+    db.today = opts.today;
+    db.audit.push({at:opts.today,actor:opts.actor||'lead',action:'new_cycle_started:'+newId+' (archived '+old.id+')',entity:'config'});
+    return newId;
+  },
   setToday(db, dateStr){
     db.today = dateStr;
     db.audit.push({at:dateStr,actor:'demo',action:'clock_set:'+dateStr,entity:'config'});
@@ -354,6 +423,6 @@ const D = {
     return c;
   },
 };
-const GRMP_EXPORT = {Store, D, TRACKS, DB_KEY};
+const GRMP_EXPORT = {Store, D, TRACKS, DB_KEY, buildSeed};
 if (typeof window !== 'undefined') window.GRMP = GRMP_EXPORT;
 if (typeof module !== 'undefined' && module.exports) module.exports = GRMP_EXPORT;

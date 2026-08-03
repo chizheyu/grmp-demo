@@ -317,6 +317,20 @@ personal(personId){
 
   /* --- next-step card --- */
   let nextCard = '';
+  if(p.appStatus==='invited'){
+    nextCard = `<div class="card"><h3>👋 Welcome back — ${esc(db.config.cohort.label)}</h3>
+      <p style="font-size:13px;color:var(--ink-2)">You mentored in a previous cycle and the programme team has invited you to return.
+      Confirm below — then re-acknowledge the programme documents (they may have changed) and complete this cycle's orientation.</p>
+      <button class="btn btn-primary" data-act="confirmReturn" data-person="${p.id}">Yes — I'm returning as a mentor</button></div>`;
+    return `<div class="pp-shell">
+      <div class="pp-head">
+        <div class="avatar av-mentor">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
+        <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
+          <div class="sub">Returning mentor · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}</div></div>
+      </div>
+      ${nextCard}
+    </div>`;
+  }
   const DOCS = [['rules','GRMP Programme Rules','v2.0'],['charter','SMC Charter','v1.3'],['governance','Governance Guidelines','v1.1'],['pdpa','PDPA Consent','v1.0'],['coi','Conflict-of-Interest Declaration','v1.0']];
   if(!ackDone){
     nextCard = `<div class="card"><h3>📄 Acknowledge the programme documents</h3>
@@ -420,7 +434,7 @@ personal(personId){
     <div class="pp-head">
       <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
       <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
-        <div class="sub">${mentee?'Mentee':'Mentor'} · ${esc(GRMP.TRACKS[p.track].label)} track · GRMP 2026
+        <div class="sub">${mentee?'Mentee':'Mentor'} · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}
         ${p.previewFastForward?' · <b style="color:var(--ai-ink)">demo fast-forwarded to March</b>':''}</div></div>
     </div>
     <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — no account, no password. That's by design.</div>

@@ -1,7 +1,37 @@
 /* GRMP Demo — core: router, shell, open-as switcher, email popups.
    Views live in views_public.js (microsite + personal) and views_console.js (admin). */
 
-let db = GRMP.Store.load();
+/* ---------- runtime mode ----------
+   REMOTE: served from Apps Script (google.script.run available) — shared database, real accounts.
+   local : GitHub Pages / file — per-browser sandbox (kept for tests and public demo). */
+const REMOTE = (typeof google!=='undefined' && google.script && google.script.run);
+let SESSION = null;
+try{ SESSION = JSON.parse(localStorage.getItem('grmp_session')||'null'); }catch(e){}
+let db = REMOTE ? null : GRMP.Store.load();
+
+function busy(on){
+  let el=document.getElementById('rpc-busy');
+  if(on){ if(!el){ el=document.createElement('div'); el.id='rpc-busy'; el.className='rpc-busy'; document.body.appendChild(el);} }
+  else if(el) el.remove();
+}
+/* every mutation goes through call(): local = apply directly; remote = server applies + returns new db */
+function call(fn, ...args){
+  if(!REMOTE){
+    const out = GRMP.D[fn](db, ...args);
+    GRMP.Store.save(db); render(); return Promise.resolve(out);
+  }
+  busy(true);
+  return new Promise((res,rej)=>google.script.run
+    .withSuccessHandler(r=>{ busy(false);
+      if(!r.ok){ toast(r.error||'Not permitted.', false); rej(r); return; }
+      db=r.db; render(); res(r.out); })
+    .withFailureHandler(e=>{ busy(false); toast('Server error — try again. '+(e&&e.message||''), false); rej(e); })
+    .applyAction(SESSION&&SESSION.token, fn, args));
+}
+function rpc(name, ...args){
+  return new Promise((res,rej)=>google.script.run
+    .withSuccessHandler(res).withFailureHandler(rej)[name](...args));
+}
 
 /* Feedback channel — filled in once the Apps Script backend is deployed.
    Empty string = button hidden, demo unaffected. */
@@ -9,7 +39,7 @@ const FEEDBACK_URL = 'https://script.google.com/macros/s/AKfycbwvothqM0XvOFOE_Hx
 const $app = () => document.getElementById('app');
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-/* ---------- persistence wrapper: every action saves + rerenders ---------- */
+/* ---------- local-only persistence wrapper (sandbox mode) ---------- */
 function act(fn){ const out = fn(db); GRMP.Store.save(db); render(); return out; }
 
 /* ---------- email popup (the "this email would be sent" surface) ---------- */
@@ -76,6 +106,7 @@ async function loadDecisions(){
 /* ---------- open-as switcher ---------- */
 let openasOpen = false;
 function renderOpenAs(){
+  if(REMOTE) return '';
   const mentees = db.people.filter(p=>p.kind==='mentee' && ['accepted','reserve_bench'].includes(p.appStatus)).slice(0,6);
   const mentors = db.people.filter(p=>p.kind==='mentor' && p.appStatus==='accepted' && !p.droppedOut).slice(0,4);
   const preview = db.people.filter(p=>p.previewFastForward);
@@ -146,6 +177,41 @@ function openFeedbackModal(){
   };
 }
 
+/* ---------- decision modal (extracted) ---------- */
+function __decideDefault(d){
+  const it = db.config.openItems[d.q]; if(!it || !FEEDBACK_URL) return;
+  const confirm_ = d.kind==='confirm';
+  const root = document.getElementById('overlay-root');
+  const wrap = document.createElement('div');
+  wrap.className='fb-wrap';
+  wrap.innerHTML = `<div class="fb-bg"></div>
+   <div class="fb-modal">
+     <h3 style="margin:0 0 4px;font-size:16px">${confirm_?'Confirm this default':'Request a change'}</h3>
+     <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px;background:var(--surface-2);border-radius:8px;padding:9px 12px"><b>${d.q}</b> · ${esc(it.title)}</div>
+     <div class="f-row"><label>Your name (for the decision record) <span class="req">*</span></label><input type="text" id="dc-name" placeholder="e.g. Esther" value="${SESSION&&SESSION.identity?esc(SESSION.identity.name||SESSION.identity.label||''):''}"></div>
+     ${confirm_?'':`<div class="f-row"><label>What should it be instead? <span class="req">*</span></label><textarea id="dc-text"></textarea></div>`}
+     <div style="display:flex;gap:8px;justify-content:flex-end">
+       <button class="btn sm btn-ghost" id="dc-cancel">Cancel</button>
+       <button class="btn sm ${confirm_?'btn-ok':'btn-primary'}" id="dc-send">${confirm_?'✓ Confirm':'Send change request'}</button>
+     </div></div>`;
+  root.appendChild(wrap);
+  wrap.querySelector('.fb-bg').onclick=()=>wrap.remove();
+  wrap.querySelector('#dc-cancel').onclick=()=>wrap.remove();
+  wrap.querySelector('#dc-send').onclick=async ()=>{
+    const name=wrap.querySelector('#dc-name').value.trim();
+    if(!name){ toast('Please add your name — decisions need an owner.', false); return; }
+    const text=confirm_?'Confirmed as running.':(wrap.querySelector('#dc-text').value.trim());
+    if(!text){ toast('Please describe the change.', false); return; }
+    wrap.querySelector('#dc-send').disabled=true;
+    try{
+      await fetch(FEEDBACK_URL,{method:'POST',body:JSON.stringify({page:'DECISION:'+d.q+':'+d.kind,role:'decision',author:name,text})});
+      wrap.remove();
+      toast(confirm_?'Decision recorded — thank you, '+name+'.':'Change request recorded — the build team will follow up.');
+      await loadDecisions(); render();
+    }catch(e){ wrap.querySelector('#dc-send').disabled=false; toast('Could not record right now — try again in a minute.', false); }
+  };
+}
+
 /* ---------- banner ---------- */
 function demoBanner(){
   const rot = GRMP.D.currentRotation(db);
@@ -171,6 +237,8 @@ const routes = [
   {re:/^#\/console\/([^/]+)\/?([^/]*)$/, view:m=>Console.shell(decodeURIComponent(m[1]), m[2]||'')},
 ];
 function render(){
+  if(REMOTE && !db){ $app().innerHTML = `<div class="login-wrap"><div class="login-card" style="text-align:center"><h1>GRMP Platform</h1><div class="sub">Connecting to the shared database…</div></div></div>`; return; }
+  if(REMOTE && !SESSION){ $app().innerHTML = renderLogin(); bindGlobal(); return; }
   const h = location.hash || '#/';
   let html = null;
   for(const r of routes){ const m = h.match(r.re); if(m){ html = r.view(m); break; } }
@@ -180,6 +248,26 @@ function render(){
   flushEmails();
   upgradeAI();
   window.scrollTo(0,0);
+}
+
+/* ---------- login (remote mode) ---------- */
+function renderLogin(){
+  const err = window.__loginErr ? `<div style="color:var(--red);font-size:12.5px;margin-bottom:10px">${esc(window.__loginErr)}</div>` : '';
+  return `<div class="login-wrap"><div class="login-card">
+    <h1>GRMP Platform</h1>
+    <div class="sub">Shared staging environment · sign in with a demo account</div>
+    ${err}
+    <div class="f-row"><label>Account</label><input type="text" id="lg-u" placeholder="e.g. esther · mentee.new · mentor.active" autocomplete="off"></div>
+    <div class="f-row"><label>Passcode</label><input type="password" id="lg-p" placeholder="shared demo passcode" autocomplete="off"></div>
+    <button class="btn btn-primary" style="width:100%" data-act="doLogin">Sign in</button>
+    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:10px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--ink-3);text-transform:uppercase;margin-bottom:6px">Demo accounts (passcode in the group message)</div>
+      <div style="font-size:12px;color:var(--ink-2);line-height:1.7">
+        <b>Admins:</b> esther · weikiat · kenzie · yutong · portia · sapranshu<br>
+        <b>Participants:</b> mentee.new · mentee.mid · mentee.done · mentor.active · mentor.bench</div>
+    </div>
+    <div class="sim-note">Fictional sample data · every action is shared with everyone signed in — that's the point.</div>
+  </div></div>`;
 }
 
 /* ---------- progressive AI upgrade: simulated → Gemini, in place ---------- */
@@ -222,45 +310,108 @@ function bindGlobal(){
   });
 }
 window.addEventListener('hashchange', render);
-window.addEventListener('DOMContentLoaded', ()=>{ render(); loadDecisions().then(()=>render()); });
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(!REMOTE){ render(); loadDecisions().then(()=>render()); return; }
+  render();                                   // connecting splash / login
+  rpc('boot', SESSION&&SESSION.token).then(r=>{
+    if(r.ok){ db=r.db; if(r.identity) SESSION={...(SESSION||{}), identity:r.identity};
+      render(); loadDecisions().then(()=>render()); }
+    else { SESSION=null; localStorage.removeItem('grmp_session'); db=r.db||null;
+      if(r.db){ render(); } else { rpc('boot', null).then(r2=>{ db=r2.db; render(); }); } }
+  }).catch(e=>{ $app().innerHTML='<div class="login-wrap"><div class="login-card"><h1>GRMP Platform</h1><div class="sub">Could not reach the server — refresh to retry.</div></div></div>'; });
+});
 
 /* ---------- action registry (wired from data-act attributes) ---------- */
 const Actions = {
-  reset(){ if(confirm('Reset all demo data to the seeded state?')){ db = GRMP.Store.reset(); lastEmailShown = db.emails.length; render(); } },
-  ack(d){ act(x=>GRMP.D.acknowledge(x, d.person, d.doc)); },
-  ackAll(d){ act(x=>{['rules','charter','governance','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); },
-  orient(d){ act(x=>GRMP.D.completeOrientation(x, d.person, d.mode)); toast(d.mode==='recorded'?'Recording opened — your completion has been recorded.':'Live attendance marked — orientation complete.'); },
+  doLogin(){
+    const u=(document.getElementById('lg-u')||{}).value?.trim().toLowerCase();
+    const p=(document.getElementById('lg-p')||{}).value?.trim();
+    if(!u||!p){ window.__loginErr='Enter the account and passcode.'; render(); return; }
+    busy(true);
+    rpc('login', u, p).then(r=>{ busy(false);
+      if(!r.ok){ window.__loginErr=r.error||'Wrong account or passcode.'; render(); return; }
+      window.__loginErr=null; SESSION={token:r.token, identity:r.identity};
+      localStorage.setItem('grmp_session', JSON.stringify(SESSION));
+      db=r.db; render();
+      toast('Signed in as '+r.identity.label+'. Everything you do here is shared with the team.');
+      const id=r.identity;
+      if(id.kind==='person') location.hash='#/me/'+id.personId;
+      else location.hash='#/console/'+encodeURIComponent(id.name);
+    }).catch(e=>{ busy(false); window.__loginErr='Server unreachable — try again.'; render(); });
+  },
+  logout(){
+    if(REMOTE && SESSION) rpc('logout', SESSION.token).catch(()=>{});
+    SESSION=null; localStorage.removeItem('grmp_session'); location.hash='#/'; render();
+  },
+  reset(){
+    if(REMOTE){ if(confirm('Reset the SHARED database to the seeded state for everyone?')) call('adminReset'); return; }
+    if(confirm('Reset all demo data to the seeded state?')){ db = GRMP.Store.reset(); lastEmailShown = db.emails.length; render(); }
+  },
+  ack(d){ call('acknowledge', d.person, d.doc); },
+  ackAll(d){ if(REMOTE){ call('ackAllDocs', d.person); } else { act(x=>{['rules','charter','governance','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); } },
+  orient(d){ call('completeOrientation', d.person, d.mode).then(()=>toast(d.mode==='recorded'?'Recording opened — your completion has been recorded.':'Live attendance marked — orientation complete.')); },
+  confirmReturn(d){ call('confirmReturn', d.person).then(()=>toast('Welcome back! Please re-acknowledge the programme documents below.')); },
   closeoff(d){
     const met = document.getElementById('co-met').checked;
     const ref = document.getElementById('co-ref').checked;
     if(!met || !ref){ toast('Both confirmations are required to close off the rotation.', false); return; }
     const c = document.getElementById('co-comment').value;
-    act(x=>GRMP.D.closeoff(x, d.pair, true, true, c));
+    call('closeoff', d.pair, true, true, c);
   },
   midreview(d){
     const t = document.getElementById('mr-text').value.trim();
     if(!t){ toast('Please write a short review first.', false); return; }
-    act(x=>GRMP.D.submitMidReview(x, d.person, t));
+    call('submitMidReview', d.person, t);
   },
   builder(d){
     const t = document.getElementById('br-text').value.trim();
     if(!t){ toast('Please write your Builder Reflection first.', false); return; }
-    act(x=>GRMP.D.submitBuilderReflection(x, d.person, t));
+    call('submitBuilderReflection', d.person, t);
   },
   score(d){
     const s = document.getElementById('sc-'+d.person).value;
     const c = document.getElementById('cm-'+d.person).value;
-    act(x=>GRMP.D.score(x, d.person, d.reviewer, Number(s), c));
+    call('score', d.person, d.reviewer, Number(s), c);
   },
-  decide(d){ act(x=>GRMP.D.decide(x, d.person, d.decision, d.actor)); },
-  suggest(d){ const n = act(x=>GRMP.D.suggestMatches(x, Number(d.rotation), d.track)); if(!n.length) toast('No unmatched mentees (or no capacity) in this track right now.', false); },
-  approvePair(d){ act(x=>GRMP.D.approvePair(x, d.pair, d.actor)); },
-  promote(d){ act(x=>GRMP.D.promoteWaitlist(x, d.person, d.actor)); },
-  replaceMentor(d){ act(x=>GRMP.D.replaceMentor(x, d.pair, d.bench, d.actor)); },
-  issueCerts(d){ const out = act(x=>GRMP.D.issueCertificates(x, d.actor)); toast(out.length? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.', out.length>0); },
-  remindCloseoff(d){ act(x=>{ x.emails.push({at:x.today,to:d.email,kind:'closeoff',subject:'Reminder: please close off your rotation (two quick confirmations)'}); }); },
-  checkin(d){ act(x=>{ const ev=x.events[d.event]; const i=ev.attendance.indexOf(d.person);
-    if(i>=0) ev.attendance.splice(i,1); else ev.attendance.push(d.person); }); },
+  decide(d){ call('decide', d.person, d.decision, d.actor); },
+  suggest(d){ call('suggestMatches', Number(d.rotation), d.track).then(n=>{ if(!n||!n.length) toast('No unmatched mentees (or no capacity) in this track right now.', false); }); },
+  approvePair(d){ call('approvePair', d.pair, d.actor); },
+  promote(d){ call('promoteWaitlist', d.person, d.actor); },
+  replaceMentor(d){ call('replaceMentor', d.pair, d.bench, d.actor); },
+  issueCerts(d){ call('issueCertificates', d.actor).then(out=>toast((out&&out.length)? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.', !!(out&&out.length))); },
+  remindCloseoff(d){ call('remindCloseoff', d.email).then(()=>toast('Reminder queued.')); },
+  checkin(d){ call('toggleAttendance', d.event, d.person); },
+  setToday(d){ call('setToday', d.date); },
+  startNewCycle(){
+    const g=id=>(document.getElementById(id)||{}).value?.trim();
+    const label=g('cy-label');
+    const rot=[{n:1,label:'Know Yourself',start:g('cy-r1s'),end:g('cy-r1e')},
+               {n:2,label:'Know Your World',start:g('cy-r2s'),end:g('cy-r2e')},
+               {n:3,label:'Know Your Path',start:g('cy-r3s'),end:g('cy-r3e')}];
+    const today=g('cy-today');
+    const carry=(document.getElementById('cy-carry')||{}).checked;
+    if(!label||rot.some(r=>!r.start||!r.end)||!today){ toast('Fill in the cycle label, all six rotation dates and the start date.', false); return; }
+    if(!confirm('Start "'+label+'"? The current cycle will be archived; mentors '+(carry?'carry over as invited':'are NOT carried over')+'; mentees, pairs and certificates reset.')) return;
+    call('startNewCycle', {label, rotations:rot, today, actor:(SESSION&&SESSION.identity&&SESSION.identity.name)||'lead', carryOverMentors:carry})
+      .then(id=>{ toast('New cycle '+id+' started — previous cycle archived.'); location.hash='#/console/'+encodeURIComponent((SESSION&&SESSION.identity&&SESSION.identity.name)||'Esther'); });
+  },
+  exportReport(){
+    const D=GRMP.D;
+    const rows=[['id','name','kind','track','status','acknowledged','orientation','closeoffs','mid_review','builder_reflection','certificate']];
+    db.people.filter(p=>['accepted','reserve_bench','invited'].includes(p.appStatus)).forEach(p=>{
+      rows.push([p.id,p.name,p.kind,p.track,p.appStatus,D.ackComplete(p)?'yes':'no',p.orientation?'yes':'no',
+        p.kind==='mentee'?D.menteeCloseoffs(db,p.id).length:'-',
+        p.kind==='mentor'?(db.midreviews.some(m=>m.mentorId===p.id)?'yes':'no'):'-',
+        p.kind==='mentee'?(db.builderReflections.some(b=>b.menteeId===p.id)?'yes':'no'):'-',
+        db.certificates.some(c=>c.personId===p.id)?'yes':'no']);
+    });
+    const csv=rows.map(r=>r.join(',')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv'});
+    const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download='grmp_cohort_report.csv'; aEl.click();
+    toast('Cohort report downloaded ('+(rows.length-1)+' rows).');
+  },
+  openFeedback(){ openFeedbackModal(); },
+  decideDefault(d){ __decideDefault(d); },
   submitApply(d){
     const kind = d.kind;
     const get = id => (document.getElementById(id)||{}).value || '';
@@ -273,71 +424,19 @@ const Actions = {
       : {name:get('f-name'),email:get('f-email'),mobile:get('f-mobile'),track,org:get('f-org'),role:get('f-role'),
          industry:get('f-ind'),background:get('f-bg'),leadership:get('f-lead'),xcultural:get('f-x'),
          languages:[get('f-lang')],motivation:get('f-mot'),consent};
-    const res = act(x=>GRMP.D.submitApplication(x, kind, fields));
-    location.hash = '#/applied/'+res.person.id;
+    call('submitApplication', kind, fields).then(res=>{ location.hash = '#/applied/'+res.person.id; });
   },
   pickTrack(d){
     document.querySelectorAll('.track-opt').forEach(el=>el.classList.remove('sel'));
     document.querySelector(`.track-opt[data-track="${d.track}"]`).classList.add('sel');
   },
-  openFeedback(){ openFeedbackModal(); },
-  decideDefault(d){
-    const it = db.config.openItems[d.q]; if(!it || !FEEDBACK_URL) return;
-    const confirm_ = d.kind==='confirm';
-    const root = document.getElementById('overlay-root');
-    const wrap = document.createElement('div');
-    wrap.className='fb-wrap';
-    wrap.innerHTML = `<div class="fb-bg"></div>
-     <div class="fb-modal">
-       <h3 style="margin:0 0 4px;font-size:16px">${confirm_?'Confirm this default':'Request a change'}</h3>
-       <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:12px;background:var(--surface-2);border-radius:8px;padding:9px 12px"><b>${d.q}</b> · ${esc(it.title)}</div>
-       <div class="f-row"><label>Your name (for the decision record) <span class="req">*</span></label><input type="text" id="dc-name" placeholder="e.g. Esther"></div>
-       ${confirm_?'':`<div class="f-row"><label>What should it be instead? <span class="req">*</span></label><textarea id="dc-text"></textarea></div>`}
-       <div style="display:flex;gap:8px;justify-content:flex-end">
-         <button class="btn sm btn-ghost" id="dc-cancel">Cancel</button>
-         <button class="btn sm ${confirm_?'btn-ok':'btn-primary'}" id="dc-send">${confirm_?'✓ Confirm':'Send change request'}</button>
-       </div></div>`;
-    root.appendChild(wrap);
-    wrap.querySelector('.fb-bg').onclick=()=>wrap.remove();
-    wrap.querySelector('#dc-cancel').onclick=()=>wrap.remove();
-    wrap.querySelector('#dc-send').onclick=async ()=>{
-      const name=wrap.querySelector('#dc-name').value.trim();
-      if(!name){ toast('Please add your name — decisions need an owner.', false); return; }
-      const text=confirm_?'Confirmed as running.':(wrap.querySelector('#dc-text').value.trim());
-      if(!text){ toast('Please describe the change.', false); return; }
-      wrap.querySelector('#dc-send').disabled=true;
-      try{
-        await fetch(FEEDBACK_URL,{method:'POST',body:JSON.stringify({page:'DECISION:'+d.q+':'+d.kind,role:'decision',author:name,text})});
-        wrap.remove();
-        toast(confirm_?'Decision recorded — thank you, '+name+'.':'Change request recorded — the build team will follow up.');
-        await loadDecisions(); render();
-      }catch(e){ wrap.querySelector('#dc-send').disabled=false; toast('Could not record right now — try again in a minute.', false); }
-    };
-  },
-  setToday(d){ act(x=>GRMP.D.setToday(x, d.date)); },
-  exportReport(){
-    const D=GRMP.D;
-    const rows=[['id','name','kind','track','status','acknowledged','orientation','closeoffs','mid_review','builder_reflection','certificate']];
-    db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus)).forEach(p=>{
-      rows.push([p.id,p.name,p.kind,p.track,p.appStatus,D.ackComplete(p)?'yes':'no',p.orientation?'yes':'no',
-        p.kind==='mentee'?D.menteeCloseoffs(db,p.id).length:'-',
-        p.kind==='mentor'?(db.midreviews.some(m=>m.mentorId===p.id)?'yes':'no'):'-',
-        p.kind==='mentee'?(db.builderReflections.some(b=>b.menteeId===p.id)?'yes':'no'):'-',
-        db.certificates.some(c=>c.personId===p.id)?'yes':'no']);
-    });
-    const csv=rows.map(r=>r.join(',')).join('\n');
-    const blob=new Blob([csv],{type:'text/csv'});
-    const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download='grmp_cohort_report.csv'; aEl.click();
-    toast('Cohort report downloaded ('+(rows.length-1)+' rows).');
-    db.audit.push({at:db.today,actor:'lead',action:'export_report',entity:'dashboard'});
-    GRMP.Store.save(db);
-  },
   raiseConcern(){
     const t = document.getElementById('cn-text').value.trim();
     if(!t){ toast('Please describe the concern first.', false); return; }
-    act(x=>GRMP.D.raiseConcern(x, t));
-    location.hash = '#/';
-    toast('Submitted privately. Only the Escalation Owner can see this; it is referred to the SMC Grievance & Misconduct process.');
+    call('raiseConcern', t).then(()=>{
+      location.hash = '#/';
+      toast('Submitted privately. Only the Escalation Owner can see this; it is referred to the SMC Grievance & Misconduct process.');
+    });
   },
 };
 window.__demo = {get db(){return db}, act, Actions};   // exposed for Playwright tests

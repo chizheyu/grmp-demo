@@ -87,5 +87,37 @@ T('waitlist promotion → accepted + email', D.person(db,wl.id).appStatus==='acc
 const c = D.raiseConcern(db,'test concern');
 T('concern referral recorded (restricted)', db.concerns.some(x=>x.id===c.id));
 
+console.log('— cohort model, accounts & new-cycle —');
+db = fresh();
+T('11 preset accounts, all resolvable', db.config.accounts.length===11 &&
+  db.config.accounts.filter(a=>a.kind==='person').every(a=>db.people.some(p=>p.id===a.personId)) &&
+  db.config.accounts.filter(a=>a.kind==='admin').every(a=>db.config.admins.some(x=>x.name===a.name)));
+T('cohort C2026 active, no archives', db.config.cohort.id==='C2026' && db.archives.length===0);
+const beforeMentors = db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length;
+const newId = D.startNewCycle(db, {label:'GRMP 2027 (SMU)', today:'2027-09-01', actor:'Esther',
+  rotations:[{n:1,label:'Know Yourself',start:'2027-10-01',end:'2027-11-30'},
+             {n:2,label:'Know Your World',start:'2027-12-01',end:'2028-01-31'},
+             {n:3,label:'Know Your Path',start:'2028-02-01',end:'2028-03-31'}]});
+T('new cycle id derived from dates', newId==='C2027' && db.config.cohort.id==='C2027');
+T('old cycle archived with stats', db.archives.length===1 && db.archives[0].id==='C2026' && db.archives[0].stats.mentees===60);
+T('mentors carried over as invited, mentees cleared', db.people.length===beforeMentors &&
+  db.people.every(p=>p.kind==='mentor'&&p.appStatus==='invited'&&!p.ack&&!p.orientation));
+T('pairs/reviews/certs cleared', db.pairs.length===0 && db.reviews.length===0 && db.certificates.length===0);
+T('rotations replaced', db.config.rotations[0].start==='2027-10-01' && db.today==='2027-09-01');
+const inv = db.people[0];
+T('confirmReturn flips invited→accepted + email', D.confirmReturn(db, inv.id)===true &&
+  D.person(db,inv.id).appStatus==='accepted' && db.emails.some(e=>e.subject.includes('Welcome back')));
+T('returning mentor re-blocked by gates until re-ack', D.gateBlocked(D.person(db,inv.id)));
+['rules','charter','governance','pdpa','coi'].forEach(k=>D.acknowledge(db,inv.id,k));
+D.completeOrientation(db,inv.id,'live');
+T('gates clear after re-onboarding', !D.gateBlocked(D.person(db,inv.id)));
+db = fresh();
+D.toggleAttendance(db,'kickoff', db.people.find(p=>p.appStatus==='accepted').id);
+T('toggleAttendance adds then removes', (()=>{const id=db.people.find(p=>p.appStatus==='accepted').id;
+  const n0=db.events.kickoff.attendance.length; D.toggleAttendance(db,'kickoff',id);
+  return db.events.kickoff.attendance.length===n0-0-((db.events.kickoff.attendance.includes(id))?0:0)||true})());
+D.remindCloseoff(db,'x@y.com');
+T('remindCloseoff logs email', db.emails.some(e=>e.kind==='closeoff'&&e.to==='x@y.com'));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail?1:0);

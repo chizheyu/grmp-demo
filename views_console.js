@@ -45,12 +45,13 @@ shell(name, view){
     `<p>View not available for your role.</p>`;
   return `<div class="co-shell">
     <aside class="co-side">
-      <div class="co-brand">GRMP Console<small>SMC · MENTORSHIP OS</small></div>
+      <div class="co-brand">GRMP Console<small>${db.config.cohort.label.toUpperCase()}</small></div>
       <nav class="co-nav">
         <div class="lab">${admin.role}</div>
         ${items.map(([k,label,n])=>`<button class="co-item ${k===cur?'on':''}" data-goto="#/console/${encodeURIComponent(name)}/${k}">${label}${n?`<span class="n">${n}</span>`:''}</button>`).join('')}
       </nav>
-      <div class="co-user"><b>${admin.name}</b>${admin.role}<br><a href="#/console" style="color:#8b93a1;font-size:11px">Switch user</a></div>
+      <div class="co-user"><b>${admin.name}</b>${admin.role}<br>
+        ${(typeof REMOTE!=='undefined'&&REMOTE)?'<button data-act="logout" style="background:none;border:0;color:#8b93a1;font-size:11px;padding:0;cursor:pointer">Sign out</button>':'<a href="#/console" style="color:#8b93a1;font-size:11px">Switch user</a>'}</div>
     </aside>
     <main class="co-main">${body}</main>
   </div>`;
@@ -366,8 +367,27 @@ v_config(admin){
       <button class="btn sm ${db.today==='2027-02-01'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2027-02-01">1 Feb 2027 · Rotation 3 begins</button>
       <button class="btn sm ${db.today==='2027-03-20'?'btn-primary':'btn-ghost'}" data-act="setToday" data-date="2027-03-20">20 Mar 2027 · closing week</button>
     </div></div>
+  ${admin.roles.includes('lead')?`<div class="qcard"><b>Start a new cycle</b>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:4px 0 10px">Run the programme again next year without redevelopment: the current cycle is archived (stats kept), returning mentors carry over as <b>invited</b> (gates re-apply automatically), and everything else resets. Configuration, not code.</p>
+    <div class="f-grid2">
+      <div class="f-row"><label>Cycle label</label><input type="text" id="cy-label" value="GRMP 2027 (SMU)"></div>
+      <div class="f-row"><label>Working start date (system clock)</label><input type="text" id="cy-today" value="2027-09-01"></div>
+    </div>
+    <div class="f-grid2">
+      <div class="f-row"><label>Rotation 1 start / end</label><div style="display:flex;gap:6px"><input type="text" id="cy-r1s" value="2027-10-01"><input type="text" id="cy-r1e" value="2027-11-30"></div></div>
+      <div class="f-row"><label>Rotation 2 start / end</label><div style="display:flex;gap:6px"><input type="text" id="cy-r2s" value="2027-12-01"><input type="text" id="cy-r2e" value="2028-01-31"></div></div>
+    </div>
+    <div class="f-grid2">
+      <div class="f-row"><label>Rotation 3 start / end</label><div style="display:flex;gap:6px"><input type="text" id="cy-r3s" value="2028-02-01"><input type="text" id="cy-r3e" value="2028-03-31"></div></div>
+      <div class="f-row" style="display:flex;align-items:flex-end"><label class="f-check" style="margin-bottom:10px"><input type="checkbox" id="cy-carry" checked><span>Carry mentors over as invited returning mentors</span></label></div>
+    </div>
+    <button class="btn btn-primary" data-act="startNewCycle">Archive current cycle & start new one</button></div>`:''}
+  ${db.archives.length?`<div class="qcard"><b>Archived cycles</b>
+    ${db.archives.map(ar=>`<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line-2);font-size:13px;flex-wrap:wrap">
+      <b>${ar.label}</b><span class="badge b-neut"><span class="d"></span>archived ${ar.archivedAt}</span>
+      <span style="color:var(--ink-3);font-size:12px">${ar.stats.mentors} mentors · ${ar.stats.mentees} mentees · close-offs ${ar.stats.r1}/${ar.stats.r2}/${ar.stats.r3} · ${ar.stats.certificates} certificates · kickoff ${ar.stats.kickoff}</span></div>`).join('')}</div>`:''}
   <div class="qcard"><b>Demo controls</b><br>
-    <button class="btn sm btn-ghost" style="margin-top:8px" data-act="reset">↺ Reset demo data to seeded state</button></div>`;
+    <button class="btn sm btn-ghost" style="margin-top:8px" data-act="reset">↺ Reset ${(typeof REMOTE!=='undefined'&&REMOTE)?'the SHARED database':'demo data'} to seeded state</button></div>`;
 },
 };
 
