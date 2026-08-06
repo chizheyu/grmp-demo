@@ -1,0 +1,116 @@
+/* Render smoke — execute every view function in Node, on the exact files the browser
+   loads, in the same order. A template that references an undefined name (the CF-in-
+   v_config class of bug) throws HERE instead of shipping: the literal-guard greps text,
+   the e2e suites need a deploy first — this is the gap between them.
+   Run: node tests/render_smoke.js */
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const root = path.join(__dirname, '..');
+
+let pass = 0, fail = 0;
+function T(name, cond, note) {
+  if (cond) { pass++; console.log('  PASS', name); }
+  else { fail++; console.log('  FAIL', name, note ? '— ' + note : ''); }
+}
+
+/* Browser-shaped context: enough window/document for load-time code, nothing more —
+   if a view starts needing real DOM at render time, that is a finding, not a shim gap. */
+const ctx = {
+  console, setTimeout, clearTimeout,
+  navigator: { webdriver: true },
+  window: { addEventListener: () => {} },
+  document: { getElementById: () => null, querySelectorAll: () => [], querySelector: () => null,
+              createElement: () => ({ style: {}, classList: { add() {} }, setAttribute() {} }),
+              addEventListener: () => {} },
+  localStorage: (() => { const m = {}; return {
+    getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); },
+    removeItem: k => { delete m[k]; } }; })(),
+  location: { hash: '#/', reload: () => {} },
+  fetch: () => new Promise(() => {}),
+};
+ctx.globalThis = ctx;
+vm.createContext(ctx);
+
+for (const f of ['data.js', 'ai.js', 'views_public.js', 'views_console.js', 'app.js']) {
+  const src = fs.readFileSync(path.join(root, f), 'utf8');
+  try {
+    new vm.Script(src, { filename: f }).runInContext(ctx);
+    // the browser reaches window.* as bare globals; mirror that between file loads
+    if (ctx.window.GRMP && !ctx.GRMP) ctx.GRMP = ctx.window.GRMP;
+    if (ctx.window.AI && !ctx.AI) ctx.AI = ctx.window.AI;
+  }
+  catch (e) { console.log(`  FAIL load ${f} — ${e.message}`); fail++; }
+}
+
+/* Top-level const/let in a vm Script live in the context's lexical environment —
+   visible to the next script (exactly like browser <script> tags) but not as ctx.*
+   properties. Pull the bindings out by evaluating inside the context. */
+const G = vm.runInContext(
+  '({Views, Console, GRMP, db}); globalThis.__demo={db}; window.__demo=__demo; ({Views, Console, GRMP, db})', ctx);
+const db = G.db;
+
+// A literal ${ in rendered HTML means a template expression fell into a plain string —
+// the exact bug class the eye catches instantly and 'is it a string?' checks never did.
+const BAD = /undefined|\bNaN\b|\[object Object\]|\$\{/;
+const check = (name, fn) => {
+  try {
+    const html = fn();
+    T(name, typeof html === 'string' && html.length > 200 && !BAD.test(html),
+      typeof html !== 'string' ? 'not a string' : html.length <= 200 ? `only ${html.length} chars`
+        : 'contains ' + (html.match(BAD) || [])[0]);
+  } catch (e) { T(name, false, e.message); }
+};
+
+console.log('— public views —');
+const V = G.Views;
+check('landing', () => V.landing());
+check('guideMentee', () => V.guideMentee());
+check('guideMentor', () => V.guideMentor());
+check('reflection', () => V.reflection());
+check('concern', () => V.concern());
+check('apply(mentee)', () => V.apply('mentee'));
+check('apply(mentor)', () => V.apply('mentor'));
+check('manual', () => V.manual());
+check('decisions', () => V.decisions());
+
+console.log('— personal pages (every persona state) —');
+for (const acct of (db.config.accounts || []).filter(a => a.kind === 'person'))
+  check(`personal ${acct.u}`, () => V.personal(acct.personId));
+
+console.log('— console: every admin × every view they can open —');
+const C = G.Console;
+check('console login', () => C.login());
+for (const admin of db.config.admins) {
+  for (const [key] of C.navItems(db, admin.roles))
+    check(`${admin.name} → ${key}`, () => C.shell(admin.name, key));
+}
+
+console.log('— settled decisions carry no card; open ones still do —');
+{
+  const html_rem = C.shell('Wei Kiat','reminders');
+  T('Q5 settled → no card on Reminders', !/INFERRED · Q5/.test(html_rem));
+  const html_dash = C.shell('Esther','dashboard');
+  T('Q7 settled → no card on Dashboard', !/INFERRED · Q7/.test(html_dash));
+  const html_cfg = C.shell('Esther','config');
+  T('Q8 settled → no card on Configuration', !/INFERRED · Q8/.test(html_cfg));
+  const html_match = C.shell('Esther','matching');
+  T('Q3 still open → its card stays on Matching', /INFERRED · Q3/.test(html_match));
+}
+
+console.log('— and the same sweep on a brand-new cycle (derived-facts proof) —');
+G.GRMP.D.startNewCycle(db, { label: 'GRMP 2031 (NTU pilot)', today: '2031-09-01', actor: 'smoke',
+  rotations: [{ n: 1, label: 'Know Yourself', start: '2031-10-01', end: '2031-11-30' },
+              { n: 2, label: 'Know Your World', start: '2031-12-01', end: '2032-01-31' },
+              { n: 3, label: 'Know Your Path', start: '2032-02-01', end: '2032-03-31' }] });
+check('landing (new cycle)', () => {
+  const html = V.landing();
+  if (!/2031|2032/.test(html)) throw new Error('new-cycle dates missing from the page');
+  if (/\b2025\b|\b2026\b/.test(html)) throw new Error('old-cycle dates still rendered');
+  if (!/NTU/.test(html)) throw new Error('institution not derived');
+  return html;
+});
+for (const admin of db.config.admins)
+  for (const [key] of C.navItems(db, admin.roles))
+    check(`new-cycle ${admin.name} → ${key}`, () => C.shell(admin.name, key));
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

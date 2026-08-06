@@ -56,22 +56,28 @@ const FIRE = {
     });
   },
 
-  /* persist: diff current db against last-seen slice JSON; batch-write changes. */
+  /* persist: diff current db against last-seen slice JSON; batch-write changes.
+     `last` is updated ONLY after the commit resolves. The previous version updated it
+     optimistically before the write — one failed commit then poisoned the baseline, and
+     every later mutation that produced the same JSON diffed as "no change" and was
+     silently never written again. That is a data-loss machine, not an optimisation. */
   async persist(db){
     if(!this.ready) return;
     const col = this.fs.collection('state');
     const batch = this.fs.batch();
-    let n = 0;
+    const staged = [];
     this.slices.forEach(s=>{
       const now = JSON.stringify(db[s]===undefined?null:db[s]);
       if(this.last[s] !== now){
         batch.set(col.doc(s), {v: db[s]===undefined?null:db[s]});
-        this.last[s] = now;
-        n++;
+        staged.push([s, now]);
       }
     });
-    if(n) await batch.commit();
-    return n;
+    if(staged.length){
+      await batch.commit();                       // throws → last untouched → retried next persist
+      staged.forEach(([s, now])=>{ this.last[s] = now; });
+    }
+    return staged.length;
   },
 
   async resetAll(){

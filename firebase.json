@@ -2,7 +2,12 @@
   "hosting": {
     "public": "fsdist",
     "ignore": ["firebase.json", "**/.*"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "headers": [{
+      "//": "Default max-age=3600 meant a visitor from an hour ago ran stale JS against a new database. Files are tens of KB — revalidate every load.",
+      "source": "**",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }]
+    }]
   },
   "firestore": { "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
 }

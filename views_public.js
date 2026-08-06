@@ -1,5 +1,9 @@
 /* GRMP Demo — public views: microsite (manual ch.1) + personal pages (ch.2–3). */
 
+/* Cohort facts, read lazily at render time — every cohort-specific number, date or
+   institution name in these templates must come from here (guard-tested in L1). */
+const F = () => GRMP.D.cohortFacts((typeof __demo!=='undefined'&&__demo.db)||db);
+
 const Views = {
 
 /* ---------- shared microsite chrome ---------- */
@@ -16,7 +20,7 @@ msNav(){
 },
 msFooter(){
   return `<footer class="ms-footer"><div class="wrap" style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
-    <span>Singapore Mentorship Committee · GRMP 2026 (SMU pilot)</span>
+    <span>Singapore Mentorship Committee · ${F().label}</span>
     <span class="spacer" style="flex:1"></span>
     <a href="#/concern">Raise a concern (private)</a>
   </div></footer>`;
@@ -29,15 +33,14 @@ landing(){
   <header class="ms-hero"><div class="wrap">
     <div class="eyebrow">Singapore Mentorship Committee · Global Ready for SG100</div>
     <h1>Six months. Three mentors. A global-ready you.</h1>
-    <p>The Global Ready Mentorship Programme pairs SMU students and young professionals with senior
-       leaders across three rotations — October 2026 to March 2027. One hour with the right mentor
+    <p>The Global Ready Mentorship Programme pairs ${F().inst?F().inst+' ':''}students and young professionals with senior leaders across three rotations — ${F().spanLong}. One hour with the right mentor
        can reframe a career.</p>
     <div class="cta">
       <a class="btn btn-light" href="#/apply/mentee" style="text-decoration:none">Apply as Mentee</a>
       <a class="btn btn-line" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
     </div>
   </div></header>
-  <div class="ms-strip">Cycle 1 is piloted with SMU · 60 mentors · 60 mentees · applications reviewed by the programme team</div>
+  <div class="ms-strip">${F().short}${F().inst?` is piloted with ${F().inst}`:``} · ${F().mentors} mentors · ${F().mentees} mentees · applications reviewed by the programme team</div>
 
   <section class="ms-section"><div class="wrap">
     <h2>Three tracks, one journey</h2>
@@ -53,15 +56,29 @@ landing(){
   </div></section>
 
   <section class="ms-section" style="padding-top:0"><div class="wrap">
+    <h2>Is this for you?</h2>
+    <div class="cards3" style="margin-top:14px">
+      <div class="tcard"><h3 style="margin-top:0">Who can apply</h3>
+        <p>${F().inst?F().inst+' ':''}students and young professionals ready to be mentored — and to do the reflecting that makes mentorship work.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">What it asks of you</h3>
+        <p>Meet your mentor <b>at least twice</b> in each two-month rotation, at times you both choose.
+        Write a private reflection after each rotation. One minute to close each rotation off. That is all.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">What you leave with</h3>
+        <p>Three mentors across three themes, a habit of reflecting on your own direction, and a
+        completion certificate from the Singapore Mentorship Committee.</p></div>
+    </div>
+  </div></section>
+
+  <section class="ms-section" style="padding-top:0"><div class="wrap">
     <h2>How the six months run</h2>
     <p class="lede">Every step below is handled on this platform — no forms lost in inboxes, no chasing.</p>
     <div class="timeline">
-      <div class="tl-node"><div class="dot">1</div><h4>Apply · Sept</h4><p>One form, reviewed by the programme team</p></div>
+      <div class="tl-node"><div class="dot">1</div><h4>Apply · ${F().regWindow||F().applyShort}</h4><p>One form, reviewed by the programme team</p></div>
       <div class="tl-node"><div class="dot">2</div><h4>Acknowledge</h4><p>Programme Rules, PDPA & conduct — digital, timestamped</p></div>
-      <div class="tl-node"><div class="dot">3</div><h4>Orientation & Kickoff · Oct</h4><p>Required before Rotation 1</p></div>
-      <div class="tl-node"><div class="dot">4</div><h4>3 rotations · Oct–Mar</h4><p>Know Yourself · Know Your World · Know Your Path</p></div>
+      <div class="tl-node"><div class="dot">3</div><h4>Orientation & Kickoff · ${F().kickoffShort}</h4><p>Required before Rotation 1</p></div>
+      <div class="tl-node"><div class="dot">4</div><h4>3 rotations · ${F().r1Short}–${F().endShort}</h4><p>Know Yourself · Know Your World · Know Your Path</p></div>
       <div class="tl-node"><div class="dot">5</div><h4>Close-off each rotation</h4><p>Two meetings + your private reflection</p></div>
-      <div class="tl-node"><div class="dot">6</div><h4>Certificate · Mar</h4><p>Complete all three rotations</p></div>
+      <div class="tl-node"><div class="dot">6</div><h4>Certificate · ${F().endShort}</h4><p>Complete all three rotations</p></div>
     </div>
   </div></section>
 
@@ -72,6 +89,35 @@ landing(){
       No admin burden — the platform handles everything except the conversation.</p>
     </div>
     <a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+  </div></section>
+
+  <section class="ms-section"><div class="wrap">
+    <h2>Questions people ask before applying</h2>
+    <div class="faq">
+      ${[
+        ['Do I need an account or a password?',
+         'No — never. Every email we send carries your own link straight to your page. Only the ten-person programme team signs in.'],
+        ['How much time does it really take?',
+         'Two conversations per rotation, arranged directly between you and your mentor, plus a one-minute close-off at the end of each. Six conversations over six months.'],
+        ['Do I have to hand in my reflections?',
+         'No. Your reflection is yours. The platform records only that you completed the rotation — never what you wrote.'],
+        ['What if my mentor drops out?',
+         'You are re-matched from the reserve bench within seven days, in the same track, and briefed on the hand-over.'],
+        ['Can I get the same mentor twice?',
+         'No — you meet a different mentor in each rotation. That is the point of three rotations.'],
+        ['What if something goes wrong?',
+         'Every page carries a private "Raise a concern" link. It reaches the Escalation Owner alone — no other role, including IT support, can see it, and it is referred into SMC’s Grievance &amp; Misconduct process.'],
+      ].map(([q,a])=>`<details class="faq-item"><summary>${q}</summary><p>${a}</p></details>`).join('')}
+    </div>
+  </div></section>
+
+  <section class="ms-section" style="background:var(--ai-wash);border-top:1px solid var(--line)"><div class="wrap" style="text-align:center">
+    <h2 style="margin-bottom:6px">Applications for Cycle 1 are open</h2>
+    <p class="lede" style="margin:0 auto 18px">Reviewed by the programme team, with an outcome by email. One form, no account.</p>
+    <div class="cta" style="justify-content:center">
+      <a class="btn btn-primary" href="#/apply/mentee" style="text-decoration:none">Apply as Mentee</a>
+      <a class="btn btn-ghost" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+    </div>
   </div></section>` + this.msFooter();
 },
 
@@ -104,7 +150,7 @@ guideMentor(){
       <li>What your mentee shares stays between you, except safety concerns (use the private concern link).</li>
       <li>Mentorship is not recruitment; avoid conflicts of interest.</li></ul></div>
     <div class="doc-card"><h3>Your one checkpoint</h3><ul>
-      <li>A single short mid-programme review in January — two minutes, on your personal page.</li></ul></div>
+      <li>A single short mid-programme review in ${F().midMonth} — two minutes, on your personal page.</li></ul></div>
     <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — final wording comes from the programme team's mentor brief.</p>
   </div>` + this.msFooter();
 },
@@ -117,7 +163,7 @@ reflection(){
       it records only your end-of-rotation close-off. Keep this document anywhere private (your notes app, a doc, paper).</span></div>
     ${inferred('Q1')}
     <div class="doc-card"><h3>Rotation 1 — Know Yourself</h3><ul>
-      <li>What did I learn about my strengths that I didn't know in September?</li>
+      <li>What did I learn about my strengths that I didn't know in ${F().applyMonth}?</li>
       <li>Which assumption about my career did this rotation challenge?</li>
       <li>One thing my mentor said that I keep thinking about.</li></ul></div>
     <div class="doc-card"><h3>Rotation 2 — Know Your World</h3><ul>
@@ -125,7 +171,7 @@ reflection(){
       <li>Where does my track (General / Entrepreneurship / AI) fit into that world?</li></ul></div>
     <div class="doc-card"><h3>Rotation 3 — Know Your Path</h3><ul>
       <li>What path am I now considering that I wasn't before?</li>
-      <li>What would I tell September-me?</li></ul></div>
+      <li>What would I tell ${F().applyMonth}-me?</li></ul></div>
     <p style="font-size:13px;color:var(--ink-2)">When you've reflected, go to your personal page (from your email link) and complete the one-minute close-off.</p>
   </div>` + this.msFooter();
 },
@@ -153,7 +199,10 @@ apply(kind){
   const mentee = kind==='mentee';
   return this.msNav() + `<div class="doc-page" style="max-width:640px">
     <h1>${mentee?'Apply as a Mentee':'Register as a Mentor'}</h1>
-    <p class="lede">${mentee?'GRMP 2026 · October to March · reviewed by the programme team.':'Welcome — this is the registration linked from your invitation.'}</p>
+    <p class="lede">${mentee?`${F().short} · ${F().spanMonths} · reviewed by the programme team.`:'Welcome — this is the registration linked from your invitation.'}</p>
+  ${GRMP.D.registrationOpen(db)?'':`<div class="inferred" style="margin-bottom:14px"><span class="tag">NOTE</span>
+    <div style="flex:1">Registration for this cycle ran ${F().regWindow} and has closed on the simulated clock.
+    <b>The staging form stays open</b> so the team can test the full pipeline any day.</div></div>`}
     ${inferred('Q4')}
     <div class="form" id="apply-form">
       <div class="f-grid2">
@@ -163,7 +212,7 @@ apply(kind){
       <div class="f-grid2">
         <div class="f-row"><label>Mobile</label><input type="text" id="f-mobile" placeholder="+65"></div>
         ${mentee
-          ? `<div class="f-row"><label>Course at SMU <span class="req">*</span></label><input type="text" id="f-course" placeholder="e.g. Business Management"></div>`
+          ? `<div class="f-row"><label>Course${F().inst?' at '+F().inst:''} <span class="req">*</span></label><input type="text" id="f-course" placeholder="e.g. Business Management"></div>`
           : `<div class="f-row"><label>Organisation <span class="req">*</span></label><input type="text" id="f-org" placeholder="Company / venture"></div>`}
       </div>
       ${mentee ? `
@@ -220,7 +269,7 @@ applied(personId){
       <p style="font-size:13px;color:var(--ink-2);margin:0">Your application is now in the master tracker with status
       <b>${esc(p.appStatus)}</b> — visible to reviewers in the admin console. Open the console from the
       <b>Open as…</b> switcher (bottom-left) to see the other side of this demo.</p></div>
-    <a class="btn btn-ghost" href="#/" style="text-decoration:none">Back to the microsite</a>
+    <a class="btn btn-ghost" href="#/" style="text-decoration:none">Back to the programme site</a>
   </div>` + this.msFooter();
 },
 
@@ -273,7 +322,9 @@ decisions(){
     const box=document.getElementById('dc-body'); if(!box) return;
     const items = Object.entries(__demo.db.config.openItems).map(([q,it])=>{
       const dec = decisionCache && decisionCache[q];
-      const chip = dec ? (dec.kind==='confirm'
+      const chip = it.settled
+        ? `<span class="badge b-ok"><span class="d"></span>Settled · ${it.settled.by} · ${it.settled.on} · ${it.settled.via}</span>`
+        : dec ? (dec.kind==='confirm'
         ? `<span class="badge b-ok"><span class="d"></span>Confirmed · ${dec.author} · ${dec.ts}</span>`
         : `<span class="badge b-warn"><span class="d"></span>Change requested · ${dec.author}</span>`)
         : '<span class="badge b-ai">Awaiting confirmation</span>';
@@ -287,7 +338,7 @@ decisions(){
   },50);
   return this.msNav() + `<div class="doc-page">
     <h1>Decisions register</h1>
-    <p class="lede">The eight inferred defaults running in this system. Confirm or request a change right where you see each yellow card — Q1 and Q2 are Esther's calls. This register replaces the Round-2 sheet.</p>
+    <p class="lede">The inferred defaults running in this system. Settled items are on record below and no longer carry a card in the product; the rest can be confirmed right where their yellow card appears — Q1 and Q2 are Esther's calls. This register replaces the Round-2 sheet.</p>
     <div id="dc-body"><p style="color:var(--ink-3)">Loading…</p></div>
   </div>` + this.msFooter();
 },
@@ -341,18 +392,21 @@ personal(personId){
         const done = p.ack && p.ack[k];
         return `<div class="ackrow"><span class="nm">${nm}</span><span class="ver">${ver}</span>
           ${done?`<span class="badge b-ok"><span class="d"></span>Acknowledged ${done}</span>`
-                :`<button class="btn sm btn-primary" data-act="ack" data-person="${p.id}" data-doc="${k}">Read & acknowledge</button>`}</div>`;
+                :`<button class="btn sm btn-primary" data-act="openDoc" data-person="${p.id}" data-doc="${k}" data-title="${nm}" data-ver="${ver}">Read &amp; acknowledge</button>`}</div>`;
       }).join('')}</div>
       ${inferred('Q5')}
-      <div style="margin-top:10px"><button class="btn sm btn-ghost" data-act="ackAll" data-person="${p.id}">Acknowledge all (demo shortcut)</button></div></div>`;
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn sm btn-ghost" data-act="ackAll" data-person="${p.id}">Acknowledge all (demo shortcut)</button>
+        <a href="#/concern" style="font-size:12.5px">🔒 Raise a concern (private)</a></div>
+      <p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Concerns go only to the Escalation Owner — no other role, including IT support, can see them.</p></div>`;
   } else if(!p.orientation){
     nextCard = `<div class="card"><h3>🎓 Complete your orientation</h3>
       <p style="font-size:13px;color:var(--ink-2)">Attend the live session, or watch the recorded module —
       <b>required before Rotation 1, no exceptions.</b></p>
       <div style="background:#14171d;border-radius:12px;aspect-ratio:16/7;display:grid;place-items:center;margin:4px 0 10px;cursor:pointer" data-act="orient" data-person="${p.id}" data-mode="recorded" role="button" tabindex="0" aria-label="Play orientation recording">
         <div style="text-align:center;color:#fff"><div style="width:54px;height:54px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin:0 auto 8px;font-size:20px">▶</div>
-        <div style="font-size:13px;font-weight:700">GRMP Orientation 2026 — session recording</div>
-        <div style="font-size:11px;opacity:.7">sent to everyone after the live session · opening it records your completion</div></div>
+        <div style="font-size:13px;font-weight:700">${F().short} Orientation — session recording</div>
+        <div style="font-size:11px;opacity:.7">${GRMP.D.orientationVideoFor(db,p)?'opens the recording in a new tab · opening it records your completion':'recording link not set yet — the programme team adds it in Configuration · clicking still records completion in this demo'}</div></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-primary" data-act="orient" data-person="${p.id}" data-mode="recorded">▶ Watch recorded module (marks complete)</button>
@@ -394,7 +448,7 @@ personal(personId){
     const servedEarly = GRMP.D.pairsFor(db,personId).some(x=>x.rotation<=2 && x.status!=='rejected');
     if(!hasMR && servedEarly){
       nextCard = `<div class="card"><h3>📝 Mid-programme review (your one checkpoint)</h3>
-        <p style="font-size:13px;color:var(--ink-2)">Two minutes in January: how is the pairing going, anything the team should know?
+        <p style="font-size:13px;color:var(--ink-2)">Two minutes in ${F().midMonth}: how is the pairing going, anything the team should know?
         (The demo lets you submit early.)</p>
         <div class="f-row"><textarea id="mr-text" placeholder="How is it going with your mentee(s)?"></textarea></div>
         <button class="btn btn-primary" data-act="midreview" data-person="${p.id}">Submit review</button></div>`;
@@ -408,7 +462,7 @@ personal(personId){
     return `<div class="card"><h3>Rotation ${x.rotation} — ${rot.label}
         ${x.status==='closed'?'<span class="badge b-ok"><span class="d"></span>Closed off</span>'
           : x.status==='rematch_needed'?'<span class="badge b-warn"><span class="d"></span>Replacement pending</span>'
-          : '<span class="badge b-neut"><span class="d"></span>Running · Dec–Jan</span>'}</h3>
+          : `<span class="badge b-neut"><span class="d"></span>Running · ${GRMP.D.monthShort(rot.start)}–${GRMP.D.monthShort(rot.end)}</span>`}</h3>
       <div class="mentor-card">
         <div class="avatar ${mentee?'av-mentor':'av-mentee'}" style="width:44px;height:44px;font-size:14px">${esc(other.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
         <div style="flex:1">
@@ -429,14 +483,14 @@ personal(personId){
       <p style="font-size:13.5px;margin:0">“${esc(myMR.text)}”</p></div>`:'';
   const certCard = cert ? `<div class="cert"><div style="font-size:11px;letter-spacing:.18em;font-weight:800;color:var(--gold)">SINGAPORE MENTORSHIP COMMITTEE</div>
       <h2>Certificate of Completion</h2><div class="nm">${esc(p.name)}</div>
-      <div class="meta">Global Ready Mentorship Programme 2026 · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
+      <div class="meta">${F().label} · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
 
   return `<div class="pp-shell">
     <div class="pp-head">
       <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
       <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
         <div class="sub">${mentee?'Mentee':'Mentor'} · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}
-        ${p.previewFastForward?' · <b style="color:var(--ai-ink)">demo fast-forwarded to March</b>':''}</div></div>
+        ${p.previewFastForward?` · <b style="color:var(--ai-ink)">demo fast-forwarded to ${F().closingMonth}</b>`:''}</div></div>
     </div>
     <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — no account, no password. That's by design.</div>
     <div class="steps">${steps.map((s,i)=>`<div class="step ${s[1]?'done':(i===curIdx?'cur':'')}"><div class="dot">${s[1]?'✓':i+1}</div><span>${s[0]}</span></div>`).join('')}</div>

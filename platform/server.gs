@@ -3,7 +3,7 @@
  *  Domain logic: appended below from data.js — single source with the client and the tests.
  */
 const DB_FILE = 'grmp_platform_db.json';
-const GEMINI_KEY = 'AIzaSyB6OATmFTq1xAZvkAqA1Ch_FJUQHNSoFsw';   // server-side only (never sent to clients)
+// LLM credentials live in Script Properties (LLM_KEY / LLM_BASE / LLM_MODEL), never in code.
 const CACHE_KEY = 'grmp_db_v1';
 
 /* ---------- storage ---------- */
@@ -99,6 +99,10 @@ const PERMS = {
   startNewCycle: ['lead'], adminReset: ['lead'], setToday: ['lead', 'coordinator'],
   suggestMatches: ['lead', 'coordinator'], replaceMentor: ['lead', 'coordinator'],
   promoteWaitlist: ['lead', 'coordinator'], toggleAttendance: ['lead', 'coordinator'],
+  markDropout: ['lead', 'coordinator'],
+  setOrientationVideos: ['lead', 'coordinator'],
+  withdrawUnacknowledged: ['lead', 'coordinator'],
+  discardProposal: ['lead'], reassignProposal: ['lead'],
   remindCloseoff: ['lead', 'coordinator'],
   score: ['lead', 'coordinator', 'mentor_reviewer', 'mentee_reviewer'],
   acknowledge: ['participant', 'ADMIN'], ackAllDocs: ['participant', 'ADMIN'],
@@ -150,7 +154,7 @@ function applyAction(token, fn, args) {
       if (typeof GRMP_EXPORT.D[fn] !== 'function') return { ok: false, error: 'Unknown action ' + fn, db: db };
       out = GRMP_EXPORT.D[fn].apply(null, [db].concat(args || []));
     }
-    db.audit.push({ at: db.today, actor: id.name || id.label, action: 'rpc:' + fn, entity: (args && args[0]) || '' });
+    GRMP_EXPORT.D.logAudit(db, db.today, id.name || id.label, 'rpc:' + fn, (args && args[0]) || '');
     saveDb_(db);
     return { ok: true, out: out, db: db };
   } catch (e) {
@@ -164,18 +168,22 @@ function aiGen(token, id, prompt) {
   const who = sessionIdentity_(db, token);
   if (!who) return null;
   if (db.aiCache && db.aiCache[id]) return db.aiCache[id];
+  const props = PropertiesService.getScriptProperties();
+  const key = props.getProperty('LLM_KEY');
+  if (!key) return null;                       // no key configured → deterministic text stands
+  const base  = props.getProperty('LLM_BASE')  || 'https://api.z.ai/api/paas/v4';
+  const model = props.getProperty('LLM_MODEL') || 'glm-4-flash';
   try {
-    const resp = UrlFetchApp.fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent', {
+    const resp = UrlFetchApp.fetch(base.replace(/\/$/, '') + '/chat/completions', {
         method: 'post', contentType: 'application/json',
-        headers: { 'X-goog-api-key': GEMINI_KEY },
-        payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        headers: { Authorization: 'Bearer ' + key },
+        payload: JSON.stringify({ model: model, messages: [{ role: 'user', content: String(prompt).slice(0, 4000) }],
+                                  max_tokens: 300, temperature: 0.3 }),
         muteHttpExceptions: true,
       });
     if (resp.getResponseCode() !== 200) return null;
     const j = JSON.parse(resp.getContentText());
-    const txt = (((j.candidates || [])[0] || {}).content || {}).parts ?
-      j.candidates[0].content.parts.map(p => p.text || '').join('').trim() : '';
+    const txt = String((((j.choices || [])[0] || {}).message || {}).content || '').trim();
     if (!txt) return null;
     const lock = LockService.getScriptLock(); lock.waitLock(20000);
     try {
@@ -194,6 +202,42 @@ function doGet(e) {
     .setTitle('GRMP Platform — SMC (staging)')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/* LLM proxy for the Firestore front-end, which is static hosting and has no server
+   of its own. The key lives in Script Properties — never in code, never in a repo,
+   never in a browser. Sent as text/plain so it stays a CORS simple request. */
+function doPost(e) {
+  var out = function (o) {
+    return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  };
+  try {
+    var d = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (d.op !== 'ai') return out({ ok: false, error: 'unknown op' });
+    var props = PropertiesService.getScriptProperties();
+    var key = props.getProperty('LLM_KEY');
+    if (!key) return out({ ok: false, error: 'no key configured' });
+    var base = props.getProperty('LLM_BASE') || 'https://api.z.ai/api/paas/v4';
+    var model = props.getProperty('LLM_MODEL') || 'glm-4-flash';
+    var prompt = String(d.prompt || '').slice(0, 4000);
+    if (!prompt) return out({ ok: false, error: 'empty prompt' });
+    var t0 = new Date().getTime();
+    var resp = UrlFetchApp.fetch(base.replace(/\/$/, '') + '/chat/completions', {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + key },
+      payload: JSON.stringify({ model: model, messages: [{ role: 'user', content: prompt }],
+                                max_tokens: 300, temperature: 0.3 }),
+      muteHttpExceptions: true,
+    });
+    var ms = new Date().getTime() - t0;          // how long the upstream itself took
+    if (resp.getResponseCode() !== 200)
+      return out({ ok: false, error: 'upstream ' + resp.getResponseCode(), ms: ms, detail: resp.getContentText().slice(0, 300) });
+    var j = JSON.parse(resp.getContentText());
+    var txt = String((((j.choices || [])[0] || {}).message || {}).content || '').trim();
+    return txt ? out({ ok: true, text: txt, ms: ms }) : out({ ok: false, error: 'empty completion', ms: ms });
+  } catch (err) {
+    return out({ ok: false, error: String(err) });
+  }
 }
 
 /* ==== domain layer appended below (generated from data.js — do not edit here) ==== */
