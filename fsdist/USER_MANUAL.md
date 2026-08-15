@@ -1,132 +1,127 @@
 # GRMP Platform — User Manual
 
-> **Demo edition.** Everything described here runs in the requirements demo. Boxes marked **⚠ Inferred** are decisions we reasoned out from your documents and implemented as the default — they run now, and you confirm or change them (each points to its Round-2 item).
+> **Staging edition (R5 — built to the approved specs).** Everything described here runs on the shared staging platform and follows the six spec documents (mentor/mentee application specs, mentor/mentee post-selection specs, portal capability brief, project standards note). Legal text and every system email are rendered **verbatim** from the approved copy — a test suite diffs them against the spec files on every build.
 >
-> **Demo notes.** (1) The demo is a personal sandbox: it opens pre-loaded with a sample cohort, and everything you do stays in your browser — reset any time with *Reset demo data*. (2) Emails don't actually send; the demo shows each message on screen at the moment it would go out. (3) Admin sign-in is simulated — in production this is Google sign-in.
+> **Staging notes.** (1) The platform is a shared, real-time database: what one signed-in person does, everyone sees. Reset any time from Configuration. (2) Emails do not actually send; each message pops up on screen the moment it would go out, and every one is readable in full under **Console → Emails**. (3) The one-time login code is delivered the same way — it appears in the email popup, so the team can walk the whole flow. In production it arrives in the participant's inbox.
 >
-> This manual doubles as the build spec and the test script: every numbered step below is implemented and automatically tested exactly as written.
+> This manual doubles as the build spec and the test script: the flows below are implemented and automatically tested as written (six suites; see `tests/`).
 
-**The two ways into the platform** — this is a core design decision:
+**The two ways into the platform** — a core design decision:
 
 | Who | How they get in |
 |---|---|
-| Mentors & mentees (120 people) | **No accounts, no passwords — ever.** Every email they receive carries a personal link that opens their own page directly. |
-| The admin team (~10 people) | Sign in to the console (Google sign-in in production; simulated in the demo). |
+| Mentors & mentees | **No accounts, no passwords — ever.** The acceptance email carries a personal link; opening it asks for the email they applied with, sends a **one-time verification code** to that email, and the code signs them in. (A forwarded link alone cannot confirm a place — that is the point.) |
+| The programme team (~6 people) | Sign in to the console with their accounts (Google sign-in in production; passcode accounts in staging). |
+
+**The selection timeline (spec-confirmed constants, shown in Configuration):** applications 1–10 Sept · approvals completed by 16 Sept · outcome by 18 Sept · acceptance reminder (once) 23 Sept · acceptance deadline **26 Sept** · reserve-activation deadline **29 Sept** · Kick-Off **1 Oct, 7.30–9.00 pm, SMU ALCove**.
 
 ---
 
-## 1 · Visitor — the microsite
+## 1 · Visitor — the microsite & the application forms
 
-*The public doorway. Anyone on the internet.*
+**1.1 Landing page.** What GRMP is, the Oct–Mar cycle, how the six months run, and two buttons: **Apply as a Mentee** · **Apply as a Mentor** (both use "apply" — house style). *(Home-page copy updates from the UX owner land separately.)*
 
-**1.1 Landing page.** Open the demo link → the GRMP microsite. You see: what GRMP is, the Oct–Mar cycle with three rotations, the **three mentor tracks** (General / Entrepreneurship / AI), and two buttons: **Apply as Mentee** · **Register as Mentor**.
+**1.2 Programme documents.** **For Mentees** / **For Mentors** hold the briefing structure *(final text comes from Marylyn, GRMP's content creator)*. The **Reflection Sheet** stays participant-only: it opens from a personal link, never from the public menu.
 
-**1.2 Programme documents.** From the top navigation, open **For Mentees** (the mentee guide) and **For Mentors** (the mentor brief). These pages hold the briefing content. *(Content shown is placeholder structure — final text comes from the programme team.)* The **Reflection Sheet** is participant-only by the Programme Owner's decision: it opens from a participant's personal link, not from the public menu.
+**1.3 Apply as a Mentee — a 4-step staged form** (About you · Your studies · Your growth · Commitment & consent):
+- Persistent progress stepper; **Next** validates only the current step; **Back never loses data**.
+- SMU email asked with a **soft warning** if it does not look like a student address (the binding gate is the eligibility checkbox, not the domain).
+- **Step 2 — the hard gate:** "I confirm I am a current SMU undergraduate" (all years eligible, incl. final-year; 7-school faculty list).
+- **Step 3 — the scored core:** the two written prompts (verbatim from the spec), each with a live word count and a **hard cap of 200 words** (no minimum — tight answers are a good signal); three **distinct** industry preferences from the same 17-option list mentors classify themselves on.
+- **Step 4:** commitment confirmation, Telegram-group consent (the mentee channel), and the approved **PDPA consent rendered verbatim** — timestamped on submission. PDPA is collected once, here; it is *not* repeated at the acceptance gate.
+- **No save-and-resume (confirmed):** the form is completed in one sitting — there is no applicant login to attach a partial record to. A browser leave-page warning guards accidental loss. *(This replaces the earlier draft-saving behaviour — see the decisions register, Q10.)*
+- Submit → verbatim confirmation screen + the acknowledgement-receipt email.
 
-**1.3 Reflection Sheet page (participant-only).** Visiting `#/reflection` without a personal link shows a "for programme participants" notice. Opened from a personal page, the sheet shows the badge **"This reflection is yours. The platform never stores what you write here — it records only your end-of-rotation close-off"** and the three rotation templates (Know Yourself / Know Your World / Know Your Path) for private use.
-> **⚠ Inferred (R2-Q1):** Reflection content lives here on the microsite, outside the system. Confirm or move it in-system.
+**1.4 Apply as a Mentor — the same staged pattern** (About you · Your experience · Your mentoring contributions · Commitment & consent), with the **returning-mentor branch**: "I was a mentor in last year's programme" hides the screening fields (years of experience, led-a-team, leadership text, cross-industry) — returners are matched against last cycle's roster by the team before acceptance. WhatsApp is the mentor channel. Same verbatim PDPA, same no-save rule.
 
-**1.4 Concern link.** In the page footer: **"Raise a concern (private)"** — see chapter 8.
+**1.5 Duplicate protection.** A second application on a known email flags **both** records for a human to review — never silently merged, never auto-rejected.
 
-**1.5 Apply as Mentee.** Click **Apply as Mentee** → the application form. Fields follow the Working Design registration list *(swap-in pending Joanne's final form — R2-Q4)*. You must pick **exactly one track**, and tick the PDPA consent. Submit → a confirmation screen, and the demo shows the confirmation email that would be sent. If you leave required fields empty, the form saves as **incomplete** and shows the reminder email that would chase it.
-> **⚠ Inferred (R2-Q3):** one track per mentee, chosen at application. Confirm.
-
-**1.6 Register as Mentor.** Mentors arrive via an invitation link (the demo landing page includes a sample invitation). The registration form mirrors the mentee one (no availability question, no "how many mentees" question — capacity is fixed at 2 by rule). Submit → confirmation.
-
----
-
-## 2 · Mentee — my personal page
-
-*Reached only via personal links. The demo's* **Open as…** *switcher lists sample mentees — picking one is the same as clicking the link in their email.*
-
-**2.1 My page.** You see your status timeline — Applied → Under review → Accepted → Acknowledged → Orientation → Matched (R1/R2/R3) → Completed — with your current step highlighted, and a card for what to do next.
-
-**2.2 Acknowledgement.** Once accepted, your page shows **five documents to acknowledge** (Programme Rules, SMC Charter, Governance Guidelines, PDPA Consent, Conflict-of-Interest Declaration). Open each, tick, confirm — each records a timestamp and document version. Until all five are done, a banner reminds you that **you can't be matched yet**.
-> **⚠ Inferred (R2-Q5):** reminders go out Sept W1 / W2 / W3; still nothing after the final reminder → treated as withdrawn, seat freed. Confirm.
-
-**2.3 Orientation.** Your page offers the orientation: **live session** (the coordinator marks attendance) or **recorded module** — opening it records completion. Until orientation is complete you cannot enter Rotation 1.
-
-**2.4 Matched.** When the Programme Lead approves your pairing you see the match notification exactly as it would arrive by email: your mentor's name and background, the rotation window, the rotation guide link, and a suggested first step.
-
-**2.5 During the rotation.** Your page shows the current rotation guide and your mentor card. Nothing to fill in — meetings are yours to arrange; the reflection is written privately on the microsite page (1.3).
-
-**2.6 Close-off (one minute).** When the rotation window ends, your page (and a reminder email) asks for your **close-off**: two ticks — *"We met at least twice" · "I completed my reflection"* — plus an optional comment. Submit → rotation marked complete. This is the only per-rotation record the system keeps.
-
-**2.7 The close-off carries the checkpoints.** The Rotation 2 close-off includes your **mid-programme review** (required), and the Rotation 3 close-off includes your **end-of-programme evaluation** (required) — one form each, no separate chase. After Rotation 3, your page asks for your closing **Builder's Commitment** — a free-text reflection on how you'll contribute back.
-
-**2.8 Certificate.** Rule (decided by the Programme Owner): **3 close-offs + mid-programme review + end-of-programme evaluation + Builder's Commitment**. Certificates are printed and presented at the Appreciation Night; the email you receive is a heads-up, not the certificate.
+**1.6 Concern link.** In the page footer: **"Raise a concern (private)"** — see chapter 7.
 
 ---
 
-## 3 · Mentor — my personal page
+## 2 · Accepted participant — link, code, gate, page
 
-**3.1 My page.** Same personal-link model, mentor timeline: Registered → Acknowledged → Orientation → Rotations → Mid-programme review → Completed.
+**2.1 The acceptance email** (verbatim, dual-signed by Esther Koh and Wei Kiat Koh) carries the personal link and the 26 Sept deadline.
 
-**3.2 Acknowledgement & orientation.** Identical to 2.2 / 2.3 (mentor-role wording where relevant).
+**2.2 Sign-in.** The link opens a check: *enter the email you applied with* → a one-time code is emailed → entering it signs you in. Wrong email or wrong code: a clear message, no data shown.
 
-**3.3 Matched.** Per rotation you see your mentee card(s) — at most two — with their goals and development needs, the rotation guide, and a suggested first step.
+**2.3 The acceptance gate (first login; mandatory; binding).** Three items, each actioned separately, each **timestamped independently**:
+1. **Programme Rules** — the approved text (mentor and mentee versions differ in substance), rendered verbatim in a scrollable panel, with the exact acknowledgement checkbox.
+2. **Conflict of Interest** — declare / no conflict (radio); details required only when declaring; the confirmation checkbox is always required.
+3. **Kick-Off attendance** — a binding programme requirement with an exception-request path (reason required). Exception requests route to **Esther Koh and Wei Kiat Koh**, who decide; a request is a request, not a waiver.
 
-**3.4 Two checkpoints, nothing else.** Mentors submit a **mid-programme review** (January — how the pairing is going, any support needed) and an **end-of-programme evaluation** (March — how it went end-to-end). Both are short free-text forms on the personal page; there are no other mentor duties in the system.
+Completing all three **confirms the place**: the onboarding email fires *(copy is a placeholder pending the approved onboarding text)* and the portal page opens. PDPA is deliberately **not** in this gate.
 
-**3.5 Certificate.** Rule (decided by the Programme Owner): **mid-programme review + end-of-programme evaluation**. Presented physically at the Appreciation Night.
+**2.4 Kick-Off logistics (after the gate).** Confirmed attendees are asked two optional questions — arrival/departure note, dietary restrictions (catering only). Resumable; skippable.
 
----
+**2.5 The personal page.** Journey bar (Applied → Accepted → **Place confirmed** → rotations → certificate), the current next step, rotation cards with the matched partner, and every submitted artefact echoed back.
 
-## 4 · Reviewer — screening console
+**2.6 Rotations & close-offs (unchanged from the owner's decisions):** meet at least twice per rotation; one-minute close-off; the R2 close-off carries the mentee's mid-programme review, the R3 close-off the end-of-programme evaluation; then the Builder's Commitment. Reflection content is never stored.
 
-*Sign in as Kenzie or Yu Tong (mentor reviewers), Portia or Sapranshu (mentee reviewers), or Esther / Wei Kiat (both).*
+**2.7 Certificates (owner's rule):** mentee = 3 close-offs + mid-prog review + end-prog evaluation + Builder's Commitment; mentor = mid-prog feedback + end-prog evaluation. Printed and presented at the Appreciation Night (26 Mar).
 
-**4.1 My queue.** You see only your side's applications (mentor reviewers see mentors; mentee reviewers see mentees), each as a card: the full application answers, and an **AI summary** (3–5 lines, labelled "AI-generated") to speed reading. The AI never recommends accept or reject.
-
-**4.2 Score.** Give a light-touch score (1–5) and an optional comment. Multiple reviewers can score the same application; all scores stay visible side by side.
-
----
-
-## 5 · Programme Lead — decisions & matching (Esther)
-
-**5.1 Decision queue.** Every scored application appears with its reviewer scores, comments and AI summary. For each: **Accept / Reserve bench / Waitlist / Decline**. The matching decision is yours alone — reviewers recommend, you decide. Each decision immediately shows the outcome email that would be sent. Reserve bench targets 10% of accepted mentors.
-
-**5.2 Matching board (per rotation).** Three columns per track — the pool is strictly within-track. Click **Suggest matches (AI)** → ranked pairings appear, each with a plain-language rationale (why this pair: goals-fit, industry, background) and constraint checks (≤2 mentees per mentor · no conflict · no repeat mentor — violations are impossible to approve).
-> **⚠ Inferred (R2-Q3):** within-track matching, priority = development-need fit → industry → diversity; no fixed track quotas. Confirm.
-
-**5.3 Approve.** Approve pairs one by one (or adjust: swap a suggestion before approving). On approval, both sides' notification emails are shown, and the pair appears in every relevant view. Nothing is matched until you approve it.
-
-**5.4 Certificates.** Lists everyone against the completion criteria with exactly which criteria are still missing, plus an **Exception report** — participants who miss a criterion, with an **Approve by exception** control for the Programme Lead (reason mandatory; recorded on the certificate and in the audit log). Certificates are printed and presented at the Appreciation Night.
+**2.8 Reserve list members** see an honest status page: opted in / awaiting your reply / declined — and what activation would mean.
 
 ---
 
-## 6 · Coordinator — operations console (Wei Kiat)
+## 3 · Reviewer — screening console
 
-**6.1 Dashboard.** One screen: the cohort funnel (Applied → Screened → Accepted → Acknowledged → Orientated → Matched → per-rotation Closed-off → Certified), per-track counts, the two gates' blocked lists, open exceptions, and checkpoint counters (mid-programme reviews, Builder Reflections, certificates, event attendance). The Programme Lead can **export the cohort report (CSV)** — export stays restricted to Lead + System Administrator.
+**3.1 My queue.** Mentor reviewers see mentors; mentee reviewers see mentees. Each card shows the full application (for mentees: both prompts in full, with the criteria each prompt is read for — the committee scoring guide is built into the page) and a labelled AI summary that never recommends an outcome.
 
-**6.2 Reminder schedule.** The September acknowledgement ladder (W1 notify / W2 remind / W3 final) shown against today's date; each reminder that would fire lists its recipients and message. In the demo you can press **Advance demo clock** to watch the ladder fire.
-
-**6.3 Waitlist.** Waitlisted applicants in reviewer-score order. When capacity opens, **Promote** moves the top applicant into the accepted flow (acknowledgement etc.) — one click.
-
-**6.4 Close-off exceptions.** After a rotation ends, pairs with missing close-offs appear here with days-overdue and one-click **Remind again**.
-
-**6.5 Events check-in.** Kickoff Night and Appreciation Night attendance: a search-and-tick list built for a phone at the door.
-
-**6.6 Mentor dropout.** Mark a mentor dropped → their mentees enter a re-match queue restricted to **same-track reserve-bench mentors**; the Lead approves the replacement; the mentee's hand-over notification is shown. Target: within 7 days.
+**3.2 Score against the criteria.** Mentee: five scored criteria (Readiness to Learn · Global Curiosity · Values Awareness · Ownership · Community Mindset) — **Commitment is a confirmation captured on the form**, shown as a badge, not scored. Mentor: four scored criteria (Professional Credibility · Breadth of Perspective · Values Alignment · Mentoring Mindset) + the same Commitment confirmation. Each criterion is 1–5; the stored score is the average, with the per-criterion breakdown kept.
 
 ---
 
-## 7 · Escalation Owner — concern inbox (Esther)
+## 4 · Programme Lead — decisions, matching, certificates
 
-**7.1** The **Raise a concern** link (microsite footer + acknowledgement page) opens a private form. Submissions appear **only** in this inbox — no other role, including IT support, can see them; the system stores the referral record and routes the case to SMC's Grievance & Misconduct process.
-> **⚠ Inferred (R2-Q6):** link appears on both the microsite and the acknowledgement page; Esther is the sole recipient. Confirm.
+**4.1 Decisions. Approving is the send:** every decision issues its verbatim outcome email automatically (spec flow stage 0 — approval and invitation are one action; running as the default, Q9 card to confirm). The buttons per applicant:
+- **Accept** → acceptance email with personal link + 26 Sept deadline
+- **Reserve list** → the Reserve email (opt-in requested by 26 Sept)
+- Mentor: **Decline** · Mentee: **Decline (not selected)** / **Decline (ineligible)** — two honest variants: "more applications than places" is true for one and misleading for the other.
 
----
+**4.2 Matching (per rotation).** One pool — hard constraints: ≤2 mentees per mentor · no repeat mentor · **only confirmed places enter matching**. **Suggest matches** scores every eligible mentor on the mentee's three ranked industry preferences (first +10 · second +6 · third +3), significant cross-industry breadth (+2), organisation diversity across rotations (+3) and load spread; the top match is proposed with its actual scoring reasons quoted. Declared conflicts of interest from the gate are listed above the board for the Lead to check against. Alternatives, swap and discard work per proposal; nothing is matched until the Lead approves.
 
-## 8 · Admin — cohort configuration
-
-**8.1** Dates and windows: cycle dates, three rotation windows, the reminder ladder, event dates — all editable configuration, no code. **Demo clock:** advance the simulated date (15 Dec · R2 → 1 Feb · R3 → 20 Mar · closing week) to walk the full cycle to the end — Rotation 3 matching, final close-offs, Builder Reflections and certificates.
-> **⚠ Inferred (R2-Q8):** demo runs on placeholder dates (registration opens early Sept · Kickoff early Oct · microsite live before registration). Replace with real dates.
-
-**8.2** Role assignments per cohort (the SMU pilot names are pre-loaded), document versions for acknowledgement, and **Reset demo data**.
+**4.3 Certificates.** Progress against the criteria, one-click issue for qualifiers, and the **exception report** with approve-by-exception (reason mandatory; recorded and audited).
 
 ---
 
-## Appendix — what the system deliberately does *not* do
+## 5 · Coordinator — operations
 
-No pair/meeting tracking during rotations · no availability collection · no kickoff-goals form · no reflection content stored · no participant accounts or passwords · no concern-case handling (referral only) · SMC Hikes not included (separate programme). **⚠ (R2-Q7):** please confirm this lean scope on the record.
+**5.1 Dashboard.** The worklist ("what needs you"), then the standing state: **Place confirmed X/Y (gate done, by 26 Sept)** with the per-person not-yet-confirmed list (which of the three items each is missing, and whether they have been reminded), Kick-Off confirmations, open exceptions, Reserve-list counts, submissions, certificates. Tiles link to the page where the work happens. CSV export is restricted to the Lead.
+
+**5.2 Reminders.** The confirmed rule, mechanised: acceptance reminders are sent **once** per person, only to accepted-but-unconfirmed, a few days before 26 Sept (activated reserves: the compressed variant before 29 Sept; no same-day nudge). Staging has a "send now" control; production runs it on schedule. After the deadline passes, the **seat release** list appears — releasing is an explicit human action; freed seats go to the Reserve list.
+
+**5.3 Reserve lists.** Both lists ranked by committee score, with the reply state (opted in / awaiting / declined — replies arrive by email and are recorded here) and **Activate**: sends the activation acceptance email with the 29 Sept deadline and puts the person into the normal gate flow. Places opening too late for email: contact the person directly (confirmed — no email fallback deadline).
+
+**5.4 Exceptions.** Kick-Off exception requests (decide: approve / ask to attend — participant notified either way), overdue close-offs (remind), and mentor dropouts (mentees re-matched from the opted-in Reserve Mentor list within 7 days).
+
+**5.5 Events.** Kick-Off check-in list = everyone who confirmed attendance in the gate, with the **catering summary** (dietary notes) and arrival notes from the logistics step. Appreciation Night check-in for the full cohort.
+
+---
+
+## 6 · Emails — every message, verbatim
+
+**Console → Emails** holds (a) the **template library**: all 17 approved participant templates (mentor set of 8, mentee set of 9) plus the operational two (one-time code; onboarding placeholder), each openable with placeholder data; (b) the **sent log**: every message the system has issued, openable in full. Sender identity on everything: From **SMC GRMP Team**, reply-to **smu.smc@sa.smu.edu.sg** (configured at the mail-platform level in production). Relationship-defining emails are dual-signed (Esther Koh + Wei Kiat Koh); operational chase-ups are signed by Wei Kiat Koh only.
+
+---
+
+## 7 · Escalation Owner — concern inbox
+
+The **Raise a concern** link opens a private form. Submissions appear only in this inbox — no other role, including IT support, can see them; the platform stores the referral record and routes the case to SMC's Grievance & Misconduct process.
+
+---
+
+## 8 · Configuration
+
+Cycle dates, the **selection timeline** (all the spec dates in one table), roles, the decisions register (open cards + settled records), the demo clock (walk the cycle to its end), optional briefing-recording links (a resource card on confirmed participants' pages — **not** a gate), and **Start a new cycle**: archives the current cycle, carries mentors over as invited (the acceptance gate re-applies), shifts every configured date into the new year — configuration, not code.
+
+---
+
+## Appendix A — what the system deliberately does *not* do
+
+No pair/meeting tracking during rotations · no availability collection · no reflection content stored · no participant accounts or passwords · no headshots collected at any stage (privacy + bias, spec-confirmed) · no concern-case handling (referral only) · SYHL questions out of scope · SMC Hikes not included.
+
+## Appendix B — open items owed by the programme side (from the specs)
+
+SMC brand guidelines & assets (styling waits for them — Q12) · portal onboarding email copy · the SMC Charter link referenced in the Programme Rules · form fill-time estimate to measure on a real fill-through · confirmation of Q9 (auto-issue on approval).

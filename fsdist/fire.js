@@ -43,7 +43,7 @@ const FIRE = {
     const fresh = GRMP.buildSeed();
     fresh.sessions = {};
     const batch = this.fs.batch();
-    this.slices.forEach(s => batch.set(col.doc(s), {v: fresh[s]===undefined?null:fresh[s]}));
+    this.slices.forEach(s => batch.set(col.doc(s), {v: JSON.parse(JSON.stringify(fresh[s]===undefined?null:fresh[s]))}));
     await batch.commit();
     return true;
   },
@@ -78,7 +78,12 @@ const FIRE = {
     this.slices.forEach(s=>{
       const now = JSON.stringify(db[s]===undefined?null:db[s]);
       if(this.last[s] !== now){
-        batch.set(col.doc(s), {v: db[s]===undefined?null:db[s]});
+        /* Write the JSON round-trip, not the raw object: any `undefined` buried in a
+           mutation (an optional form field never shown, a conditional branch) would
+           make Firestore reject the WHOLE slice — and the change silently never lands.
+           The round-trip drops undefined exactly the way the diff baseline (`now`)
+           already does, so what is written is what was compared. */
+        batch.set(col.doc(s), {v: JSON.parse(now)});
         staged.push([s, now]);
       }
     });
@@ -94,7 +99,7 @@ const FIRE = {
     fresh.sessions = {};
     const col = this.fs.collection('state');
     const batch = this.fs.batch();
-    this.slices.forEach(s => batch.set(col.doc(s), {v: fresh[s]===undefined?null:fresh[s]}));
+    this.slices.forEach(s => batch.set(col.doc(s), {v: JSON.parse(JSON.stringify(fresh[s]===undefined?null:fresh[s]))}));
     await batch.commit();
     return fresh;
   },

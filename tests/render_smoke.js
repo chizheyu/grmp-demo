@@ -90,10 +90,31 @@ console.log('— settled decisions carry no card; open ones still do —');
   T('Q5 settled → no card on Reminders', !/INFERRED · Q5/.test(html_rem));
   const html_dash = C.shell('Esther','dashboard');
   T('Q7 settled → no card on Dashboard', !/INFERRED · Q7/.test(html_dash));
+  const html_match = C.shell('Esther','matching');
+  T('Q3 settled by the specs → no card on Matching', !/INFERRED · Q3/.test(html_match));
+  const html_apply = V.apply('mentee');
+  T('Q4/Q10 settled by the specs → no card on the application form', !/INFERRED · (Q4|Q10)/.test(html_apply));
+  const html_dec = C.shell('Esther','decisions');
+  T('Q9 (auto-issue on approval) still open → its card stays on Decisions', /INFERRED · Q9/.test(html_dec));
   const html_cfg = C.shell('Esther','config');
   T('Q8 settled → no card on Configuration', !/INFERRED · Q8/.test(html_cfg));
-  const html_match = C.shell('Esther','matching');
-  T('Q3 still open → its card stays on Matching', /INFERRED · Q3/.test(html_match));
+  T('Q12 (brand assets outstanding) still open → its card stays on Configuration', /INFERRED · Q12/.test(html_cfg));
+}
+console.log('— R5: the gate, OTP card and staged form render in every state —');
+{
+  const gatep = db.people.find(p=>p.appStatus==='accepted' && !G.GRMP.D.placeConfirmed(p));
+  check('personal (gate ahead)', () => V.personal(gatep.id));
+  const res = db.people.find(p=>p.appStatus==='reserve_invited');
+  check('personal (reserve list)', () => V.personal(res.id));
+  for(const s of [1,2,3,4]){
+    vm.runInContext(`window.__APPLY = {kind:'mentee', step:${s}, d:{}, errors:{}}`, ctx);
+    check(`apply mentee step ${s}`, () => V.apply('mentee'));
+  }
+  for(const s of [1,2,3,4]){
+    vm.runInContext(`window.__APPLY = {kind:'mentor', step:${s}, d:${s>1?`{heard:GRMP.FORM_OPTS.heardMentor[0]}`:'{}'}, errors:{}}`, ctx);
+    check(`apply mentor step ${s}${s>1?' (returning branch)':''}`, () => V.apply('mentor'));
+  }
+  vm.runInContext('window.__APPLY = null', ctx);
 }
 
 console.log('— and the same sweep on a brand-new cycle (derived-facts proof) —');

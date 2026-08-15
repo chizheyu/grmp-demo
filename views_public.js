@@ -1,8 +1,23 @@
-/* GRMP Demo — public views: microsite (manual ch.1) + personal pages (ch.2–3). */
+/* GRMP Demo — public views: microsite (manual ch.1) + personal pages (ch.2–3).
+   R5: staged 4-step application forms (Joanne's specs, verbatim), OTP link login,
+   gated acceptance (Rules + COI + Kick-Off) and the post-gate logistics step.
+   NO cohort literal (year / institution / cap / month) may appear in this file —
+   everything comes from GRMP.D.cohortFacts(db) or GRMP.COPY (guard-tested in L1). */
 
-/* Cohort facts, read lazily at render time — every cohort-specific number, date or
-   institution name in these templates must come from here (guard-tested in L1). */
+/* Cohort facts, read lazily at render time. */
 const F = () => GRMP.D.cohortFacts((typeof __demo!=='undefined'&&__demo.db)||db);
+
+/* Verbatim copy renderer: '**x**' → bold, list-ish lines keep their own row. */
+function copyHTML(lines){
+  return lines.map(l=>{
+    const h = esc(l).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    const tight = /^(\d+\.|-)\s/.test(l) ? 'margin:2px 0 2px 14px' : 'margin:8px 0';
+    return `<p style="${tight}">${h}</p>`;
+  }).join('');
+}
+/* Multi-step application state (in memory only — the specs confirm no save-and-resume). */
+window.__APPLY = window.__APPLY || null;
+window.__OTP = window.__OTP || null;
 
 const Views = {
 
@@ -27,44 +42,31 @@ msFooter(){
 
 /* ---------- 1.1 landing ---------- */
 landing(){
-  const t = GRMP.TRACKS;
   return this.msNav() + `
   <header class="ms-hero"><div class="wrap">
     <div class="eyebrow">Singapore Mentorship Committee · Global Ready for SG100</div>
     <h1>Six months. Three mentors. A global-ready you.</h1>
-    <p>The Global Ready Mentorship Programme pairs ${F().inst?F().inst+' ':''}students and young professionals with senior leaders across three rotations — ${F().spanLong}. One hour with the right mentor
+    <p>The Global Ready Mentorship Programme pairs ${F().inst?F().inst+' ':''}students with senior leaders across three rotations — ${F().spanLong}. One hour with the right mentor
        can reframe a career.</p>
     <div class="cta">
-      <a class="btn btn-light" href="#/apply/mentee" style="text-decoration:none">Apply as Mentee</a>
-      <a class="btn btn-line" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+      <a class="btn btn-light" href="#/apply/mentee" style="text-decoration:none">Apply as a Mentee</a>
+      <a class="btn btn-line" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
     </div>
   </div></header>
   <div class="ms-strip">${F().short}${F().inst?` is piloted with ${F().inst}`:``} · ${F().mentors} mentors · ${F().mentees} mentees · applications reviewed by the programme team</div>
 
   <section class="ms-section"><div class="wrap">
-    <h2>Three tracks, one journey</h2>
-    <p class="lede">Choose the track that matches where you want to grow. You'll be matched with a different mentor from your track in each rotation.</p>
-    <div class="cards3">
-      <div class="tcard"><div class="glyph" style="background:#1A56A0">G</div><h3>General</h3>
-        <p>Mentors from Finance, Tech, Communications, HR, Education and more — for building a strong career foundation.</p></div>
-      <div class="tcard"><div class="glyph" style="background:#B85C1E">E</div><h3>Entrepreneurship</h3>
-        <p>Builders and founders — for those testing whether the founder's path is theirs.</p></div>
-      <div class="tcard"><div class="glyph" style="background:#6D5CF0">AI</div><h3>AI</h3>
-        <p>Practitioners applying AI in real workplaces — for careers that ride the wave instead of watching it.</p></div>
-    </div>
-  </div></section>
-
-  <section class="ms-section" style="padding-top:0"><div class="wrap">
     <h2>Is this for you?</h2>
     <div class="cards3" style="margin-top:14px">
       <div class="tcard"><h3 style="margin-top:0">Who can apply</h3>
-        <p>${F().inst?F().inst+' ':''}students and young professionals ready to be mentored — and to do the reflecting that makes mentorship work.</p></div>
+        <p>Current ${F().inst?F().inst+' ':''}undergraduates from every school and every year — ready to be mentored,
+        and to do the reflecting that makes mentorship work. Places are capped at ${F().menteeCap}, and every application is read with care.</p></div>
       <div class="tcard"><h3 style="margin-top:0">What it asks of you</h3>
         <p>Meet your mentor <b>at least twice</b> in each two-month rotation, at times you both choose.
         Write a private reflection after each rotation. One minute to close each rotation off. That is all.</p></div>
       <div class="tcard"><h3 style="margin-top:0">What you leave with</h3>
-        <p>Three mentors across three themes, a habit of reflecting on your own direction, and a
-        completion certificate from the Singapore Mentorship Committee.</p></div>
+        <p>Three mentors across three rotations, matched to your industry preferences, a habit of reflecting on your own direction, and a
+        completion certificate presented jointly by ${F().inst||'the university'} and the Singapore Mentorship Committee.</p></div>
     </div>
   </div></section>
 
@@ -72,9 +74,9 @@ landing(){
     <h2>How the six months run</h2>
     <p class="lede">Every step below is handled on this platform — no forms lost in inboxes, no chasing.</p>
     <div class="timeline">
-      <div class="tl-node"><div class="dot">1</div><h4>Apply · ${F().regWindow||F().applyShort}</h4><p>One form, reviewed by the programme team</p></div>
-      <div class="tl-node"><div class="dot">2</div><h4>Acknowledge</h4><p>Programme Rules, PDPA & conduct — digital, timestamped</p></div>
-      <div class="tl-node"><div class="dot">3</div><h4>Orientation & Kickoff · ${F().kickoffShort}</h4><p>Required before Rotation 1</p></div>
+      <div class="tl-node"><div class="dot">1</div><h4>Apply · ${F().regWindow||F().applyShort}</h4><p>One staged form, reviewed by the programme team · outcome by ${F().outcomeByLong}</p></div>
+      <div class="tl-node"><div class="dot">2</div><h4>Accept your place</h4><p>Your personal link opens the portal gate — Programme Rules, a conflict declaration and Kick-Off attendance, by ${F().acceptByLong}</p></div>
+      <div class="tl-node"><div class="dot">3</div><h4>Kick-Off · ${F().kickoffShort}</h4><p>${F().kickoffLong}, ${F().kickoffTime} — a binding programme requirement</p></div>
       <div class="tl-node"><div class="dot">4</div><h4>3 rotations · ${F().r1Short}–${F().endShort}</h4><p>Know Yourself · Know Your World · Know Your Path</p></div>
       <div class="tl-node"><div class="dot">5</div><h4>Close-off each rotation</h4><p>Two meetings + your private reflection</p></div>
       <div class="tl-node"><div class="dot">6</div><h4>Certificate · ${F().endShort}</h4><p>Complete all three rotations</p></div>
@@ -87,7 +89,7 @@ landing(){
       <p class="lede" style="margin:0">Meet your mentee at least twice per two-month rotation, at times you both choose.
       No admin burden — the platform handles everything except the conversation.</p>
     </div>
-    <a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+    <a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
   </div></section>
 
   <section class="ms-section"><div class="wrap">
@@ -95,13 +97,13 @@ landing(){
     <div class="faq">
       ${[
         ['Do I need an account or a password?',
-         'No — never. Every email we send carries your own link straight to your page. Only the ten-person programme team signs in.'],
+         'No password, ever. Your acceptance email carries your own personal link; opening it sends a one-time code to your email, and that signs you in. Only the programme team holds accounts.'],
         ['How much time does it really take?',
          'Two conversations per rotation, arranged directly between you and your mentor, plus a one-minute close-off at the end of each. Six conversations over six months.'],
         ['Do I have to hand in my reflections?',
          'No. Your reflection is yours. The platform records only that you completed the rotation — never what you wrote.'],
         ['What if my mentor drops out?',
-         'You are re-matched from the reserve bench within seven days, in the same track, and briefed on the hand-over.'],
+         'You are re-matched within seven days from our Reserve Mentor list and briefed on the hand-over.'],
         ['Can I get the same mentor twice?',
          'No — you meet a different mentor in each rotation. That is the point of three rotations.'],
         ['What if something goes wrong?',
@@ -112,10 +114,10 @@ landing(){
 
   <section class="ms-section" style="background:var(--ai-wash);border-top:1px solid var(--line)"><div class="wrap" style="text-align:center">
     <h2 style="margin-bottom:6px">Applications are open</h2>
-    <p class="lede" style="margin:0 auto 18px">Reviewed by the programme team, with an outcome by email. One form, no account.</p>
+    <p class="lede" style="margin:0 auto 18px">Reviewed by the programme team, with an outcome by ${F().outcomeByLong}. One staged form, no account.</p>
     <div class="cta" style="justify-content:center">
-      <a class="btn btn-primary" href="#/apply/mentee" style="text-decoration:none">Apply as Mentee</a>
-      <a class="btn btn-ghost" href="#/apply/mentor" style="text-decoration:none">Register as Mentor</a>
+      <a class="btn btn-primary" href="#/apply/mentee" style="text-decoration:none">Apply as a Mentee</a>
+      <a class="btn btn-ghost" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
     </div>
   </div></section>` + this.msFooter();
 },
@@ -164,7 +166,7 @@ reflection(pid){
       <div class="doc-card"><h3>🔒 For programme participants</h3>
       <p style="font-size:13.5px">The Reflection Sheet and Conversation Guides are shared with accepted participants only —
       open this page from <b>your personal link</b> (the one in your acceptance email). Decided by the Programme Owner.</p>
-      <p style="font-size:12.5px;color:var(--ink-3)">Not in the programme yet? <a href="#/apply/mentee">Apply as a mentee</a> or <a href="#/apply/mentor">register as a mentor</a>.</p></div>
+      <p style="font-size:12.5px;color:var(--ink-3)">Not in the programme yet? <a href="#/apply/mentee">Apply as a mentee</a> or <a href="#/apply/mentor">apply as a mentor</a>.</p></div>
     </div>` + this.msFooter();
   }
   return this.msNav() + `<div class="doc-page">
@@ -178,7 +180,7 @@ reflection(pid){
       <li>One thing my mentor said that I keep thinking about.</li></ul></div>
     <div class="doc-card"><h3>Rotation 2 — Know Your World</h3><ul>
       <li>How does my target industry actually work, beyond what I imagined?</li>
-      <li>Where does my track (General / Entrepreneurship / AI) fit into that world?</li></ul></div>
+      <li>Which of my three industry preferences still holds up now that I've seen one from inside?</li></ul></div>
     <div class="doc-card"><h3>Rotation 3 — Know Your Path</h3><ul>
       <li>What path am I now considering that I wasn't before?</li>
       <li>What would I tell ${F().applyMonth}-me?</li></ul></div>
@@ -204,81 +206,235 @@ concern(){
   </div>` + this.msFooter();
 },
 
-/* ---------- 1.5/1.6 apply forms ---------- */
+/* ---------- 1.5/1.6 staged application forms (R5, Joanne's specs) ---------- */
+_applyState(kind){
+  if(!window.__APPLY || window.__APPLY.kind!==kind) window.__APPLY = {kind, step:1, d:{}, errors:{}, warned:false};
+  return window.__APPLY;
+},
+_stepLabels(kind){
+  return kind==='mentee'
+    ? ['About you','Your studies','Your growth','Commitment & consent']
+    : ['About you','Your experience','Your mentoring contributions','Commitment & consent'];
+},
+_stepper(kind, step){
+  const labels = this._stepLabels(kind);
+  return `<div class="stepper" role="group" aria-label="Application progress">
+    ${labels.map((l,i)=>{
+      const n=i+1, st = n<step?'done':(n===step?'cur':'');
+      return `<div class="st-node ${st}" ${n===step?'aria-current="step"':''}>
+        <div class="st-dot">${n<step?'✓':n}</div><span class="st-lab">${l}</span></div>`;
+    }).join('')}
+    <div class="st-txt">Step ${step} of ${labels.length}</div>
+  </div>`;
+},
+_err(state,k){ return state.errors[k] ? `<div class="f-err" role="alert">${esc(state.errors[k])}</div>` : ''; },
+_v(state,k){ return esc(state.d[k]||''); },
+_sel(state,k,opt){ return state.d[k]===opt?' selected':''; },
+_rad(state,k,val){ return state.d[k]===val?' checked':''; },
+
 apply(kind){
   const mentee = kind==='mentee';
-  return this.msNav() + `<div class="doc-page" style="max-width:640px">
-    <h1>${mentee?'Apply as a Mentee':'Register as a Mentor'}</h1>
-    <p class="lede">${mentee?`${F().short} · ${F().spanMonths} · reviewed by the programme team.`:'Welcome — this is the registration linked from your invitation.'}</p>
-  ${GRMP.D.registrationOpen(db)?'':`<div class="inferred" style="margin-bottom:14px"><span class="tag">NOTE</span>
-    <div style="flex:1">Registration for this cycle ran ${F().regWindow} and has closed on the simulated clock.
-    <b>The staging form stays open</b> so the team can test the full pipeline any day.</div></div>`}
-    ${inferred('Q4')}
-    <div class="form" id="apply-form">
-      <div class="f-grid2">
-        <div class="f-row"><label>Full name <span class="req">*</span></label><input type="text" id="f-name" placeholder="Your name"></div>
-        <div class="f-row"><label>Email <span class="req">*</span></label><input type="email" id="f-email" placeholder="you@example.com"></div>
-      </div>
-      <div class="f-grid2">
-        <div class="f-row"><label>Mobile</label><input type="text" id="f-mobile" placeholder="+65"></div>
-        ${mentee
-          ? `<div class="f-row"><label>Course${F().inst?' at '+F().inst:''} <span class="req">*</span></label><input type="text" id="f-course" placeholder="e.g. Business Management"></div>`
-          : `<div class="f-row"><label>Organisation <span class="req">*</span></label><input type="text" id="f-org" placeholder="Company / venture"></div>`}
-      </div>
-      ${mentee ? `
-      <div class="f-grid2">
-        <div class="f-row"><label>Year of study</label><select id="f-year"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>Postgraduate</option></select></div>
-        <div class="f-row"><label>Industry interest</label><input type="text" id="f-ind" placeholder="e.g. Finance"></div>
-      </div>
-      <div class="f-row"><label>Your goals for GRMP <span class="req">*</span></label><textarea id="f-goals" placeholder="What do you want out of these six months?"></textarea></div>
-      <div class="f-row"><label>Development needs</label><input type="text" id="f-dev" placeholder="e.g. confidence; networking"></div>
-      <div class="f-row"><label>What do you expect from a mentor?</label><input type="text" id="f-exp"></div>
-      <div class="f-row"><label>Readiness to reflect</label><input type="text" id="f-read" placeholder="How do you usually reflect on experiences?"></div>`
-      : `
-      <div class="f-grid2">
-        <div class="f-row"><label>Role / title <span class="req">*</span></label><input type="text" id="f-role" placeholder="e.g. Director"></div>
-        <div class="f-row"><label>Industry</label><input type="text" id="f-ind" placeholder="e.g. Technology"></div>
-      </div>
-      <div class="f-row"><label>Professional background</label><textarea id="f-bg" placeholder="A few lines on your experience"></textarea></div>
-      <div class="f-grid2">
-        <div class="f-row"><label>Leadership experience</label><input type="text" id="f-lead"></div>
-        <div class="f-row"><label>Global / cross-cultural exposure</label><input type="text" id="f-x"></div>
-      </div>
-      <div class="f-grid2">
-        <div class="f-row"><label>Languages</label><input type="text" id="f-lang" placeholder="English, ..."></div>
-        <div class="f-row"><label>Why mentor with GRMP?</label><input type="text" id="f-mot"></div>
-      </div>
-      <div class="inferred" style="margin:6px 0 14px"><span class="tag">RULE</span><div>Every mentor is allocated <b>up to two mentees</b> — fixed by the programme, so we don't ask. We also don't collect weekly availability: meeting times are yours and your mentee's to arrange.</div></div>`}
-      <div class="f-row"><label>Choose your track <span class="req">*</span></label>
-        <div class="track-pick">
-          <div class="track-opt" data-track="general" data-act="pickTrack"><h4>General</h4><p>Finance · Tech · Comms · HR · Education</p></div>
-          <div class="track-opt" data-track="entrepreneurship" data-act="pickTrack"><h4>Entrepreneurship</h4><p>Founders & builders</p></div>
-          <div class="track-opt" data-track="ai" data-act="pickTrack"><h4>AI</h4><p>AI applied in the workplace</p></div>
-        </div>${inferred('Q3')}</div>
-      <label class="f-row f-check" style="display:flex"><input type="checkbox" id="f-consent">
-        <span>I consent to SMC collecting and using this information to run GRMP, per the PDPA consent statement. <span class="req">*</span></span></label>
-      <button class="btn btn-primary" data-act="submitApply" data-kind="${kind}">Submit ${mentee?'application':'registration'}</button>
-      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Submitting with missing required fields saves your application as
-        a <b>draft</b> you can return to and finish — no reminder emails. Only complete, submitted applications enter selection.</p>
-    </div>
-  </div>` + this.msFooter();
+  const S = this._applyState(kind);
+  const CF = F();
+  const intro = (mentee?GRMP.COPY.menteeIntro(CF):GRMP.COPY.mentorIntro(CF)).split('\n');
+  const head = `<div class="doc-page" style="max-width:680px">
+    <h1>${mentee?'Apply as a Mentee':'Apply as a Mentor'}</h1>
+    ${GRMP.D.registrationOpen(db)?'':`<div class="inferred" style="margin-bottom:14px"><span class="tag">NOTE</span>
+      <div style="flex:1">Applications for this cycle ran ${CF.regWindow} and have closed on the simulated clock.
+      <b>The staging form stays open</b> so the team can test the full pipeline any day.</div></div>`}
+    ${S.step===1?`<div class="doc-card" style="background:var(--surface-2)">${copyHTML(intro)}</div>`:''}
+    ${this._stepper(kind, S.step)}
+    <div class="form" id="apply-form" data-kind="${kind}">`;
+  const foot = `</div>
+    <p style="font-size:11.5px;color:var(--ink-3);margin:10px 0 0">This application is completed in one sitting — there is no save function
+    (confirmed by the programme team; there is no applicant sign-in to attach a partial record to). If you try to leave the page, your browser will warn you first.</p>
+  </div>`;
+  const nav = `<div style="display:flex;gap:8px;margin-top:16px">
+    ${S.step>1?`<button class="btn btn-ghost" data-act="applyBack" data-kind="${kind}">← Back</button>`:''}
+    <span style="flex:1"></span>
+    ${S.step<4?`<button class="btn btn-primary" data-act="applyNext" data-kind="${kind}">Next →</button>`
+              :`<button class="btn btn-primary" id="apply-submit" data-act="applySubmit" data-kind="${kind}">Submit application</button>`}
+  </div>`;
+  const body = this['_'+kind+'Step'+S.step](S, CF);
+  return this.msNav() + head + body + nav + foot + this.msFooter();
+},
+
+/* --- mentee steps --- */
+_menteeStep1(S, CF){
+  const smuWarn = S.d.email && !/smu/i.test(String(S.d.email).split('@')[1]||'');
+  return `
+  <div class="f-row"><label>School (${CF.inst}) email <span class="req">*</span></label>
+    <input type="email" id="af-email" value="${this._v(S,'email')}" placeholder="johndoe@business.smu.example.edu" autocomplete="email">
+    <div class="f-micro">${esc(GRMP.COPY.smuEmailMicro)}</div>
+    ${smuWarn?`<div class="f-warn">${esc(GRMP.COPY.smuEmailSoftWarn)}</div>`:''}${this._err(S,'email')}</div>
+  <div class="f-grid2">
+    <div class="f-row"><label>First name <span class="req">*</span></label><input type="text" id="af-firstName" maxlength="50" value="${this._v(S,'firstName')}">${this._err(S,'firstName')}</div>
+    <div class="f-row"><label>Last name <span class="req">*</span></label><input type="text" id="af-lastName" maxlength="50" value="${this._v(S,'lastName')}">${this._err(S,'lastName')}</div>
+  </div>
+  <div class="f-grid2">
+    <div class="f-row"><label>Phone number <span class="req">*</span></label><input type="tel" id="af-phone" value="${this._v(S,'phone')}" placeholder="+65">${this._err(S,'phone')}</div>
+    <div class="f-row"><label>Nationality <span class="req">*</span></label><input type="text" id="af-nationality" value="${this._v(S,'nationality')}">${this._err(S,'nationality')}</div>
+  </div>
+  <div class="f-row"><label>LinkedIn profile URL <span class="req">*</span></label>
+    <input type="text" id="af-linkedin" value="${this._v(S,'linkedin')}" placeholder="linkedin.com/in/yourname">
+    <div class="f-micro">This helps your future mentor get to know you.</div>${this._err(S,'linkedin')}</div>
+  <div class="f-row"><label>How did you hear about GRMP? <span class="req">*</span></label>
+    <select id="af-heard"><option value=""></option>${GRMP.FORM_OPTS.heardMentee.map(o=>`<option${this._sel(S,'heard',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'heard')}</div>
+  ${/referred/.test(S.d.heard||'')?`<div class="f-row"><label>Who referred you? <span class="req">*</span></label>
+    <input type="text" id="af-referrer" value="${this._v(S,'referrer')}" placeholder="Name of the person who referred you.">${this._err(S,'referrer')}</div>`:''}`;
+},
+_menteeStep2(S, CF){
+  return `
+  <p class="f-secnote">This step establishes eligibility and supports matching — it is not scored.</p>
+  <div class="f-grid2">
+    <div class="f-row"><label>Year of study <span class="req">*</span></label>
+      <select id="af-year"><option value=""></option>${GRMP.FORM_OPTS.years.map(o=>`<option${this._sel(S,'year',o)}>${o}</option>`).join('')}</select>
+      <div class="f-micro">All undergraduate years are eligible, including final-year students.</div>${this._err(S,'year')}</div>
+    <div class="f-row"><label>Faculty (first degree) <span class="req">*</span></label>
+      <select id="af-faculty"><option value=""></option>${GRMP.FACULTIES.map(o=>`<option${this._sel(S,'faculty',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'faculty')}</div>
+  </div>
+  <div class="f-grid2">
+    <div class="f-row"><label>Faculty (second degree, if any)</label>
+      <select id="af-faculty2"><option${!S.d.faculty2||S.d.faculty2==='Not applicable'?' selected':''}>Not applicable</option>${GRMP.FACULTIES.map(o=>`<option${this._sel(S,'faculty2',o)}>${esc(o)}</option>`).join('')}</select></div>
+    <div class="f-row"><label>Degree / major <span class="req">*</span></label>
+      <input type="text" id="af-degree" value="${this._v(S,'degree')}" placeholder="e.g. BBM, Finance"><div class="f-micro">Your degree and major.</div>${this._err(S,'degree')}</div>
+  </div>
+  <label class="f-row f-check" style="display:flex"><input type="checkbox" id="af-eligibilityConfirmed" ${S.d.eligibilityConfirmed?'checked':''}>
+    <span>${esc(GRMP.COPY.eligibilityTick)} <span class="req">*</span></span></label>${this._err(S,'eligibilityConfirmed')}`;
+},
+_menteeStep3(S, CF){
+  const wc = k => GRMP.D.wordCount(S.d[k]);
+  const indSel = (k,label,err)=>`<div class="f-row"><label>${label} <span class="req">*</span></label>
+    <select id="af-${k}"><option value=""></option>${GRMP.INDUSTRIES.map(o=>`<option${this._sel(S,k,o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,k)}</div>`;
+  return `
+  <div class="f-row"><label>${esc(GRMP.COPY.menteePrompt1)} <span class="req">*</span></label>
+    <textarea id="af-prompt1" data-wordcap="200" rows="6">${this._v(S,'prompt1')}</textarea>
+    <div class="f-micro">We value focused thinking over length. <span class="wc" data-wc-for="af-prompt1">${wc('prompt1')}</span>/200 words (hard cap).</div>${this._err(S,'prompt1')}</div>
+  <div class="f-row"><label>${esc(GRMP.COPY.menteePrompt2)} <span class="req">*</span></label>
+    <textarea id="af-prompt2" data-wordcap="200" rows="6">${this._v(S,'prompt2')}</textarea>
+    <div class="f-micro"><span class="wc" data-wc-for="af-prompt2">${wc('prompt2')}</span>/200 words (hard cap).</div>${this._err(S,'prompt2')}</div>
+  ${indSel('ind1','Most preferred industry')}
+  ${indSel('ind2','Second preferred industry')}
+  ${indSel('ind3','Third preferred industry')}
+  <p class="f-secnote">Your three preferences must be three different industries — they map directly to how mentors describe themselves, so we can match on the same keys.</p>`;
+},
+_menteeStep4(S, CF){
+  return `
+  <div class="doc-card" style="background:var(--surface-2)">
+    <b>The programme asks mentees to:</b>
+    <ul style="margin:6px 0 8px">${GRMP.COPY.menteeCommitAsk(CF).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:0">${esc(GRMP.COPY.rotationsLine(CF))}</p>
+  </div>
+  <div class="f-row"><label>Can you commit to the above across the full cycle? <span class="req">*</span></label>
+    <select id="af-commit"><option value=""></option><option${this._sel(S,'commit','yes')} value="yes">Yes</option><option${this._sel(S,'commit','questions')} value="questions">I have some questions first</option></select>${this._err(S,'commit')}</div>
+  <div class="f-row"><label>Consent to join the Mentee programme Telegram group for updates? <span class="req">*</span></label>
+    <select id="af-telegramConsent"><option value=""></option><option${this._sel(S,'telegramConsent','Yes')}>Yes</option><option${this._sel(S,'telegramConsent','No')}>No</option></select>${this._err(S,'telegramConsent')}</div>
+  ${S.d.telegramConsent==='No'?`<div class="f-row"><label>Preferred contact method <span class="req">*</span></label>
+    <select id="af-contactPref"><option value=""></option><option${this._sel(S,'contactPref','Email')}>Email</option><option${this._sel(S,'contactPref','Phone')}>Phone</option></select>${this._err(S,'contactPref')}</div>`:''}
+  <div class="doc-card" style="max-height:300px;overflow-y:auto"><h3 style="margin-top:0">${esc(GRMP.COPY.pdpaTitle)}</h3>${copyHTML(GRMP.COPY.pdpaBody)}</div>
+  <label class="f-row f-check" style="display:flex"><input type="checkbox" id="af-pdpa" ${S.d.pdpa?'checked':''}>
+    <span>${esc(GRMP.COPY.pdpaTick)} <span class="req">*</span></span></label>${this._err(S,'pdpa')}`;
+},
+
+/* --- mentor steps --- */
+_mentorStep1(S, CF){
+  return `
+  <div class="f-row"><label>Email <span class="req">*</span></label>
+    <input type="email" id="af-email" value="${this._v(S,'email')}" placeholder="name@company.com" autocomplete="email">
+    <div class="f-micro">Our main point of contact.</div>${this._err(S,'email')}</div>
+  <div class="f-grid2">
+    <div class="f-row"><label>First name <span class="req">*</span></label><input type="text" id="af-firstName" maxlength="50" value="${this._v(S,'firstName')}">${this._err(S,'firstName')}</div>
+    <div class="f-row"><label>Last name <span class="req">*</span></label><input type="text" id="af-lastName" maxlength="50" value="${this._v(S,'lastName')}">${this._err(S,'lastName')}</div>
+  </div>
+  <div class="f-grid2">
+    <div class="f-row"><label>Phone number <span class="req">*</span></label><input type="tel" id="af-phone" value="${this._v(S,'phone')}" placeholder="+65">${this._err(S,'phone')}</div>
+    <div class="f-row"><label>Nationality <span class="req">*</span></label><input type="text" id="af-nationality" value="${this._v(S,'nationality')}">${this._err(S,'nationality')}</div>
+  </div>
+  <div class="f-row"><label>How did you hear about GRMP? <span class="req">*</span></label>
+    <select id="af-heard"><option value=""></option>${GRMP.FORM_OPTS.heardMentor.map(o=>`<option${this._sel(S,'heard',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'heard')}</div>
+  ${/referred/.test(S.d.heard||'')?`<div class="f-row"><label>Who referred you? <span class="req">*</span></label>
+    <input type="text" id="af-referrer" value="${this._v(S,'referrer')}" placeholder="Name of the person who referred you.">${this._err(S,'referrer')}</div>`:''}
+  ${S.d.heard===GRMP.FORM_OPTS.heardMentor[0]?`<div class="f-row"><label>Which email did you use when you mentored last cycle?</label>
+    <input type="text" id="af-lastCycleEmail" value="${this._v(S,'lastCycleEmail')}" placeholder="If different from the email above.">
+    <div class="f-micro">This helps us find your records.</div></div>`:''}`;
+},
+_mentorStep2(S, CF){
+  const returning = S.d.heard===GRMP.FORM_OPTS.heardMentor[0];
+  return `
+  ${returning?`<p class="f-secnote">Welcome back — as a returning mentor we only need your current professional details.</p>`:''}
+  <div class="f-grid2">
+    <div class="f-row"><label>Organisation <span class="req">*</span></label><input type="text" id="af-org" value="${this._v(S,'org')}"><div class="f-micro">May have changed since last cycle.</div>${this._err(S,'org')}</div>
+    <div class="f-row"><label>Designation <span class="req">*</span></label><input type="text" id="af-designation" value="${this._v(S,'designation')}">${this._err(S,'designation')}</div>
+  </div>
+  <div class="f-row"><label>Current industry <span class="req">*</span></label>
+    <select id="af-industry"><option value=""></option>${GRMP.INDUSTRIES.map(o=>`<option${this._sel(S,'industry',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'industry')}</div>
+  ${S.d.industry===GRMP.INDUSTRIES[16]?`<div class="f-row"><label>Your industry (free text) <span class="req">*</span></label>
+    <input type="text" id="af-industryOther" value="${this._v(S,'industryOther')}">${this._err(S,'industryOther')}</div>`:''}
+  <div class="f-row"><label>LinkedIn profile URL <span class="req">*</span></label>
+    <input type="text" id="af-linkedin" value="${this._v(S,'linkedin')}" placeholder="linkedin.com/in/yourname">
+    <div class="f-micro">Helps us get to know your background.</div>${this._err(S,'linkedin')}</div>
+  ${returning?'':`
+  <div class="f-grid2">
+    <div class="f-row"><label>Years of professional experience <span class="req">*</span></label>
+      <select id="af-yearsExp"><option value=""></option>${GRMP.FORM_OPTS.yearsExp.map(o=>`<option${this._sel(S,'yearsExp',o)}>${esc(o)}</option>`).join('')}</select>
+      <div class="f-micro">Helps us match you well.</div>${this._err(S,'yearsExp')}</div>
+    <div class="f-row"><label>Have you led a team, project, organisation or business? <span class="req">*</span></label>
+      <select id="af-ledTeam"><option value=""></option><option${this._sel(S,'ledTeam','Yes')}>Yes</option><option${this._sel(S,'ledTeam','No')}>No</option></select>${this._err(S,'ledTeam')}</div>
+  </div>
+  <div class="f-row"><label>Briefly, what leadership or entrepreneurial experience would you bring? <span class="req">*</span></label>
+    <textarea id="af-leadership" maxlength="300" rows="3" placeholder="e.g. led a 12-person team, founded a startup, ran a regional function.">${this._v(S,'leadership')}</textarea>
+    <div class="f-micro">A sentence or two is plenty.</div>${this._err(S,'leadership')}</div>
+  <div class="f-row"><label>Have you worked across different industries, markets, cultures or communities? <span class="req">*</span></label>
+    <select id="af-crossIndustry"><option value=""></option>${GRMP.FORM_OPTS.crossIndustry.map(o=>`<option${this._sel(S,'crossIndustry',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'crossIndustry')}</div>`}`;
+},
+_mentorStep3(S, CF){
+  const returning = S.d.heard===GRMP.FORM_OPTS.heardMentor[0];
+  const draws = S.d.draws||[];
+  return `
+  ${returning?'':`<div class="f-row"><label>Do you have previous mentoring or coaching experience? <span class="req">*</span></label>
+    <select id="af-priorMentoring"><option value=""></option><option${this._sel(S,'priorMentoring','Yes')}>Yes</option><option${this._sel(S,'priorMentoring','No')}>No</option></select>
+    <div class="f-micro">Not essential, we welcome first-time mentors.</div>${this._err(S,'priorMentoring')}</div>`}
+  <div class="f-row"><label>What draws you to mentoring with GRMP? <span class="req">*</span></label>
+    <div class="f-micro" style="margin-bottom:6px">Select all that apply.</div>
+    ${GRMP.FORM_OPTS.draws.map((o,i)=>`<label class="f-check" style="display:flex;margin:4px 0"><input type="checkbox" class="af-draw" value="${esc(o)}" ${draws.includes(o)?'checked':''}><span>${esc(o)}</span></label>`).join('')}
+    ${this._err(S,'draws')}</div>
+  <div class="f-row"><label>Anything else you would like to share?</label>
+    <textarea id="af-anythingElse" maxlength="300" rows="2" placeholder="Optional, anything you would like us to know.">${this._v(S,'anythingElse')}</textarea></div>
+  <div class="f-row"><label>Your interests <span class="req">*</span></label>
+    <textarea id="af-interests" maxlength="300" rows="2" placeholder="e.g. topics or industries you would gladly share on.">${this._v(S,'interests')}</textarea>
+    <div class="f-micro">Helps us match you with the right mentee.</div>${this._err(S,'interests')}</div>`;
+},
+_mentorStep4(S, CF){
+  return `
+  <div class="doc-card" style="background:var(--surface-2)">
+    <b>The programme asks mentors to:</b>
+    <ul style="margin:6px 0 8px">${GRMP.COPY.mentorCommitAsk(CF).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>
+    <p style="font-size:12.5px;color:var(--ink-2);margin:0">${esc(GRMP.COPY.rotationsLine(CF))}</p>
+  </div>
+  <div class="f-row"><label>Can you commit to the above across the full cycle? <span class="req">*</span></label>
+    <select id="af-commit"><option value=""></option><option${this._sel(S,'commit','yes')} value="yes">Yes</option><option${this._sel(S,'commit','questions')} value="questions">I have some questions first</option></select>${this._err(S,'commit')}</div>
+  <div class="f-row"><label>Consent to join the Mentor WhatsApp group for programme updates? <span class="req">*</span></label>
+    <select id="af-whatsappConsent"><option value=""></option><option${this._sel(S,'whatsappConsent','Yes')}>Yes</option><option${this._sel(S,'whatsappConsent','No')}>No</option></select>${this._err(S,'whatsappConsent')}</div>
+  ${S.d.whatsappConsent==='No'?`<div class="f-row"><label>Preferred contact method <span class="req">*</span></label>
+    <select id="af-contactPref"><option value=""></option><option${this._sel(S,'contactPref','Telegram')}>Telegram</option><option${this._sel(S,'contactPref','Email')}>Email</option></select>${this._err(S,'contactPref')}</div>`:''}
+  <div class="doc-card" style="max-height:300px;overflow-y:auto"><h3 style="margin-top:0">${esc(GRMP.COPY.pdpaTitle)}</h3>${copyHTML(GRMP.COPY.pdpaBody)}</div>
+  <label class="f-row f-check" style="display:flex"><input type="checkbox" id="af-pdpa" ${S.d.pdpa?'checked':''}>
+    <span>${esc(GRMP.COPY.pdpaTick)} <span class="req">*</span></span></label>${this._err(S,'pdpa')}`;
 },
 
 /* ---------- applied confirmation ---------- */
 applied(personId){
   const p = GRMP.D.person(__demo.db, personId);
   if(!p) return this.landing();
-  const ok = p.appStatus==='submitted';
+  const CF = F();
+  const txt = (p.kind==='mentee'?GRMP.COPY.menteeConfirmScreen(CF):GRMP.COPY.mentorConfirmScreen(CF)).split('\n');
   return this.msNav() + `<div class="doc-page" style="max-width:560px;text-align:center">
-    <div style="font-size:44px;margin:16px 0">${ok?'✅':'🟡'}</div>
-    <h1 style="font-size:24px">${ok?'Application received':'Saved as a draft'}</h1>
-    <p class="lede">${ok
-      ? `Thank you, ${esc(p.name)}. A confirmation email is on its way. The programme team reviews applications and you'll hear the outcome by email — every next step will arrive as a personal link, no account needed.`
-      : `We saved what you entered, ${esc(p.name)}, and emailed you a reminder listing what's missing. Your application enters review once it's complete.`}</p>
+    <div style="font-size:44px;margin:16px 0">✅</div>
+    ${copyHTML(txt)}
     <div class="card" style="text-align:left"><h3>What happens behind the scenes</h3>
       <p style="font-size:13px;color:var(--ink-2);margin:0">Your application is now in the master tracker with status
-      <b>${esc(p.appStatus)}</b> — visible to reviewers in the admin console. Open the console from the
-      <b>Open as…</b> switcher (bottom-left) to see the other side of this demo.</p></div>
+      <b>${esc(p.appStatus)}</b>, and your acknowledgement email is in the outbox — visible to reviewers in the admin console. Open the console from the
+      <b>Open as…</b> switcher (bottom-left) to see the other side of this staging build.</p></div>
     <a class="btn btn-ghost" href="#/" style="text-decoration:none">Back to the programme site</a>
   </div>` + this.msFooter();
 },
@@ -299,9 +455,6 @@ changelog(){
   setTimeout(async ()=>{
     const box = document.getElementById('cl-body');
     if(!box) return;
-    /* Re-renders arrive constantly (every remote onSnapshot). Serve the cached list
-       instantly so the page never flashes back to Loading, and never write into a
-       box that a newer render has already replaced. */
     if(Views.__clCache && Date.now()-Views.__clCacheAt<60000){
       box.innerHTML = Views.__clCache; return;
     }
@@ -311,7 +464,6 @@ changelog(){
       const r = await fetch(url+'?list=1'); const j = await r.json();
       j.items = (j.items||[]).filter(it=>!String(it.page||'').startsWith('DECISION:'));
       if(!j.ok || !j.items.length){ box.innerHTML='<p style="color:var(--ink-3)">No feedback yet — be the first: every screen has a 💬 Feedback button.</p>'; return; }
-      /* conversation threads live in Firestore (outside /state, so demo resets keep them) */
       let threads={};
       const live = (typeof NET!=='undefined'&&NET&&typeof FIRE!=='undefined'&&FIRE.fs);
       if(live){
@@ -354,7 +506,7 @@ changelog(){
   </div>` + this.msFooter();
 },
 
-/* ---------- decisions register (replaces the Round 2 sheet) ---------- */
+/* ---------- decisions register ---------- */
 decisions(){
   setTimeout(async ()=>{
     await loadDecisions();
@@ -379,9 +531,85 @@ decisions(){
   },50);
   return this.msNav() + `<div class="doc-page">
     <h1>Decisions register</h1>
-    <p class="lede">The inferred defaults running in this system. Settled items are on record below and no longer carry a card in the product; the rest can be confirmed right where their yellow card appears — Q1 and Q2 are Esther's calls. This register replaces the Round-2 sheet.</p>
+    <p class="lede">The inferred defaults running in this system. Settled items are on record below and no longer carry a card in the product; the rest can be confirmed right where their yellow card appears.</p>
     <div id="dc-body"><p style="color:var(--ink-3)">Loading…</p></div>
   </div>` + this.msFooter();
+},
+
+/* ---------- OTP link login (spec §2: personalized link + emailed one-time code) ---------- */
+_otpCard(p){
+  const O = window.__OTP && window.__OTP.pid===p.id ? window.__OTP : (window.__OTP={pid:p.id, stage:'email', err:null});
+  return `<div class="pp-shell" style="max-width:520px">
+    <div class="login-card" style="margin:40px auto">
+      <h1 style="font-size:20px">Confirm it's you</h1>
+      <div class="sub">This is a personal link for one participant. Sign in with the email you applied with.</div>
+      ${O.err?`<div class="f-err" role="alert" style="margin-bottom:8px">${esc(O.err)}</div>`:''}
+      ${O.stage==='email'?`
+        <div class="f-row"><label>Enter the email address you used in your application</label>
+          <input type="email" id="otp-email" autocomplete="email"></div>
+        <button class="btn btn-primary" style="width:100%" data-act="otpRequest" data-person="${p.id}">Send me the verification code</button>
+        <p style="font-size:11.5px;color:var(--ink-3);margin-top:10px">We will send a one-time verification code to that email. Entering it signs you in — no password, ever.</p>`
+      :`
+        <div class="f-row"><label>Enter the verification code we emailed you</label>
+          <input type="text" id="otp-code" inputmode="numeric" autocomplete="one-time-code"></div>
+        <button class="btn btn-primary" style="width:100%" data-act="otpVerify" data-person="${p.id}">Verify and continue</button>
+        <p style="font-size:11.5px;color:var(--ink-3);margin-top:10px">Staging note: no real email is sent here — the code appears in the ✉ email popup (and the console's Email log). In production it arrives in the participant's inbox.</p>
+        <button class="btn sm btn-ghost" style="margin-top:8px" data-act="otpRestart" data-person="${p.id}">Use a different email</button>`}
+    </div></div>`;
+},
+
+/* ---------- the acceptance gate (first login; mandatory; binding) ---------- */
+_gateCard(p){
+  const CF = F();
+  const mentee = p.kind==='mentee';
+  const rulesDone = p.ack && p.ack.rules, coiDone = p.ack && p.ack.coi, koDone = p.ack && p.ack.kickoff;
+  const ts = iso => iso ? new Date(iso).toLocaleString('en-SG',{timeZone:'Asia/Singapore',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}) : '';
+  const doneBadge = iso => `<span class="badge b-ok"><span class="d"></span>Recorded · ${ts(iso)}</span>`;
+  return `<div class="card" id="gate">
+    <h3>📄 Confirm your place — three acknowledgements</h3>
+    <p style="font-size:13px;color:var(--ink-2)">Each item is actioned separately and each is timestamped on action.
+    Completing all three <b>confirms your place</b> in the programme and opens your portal page.
+    Please complete this by <b>${p.activatedFromReserve?CF.reserveAcceptByLong:CF.acceptByLong}</b>.</p>
+
+    <div class="gate-item ${rulesDone?'g-done':''}">
+      <div class="g-head"><b>1 · ${esc(mentee?GRMP.COPY.rulesTitleMentee:GRMP.COPY.rulesTitleMentor)}</b>${rulesDone?doneBadge(p.ack.rules):''}</div>
+      ${rulesDone?'':`
+      <div class="doc-body g-scroll">${copyHTML(mentee?GRMP.COPY.rulesMentee:GRMP.COPY.rulesMentor)}</div>
+      <label class="f-check g-tick"><input type="checkbox" id="g-rules-tick"><span>${esc(GRMP.COPY.rulesTick)}</span></label>
+      <div class="f-err" id="g-rules-err" style="display:none">${esc(GRMP.COPY.rulesTickErr)}</div>
+      <button class="btn sm btn-primary" data-act="gateRules" data-person="${p.id}">Confirm the Programme Rules</button>`}
+    </div>
+
+    <div class="gate-item ${coiDone?'g-done':''}">
+      <div class="g-head"><b>2 · ${esc(mentee?GRMP.COPY.coiTitleMentee:GRMP.COPY.coiTitleMentor)}</b>${coiDone?doneBadge(p.ack.coi):''}</div>
+      ${coiDone?`${p.coi&&p.coi.declared?`<p style="font-size:12.5px;color:var(--warn);margin:6px 0 0">Conflict declared — the programme team will assess and manage it.</p>`:''}`:`
+      <div class="doc-body g-scroll" style="max-height:180px">${copyHTML(mentee?GRMP.COPY.coiMentee:GRMP.COPY.coiMentor)}</div>
+      <div style="font-size:13px;margin:8px 0 4px">Please select one:</div>
+      <label class="f-check g-tick"><input type="radio" name="g-coi" value="none"><span>${esc(GRMP.COPY.coiNone)}</span></label>
+      <label class="f-check g-tick"><input type="radio" name="g-coi" value="some"><span>${esc(GRMP.COPY.coiSome)}</span></label>
+      <div id="g-coi-details" style="display:none;margin:6px 0"><label style="font-size:12.5px;display:block;margin-bottom:4px">${esc(mentee?GRMP.COPY.coiDetailsLabelMentee:GRMP.COPY.coiDetailsLabelMentor)}</label>
+        <textarea id="g-coi-text" rows="3" style="width:100%"></textarea></div>
+      <label class="f-check g-tick"><input type="checkbox" id="g-coi-confirm"><span>${esc(GRMP.COPY.coiTick)}</span></label>
+      <div class="f-err" id="g-coi-err" style="display:none"></div>
+      <button class="btn sm btn-primary" data-act="gateCoi" data-person="${p.id}">Submit my declaration</button>`}
+    </div>
+
+    <div class="gate-item ${koDone?'g-done':''}">
+      <div class="g-head"><b>3 · Kick-Off attendance</b>${koDone?doneBadge(p.ack.kickoff):''}</div>
+      ${koDone?`${p.kickoff&&p.kickoff.status==='exception_requested'?`<p style="font-size:12.5px;color:var(--warn);margin:6px 0 0">Exception requested — Esther Koh and Wei Kiat Koh will review it and come back to you. An exception request is a request, not an automatic waiver.</p>`:''}`:`
+      <div class="doc-body" style="padding:10px 14px">${copyHTML([GRMP.COPY.kickoffFraming(CF, p.kind)])}</div>
+      <label class="f-check g-tick"><input type="radio" name="g-ko" value="attend"><span>${esc(GRMP.COPY.kickoffAttend(CF))}</span></label>
+      <label class="f-check g-tick"><input type="radio" name="g-ko" value="exception"><span>${esc(GRMP.COPY.kickoffException)}</span></label>
+      <div id="g-ko-reason" style="display:none;margin:6px 0"><label style="font-size:12.5px;display:block;margin-bottom:4px">${esc(GRMP.COPY.kickoffReasonLabel)}</label>
+        <textarea id="g-ko-text" rows="3" style="width:100%"></textarea></div>
+      <div class="f-err" id="g-ko-err" style="display:none"></div>
+      <button class="btn sm btn-primary" data-act="gateKickoff" data-person="${p.id}">Confirm</button>`}
+    </div>
+
+    ${(typeof NET==='undefined'||!NET)?`<div style="margin-top:10px"><button class="btn sm btn-ghost" data-act="gateDemoAll" data-person="${p.id}">Complete all three (demo shortcut)</button></div>`:''}
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <a href="#/concern" style="font-size:12.5px">🔒 Raise a concern (private)</a></div>
+  </div>`;
 },
 
 /* ---------- 2/3 personal pages ---------- */
@@ -389,25 +617,49 @@ personal(personId){
   const db = __demo.db, D = GRMP.D;
   const p = D.person(db, personId);
   if(!p) return this.landing();
+  const CF = F();
   const mentee = p.kind==='mentee';
-  const ackDone = D.ackComplete(p);
+  const chip = txt => txt?`<span class="ind-chip">${esc(txt)}</span>`:'';
+
+  /* --- personalized-link auth: session identity or emailed one-time code --- */
+  if(typeof meAuthed==='function' && !meAuthed(personId)) return this.msNav() + this._otpCard(p);
+
+  /* --- non-accepted states get an honest page, not a broken journey --- */
+  if(p.appStatus==='reserve_invited'){
+    return `<div class="pp-shell"><div class="pp-head">
+      <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
+      <div><h1>Hi ${esc(p.firstName||p.name.split(' ')[0])}</h1>
+        <div class="sub">${mentee?'Reserve Mentee list':'Reserve Mentor list'} · ${esc(db.config.cohort.label)}</div></div></div>
+      <div class="card"><h3>You are on the ${mentee?'Reserve Mentee':'Reserve Mentor'} list</h3>
+      <p style="font-size:13px;color:var(--ink-2)">${p.reserveOptIn===true
+        ? 'You have told us you are happy to be on the list — thank you. Should a place open, we will invite you in with your own acceptance email and everything you need to begin well.'
+        : p.reserveOptIn===false
+        ? 'You have told us you would prefer not to be included this cycle. Thank you for your interest — we hope to see you in a future cycle.'
+        : `We have asked whether you are happy to be placed on the list — a short reply to ${esc(CF.enquiries)} by ${esc(CF.acceptByLong)} is all we need.`}</p>
+      <p style="font-size:12px;color:var(--ink-3)">A place on the list is not a guarantee of participation this cycle — we wanted to be candid about that.</p></div></div>`;
+  }
+  if(['declined','declined_not_selected','declined_ineligible','withdrawn'].includes(p.appStatus)){
+    return `<div class="pp-shell"><div class="card" style="margin-top:30px"><h3>About your application</h3>
+      <p style="font-size:13px;color:var(--ink-2)">The outcome of your application was sent to ${esc(p.email)}. For anything else, please write to ${esc(CF.enquiries)} — and you are warmly welcome in the wider SMC community at https://www.smcmentorship.org/.</p></div></div>`;
+  }
+
+  const confirmed = D.placeConfirmed(p);
   const rotNow = D.currentRotation(db);
   const myPairs = D.pairsFor(db, personId).filter(x=>['approved','closed','rematch_needed','replaced'].includes(x.status));
   const closed = mentee ? D.menteeCloseoffs(db, personId).length : null;
   const hasBR = db.builderReflections.some(b=>b.menteeId===personId);
   const hasMR = db.midreviews.some(m=>m.mentorId===personId);
   const hasEE = (db.endEvaluations||[]).some(e=>e.personId===personId);
-  const hasMMR = (db.menteeMidReviews||[]).some(m=>m.menteeId===personId);
   const cert = db.certificates.some(c=>c.personId===personId);
   const eligible = D.certEligible(db, p);
 
-  /* timeline model */
+  /* timeline model — "Place confirmed" = the acceptance gate (Rules + COI + Kick-Off) */
   const steps = mentee
-    ? [['Applied',true],['Accepted',['accepted','reserve_bench'].includes(p.appStatus)],['Acknowledged',ackDone],
-       ['Orientation',!!p.orientation],['R1',closed>=1],['R2',closed>=2],['R3',closed>=3],
+    ? [['Applied',true],['Accepted',p.appStatus==='accepted'],['Place confirmed',confirmed],
+       ['R1',closed>=1],['R2',closed>=2],['R3',closed>=3],
        ['Builder’s Commitment',hasBR],['Certificate',cert||eligible]]
-    : [['Registered',true],['Accepted',['accepted','reserve_bench'].includes(p.appStatus)],['Acknowledged',ackDone],
-       ['Orientation',!!p.orientation],['Matched',myPairs.length>0],['Mid-prog feedback',hasMR],
+    : [['Applied',true],['Accepted',p.appStatus==='accepted'],['Place confirmed',confirmed],
+       ['Matched',myPairs.length>0],['Mid-prog feedback',hasMR],
        ['End-prog evaluation',hasEE],['Certificate',cert||eligible]];
   let curIdx = steps.findIndex(s=>!s[1]); if(curIdx<0) curIdx = steps.length-1;
 
@@ -416,53 +668,37 @@ personal(personId){
   if(p.appStatus==='invited'){
     nextCard = `<div class="card"><h3>👋 Welcome back — ${esc(db.config.cohort.label)}</h3>
       <p style="font-size:13px;color:var(--ink-2)">You mentored in a previous cycle and the programme team has invited you to return.
-      Confirm below — then re-acknowledge the programme documents (they may have changed) and complete this cycle's orientation.</p>
+      Confirm below — then complete this cycle's acceptance gate (the documents may have changed).</p>
       <button class="btn btn-primary" data-act="confirmReturn" data-person="${p.id}">Yes — I'm returning as a mentor</button></div>`;
     return `<div class="pp-shell">
       <div class="pp-head">
         <div class="avatar av-mentor">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
-        <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
-          <div class="sub">Returning mentor · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}</div></div>
+        <div><h1>Hi ${esc(p.firstName||p.name.split(' ')[0])}</h1>
+          <div class="sub">Returning mentor · ${chip(p.industry)} · ${esc(db.config.cohort.label)}</div></div>
       </div>
       ${nextCard}
     </div>`;
   }
-  const DOCS = [['rules','GRMP Programme Rules','v2.1'],['pdpa','PDPA Consent','v1.0'],['coi','Conflict-of-Interest Declaration','v1.0']];   // Rules v2.1 incorporates the SMC Charter and the Grievance & Misconduct Procedure by reference (Owner F0806-235605)
-  if(!ackDone){
-    nextCard = `<div class="card"><h3>📄 Acknowledge the programme documents</h3>
-      <p style="font-size:13px;color:var(--ink-2)">Three documents, each recorded with a timestamp and version. The Programme Rules incorporate the SMC Charter and the Grievance &amp; Misconduct Procedure by reference.
-      <b>You can't be matched until all three are done.</b></p>
-      <div class="acklist">${DOCS.map(([k,nm,ver])=>{
-        const done = p.ack && p.ack[k];
-        return `<div class="ackrow"><span class="nm">${nm}</span><span class="ver">${ver}</span>
-          ${done?`<span class="badge b-ok"><span class="d"></span>Acknowledged ${done}</span>`
-                :`<button class="btn sm btn-primary" data-act="openDoc" data-person="${p.id}" data-doc="${k}" data-title="${nm}" data-ver="${ver}">Read &amp; acknowledge</button>`}</div>`;
-      }).join('')}</div>
-      ${inferred('Q5')}
-      <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn sm btn-ghost" data-act="ackAll" data-person="${p.id}">Acknowledge all (demo shortcut)</button>
-        <a href="#/concern" style="font-size:12.5px">🔒 Raise a concern (private)</a></div>
-      <p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Concerns go only to the Escalation Owner — no other role, including IT support, can see them.</p></div>`;
-  } else if(!p.orientation){
-    nextCard = `<div class="card"><h3>🎓 Complete your orientation</h3>
-      <p style="font-size:13px;color:var(--ink-2)">Attend the live session, or watch the recorded module —
-      <b>required before Rotation 1, no exceptions.</b></p>
-      <div style="background:#14171d;border-radius:12px;aspect-ratio:16/7;display:grid;place-items:center;margin:4px 0 10px;cursor:pointer" data-act="orient" data-person="${p.id}" data-mode="recorded" role="button" tabindex="0" aria-label="Play orientation recording">
-        <div style="text-align:center;color:#fff"><div style="width:54px;height:54px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin:0 auto 8px;font-size:20px">▶</div>
-        <div style="font-size:13px;font-weight:700">${F().short} Orientation — session recording</div>
-        <div style="font-size:11px;opacity:.7">${GRMP.D.orientationVideoFor(db,p)?'opens the recording in a new tab · opening it records your completion':'recording link not set yet — the programme team adds it in Configuration · clicking still records completion in this demo'}</div></div>
+  if(!confirmed){
+    nextCard = this._gateCard(p);
+  } else if(p.kickoff && p.kickoff.status==='confirmed' && !p.kickoffLogistics){
+    nextCard = `<div class="card"><h3>🎪 Kick-Off details — see you there</h3>
+      <p style="font-size:13px;color:var(--ink-2)"><b>Kick-Off Night</b>: ${esc(CF.kickoffLong)}, ${esc(CF.kickoffTime)}. Venue: ${esc(CF.kickoffVenue)}.</p>
+      <p style="font-size:12.5px;color:var(--ink-3);margin:0 0 8px">${esc(GRMP.COPY.rotationsLine(CF))}</p>
+      <div class="f-grid2">
+        <div class="f-row"><label>Arrival / departure note</label><input type="text" id="ko-arrival" placeholder="e.g. arriving late, leaving early, optional."></div>
+        <div class="f-row"><label>Dietary restrictions</label><input type="text" id="ko-dietary" placeholder="e.g. vegetarian, halal, allergies, optional."></div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" data-act="orient" data-person="${p.id}" data-mode="recorded">▶ Watch recorded module (marks complete)</button>
-        <span class="badge b-neut" style="align-self:center">live attendance is marked by the coordinator (Events)</span>
-      </div></div>`;
+      <button class="btn sm btn-primary" data-act="kickoffLogistics" data-person="${p.id}">Save details</button>
+      <button class="btn sm btn-ghost" data-act="kickoffLogistics" data-person="${p.id}" data-skip="1">Nothing to add</button>
+      <p style="font-size:11px;color:var(--ink-3);margin:8px 0 0">Both fields are optional. Dietary information is used only to cater the event. You can come back to this step any time.</p></div>`;
   } else if(mentee){
     const openPair = myPairs.find(x=>x.status==='approved' && x.rotation===(rotNow?rotNow.n:2));
     const needRematch = myPairs.find(x=>x.status==='rematch_needed');
     if(needRematch){
       nextCard = `<div class="card"><h3>⏳ Your mentor changed jobs — replacement on the way</h3>
         <p style="font-size:13px;color:var(--ink-2)">Your Rotation ${needRematch.rotation} mentor had to step away.
-        The coordinator is arranging a reserve-bench mentor within 7 days; you'll get a hand-over email.</p></div>`;
+        The coordinator is arranging a replacement from the Reserve Mentor list within 7 days; you'll get a hand-over email.</p></div>`;
     } else if(openPair){
       const rotEnded = rotNow && db.today >= rotNow.end;
       nextCard = `<div class="card"><h3>✅ Close off Rotation ${openPair.rotation} (one minute)</h3>
@@ -491,8 +727,8 @@ personal(personId){
         Certificates are printed and presented at the Appreciation Night; you'll get an email when yours is ready.</p></div>`;
     } else if(!myPairs.length){
       nextCard = `<div class="card"><h3>🤝 Matching in progress</h3>
-        <p style="font-size:13px;color:var(--ink-2)">You're cleared (acknowledged + orientated). The programme team is preparing
-        Rotation ${rotNow?rotNow.n:2} matches — you'll get one email with your mentor, the dates and the guide.</p></div>`;
+        <p style="font-size:13px;color:var(--ink-2)">Your place is confirmed. The programme team is preparing
+        Rotation ${rotNow?rotNow.n:2} matches against your industry preferences — you'll get one email with your mentor, the dates and the guide.</p></div>`;
     }
   } else {                                     /* mentor next-steps */
     const servedEarly = GRMP.D.pairsFor(db,personId).some(x=>x.rotation<=2 && x.status!=='rejected');
@@ -512,6 +748,12 @@ personal(personId){
     }
   }
 
+  /* optional briefing recording — a resource, not a gate (Q11) */
+  const vidUrl = GRMP.D.orientationVideoFor(db, p);
+  const vidCard = (confirmed && vidUrl) ? `<div class="card"><h3>🎓 Programme briefing recording</h3>
+    <p style="font-size:13px;color:var(--ink-2)">Optional viewing before the Kick-Off — the recorded briefing for ${mentee?'mentees':'mentors'}.
+    <a href="${esc(vidUrl)}" target="_blank" rel="noopener">Open the recording ↗</a></p></div>` : '';
+
   /* --- pairs display --- */
   const pairCards = myPairs.filter(x=>x.status!=='replaced').map(x=>{
     const other = D.person(db, mentee? x.mentorId : x.menteeId);
@@ -523,9 +765,9 @@ personal(personId){
       <div class="mentor-card">
         <div class="avatar ${mentee?'av-mentor':'av-mentee'}" style="width:44px;height:44px;font-size:14px">${esc(other.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
         <div style="flex:1">
-          <b>${esc(other.name)}</b> <span class="track-chip track-${other.track}">${esc(GRMP.TRACKS[other.track].label)}</span>
-          <div style="font-size:12.5px;color:var(--ink-2)">${mentee?esc(other.role+' · '+other.org):esc(other.university+' · '+other.course+', year '+other.year)}</div>
-          <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+other.background):esc('Goal: '+other.goals)}</div>
+          <b>${esc(other.name)}</b> ${chip(mentee?other.industry:(other.industryPrefs||[])[0])}
+          <div style="font-size:12.5px;color:var(--ink-2)">${mentee?esc((other.designation||'')+' · '+(other.org||'')):esc((other.university||'')+' · '+(other.degree||'')+', '+(other.year||''))}</div>
+          <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+(other.background||'')):esc('Growth focus: '+String(other.prompt1||'').slice(0,110)+'…')}</div>
         </div></div>
       ${x.status==='closed'&&x.closeoff&&x.closeoff.comment&&mentee?`<div style="margin-top:10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Your close-off note</b><br>“${esc(x.closeoff.comment)}”</div>`:''}
       <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection/${personId}">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>
@@ -551,13 +793,13 @@ personal(personId){
   return `<div class="pp-shell">
     <div class="pp-head">
       <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
-      <div><h1>Hi ${esc(p.name.split(' ')[0])}</h1>
-        <div class="sub">${mentee?'Mentee':'Mentor'} · ${esc(GRMP.TRACKS[p.track].label)} track · ${esc(db.config.cohort.label)}
+      <div><h1>Hi ${esc(p.firstName||p.name.split(' ')[0])}</h1>
+        <div class="sub">${mentee?'Mentee':'Mentor'} · ${chip(mentee?(p.industryPrefs||[])[0]:p.industry)} · ${esc(db.config.cohort.label)}
         ${p.previewFastForward?` · <b style="color:var(--ai-ink)">demo fast-forwarded to ${F().closingMonth}</b>`:''}</div></div>
     </div>
-    <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — no account, no password. That's by design.</div>
+    <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — email + one-time code, no password. That's by design.</div>
     <div class="steps">${steps.map((s,i)=>`<div class="step ${s[1]?'done':(i===curIdx?'cur':'')}"><div class="dot">${s[1]?'✓':i+1}</div><span>${s[0]}</span></div>`).join('')}</div>
-    ${nextCard}${certCard}${brCard}${mrCard}${mmrCard}${eeCard}${pairCards}
+    ${nextCard}${vidCard}${certCard}${brCard}${mrCard}${mmrCard}${eeCard}${pairCards}
     ${inferred('Q2')}
   </div>`;
 },

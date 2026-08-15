@@ -31,20 +31,20 @@ TODAY_REAL = _date.today().isoformat()
 # the reason, so a future reader can re-judge it instead of trusting a silent ignore.
 # Anything not on this list is a finding — the tool cries wolf on purpose.
 UNIFORM_OK = {
-    ("matching", "Track"):
-        "a Suggest run covers one track at a time, so every proposal on the board shares it",
     ("certificates", "Status"):
         "nobody has finished three rotations in December — 'In progress' for all is the truth",
     ("audit", "Programme date"):
         "the cohort clock genuinely is one date; the real instant is the separate 'Happened' column",
-    ("waitlist", ""):
-        "unlabelled column of Promote buttons — an action column, not data",
+    ("reserve", ""):
+        "unlabelled column of Activate buttons — an action column, not data",
     ("certificates", "Approve by exception"):
         "reason-input + Approve button per row — an action column, not data (F0806-232836)",
     ("matching", "Approved"):
         "the table is sorted newest-first and only the head is shown, so one date at the top is expected",
     ("matching", "Status"):
         "same head-of-a-sorted-table effect: the newest approvals are all still Running",
+    ("emails", ""):
+        "unlabelled column of Open buttons on template-rendered rows — an action column, not data",
 }
 findings = []
 

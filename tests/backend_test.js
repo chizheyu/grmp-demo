@@ -1,110 +1,262 @@
 /* L1 backend tests — run: node tests/backend_test.js
-   Tests the domain layer (data.js) directly: seed integrity, gates, constraints, lifecycle rules. */
-const {Store, D, TRACKS} = require('../data.js');
+   Tests the domain layer (data.js) directly: seed integrity, the R5 spec model
+   (staged applications, OTP, the three-item acceptance gate, Reserve lists, decline
+   variants, industry-preference matching), lifecycle rules, and the VERBATIM guard
+   (legal text + email copy compared against Joanne's spec files where present). */
+const G = require('../data.js');
+const {Store, D, INDUSTRIES, FACULTIES, FORM_OPTS, COPY, MAILS} = G;
+const fs = require('fs'), path = require('path');
 
 let pass=0, fail=0;
 function T(name, cond){ if(cond){pass++; console.log('  PASS', name);} else {fail++; console.log('  FAIL', name);} }
 function fresh(){ Store.reset(); return Store.load(); }
 
-console.log('— seed integrity —');
+/* A complete, valid application payload for each kind (the specs' field set). */
+const MENTEE_OK = {email:'t.mentee@smu.example.edu', firstName:'Test', lastName:'Mentee', phone:'+65 9123 4567',
+  nationality:'Singaporean', linkedin:'linkedin.com/in/test-mentee', heard:FORM_OPTS.heardMentee[1],
+  year:'Year 2', faculty:FACULTIES[0], faculty2:'Not applicable', degree:'BBM, Finance',
+  eligibilityConfirmed:true, prompt1:'I want to grow.', prompt2:'I am curious.',
+  industryPrefs:[INDUSTRIES[2],INDUSTRIES[1],INDUSTRIES[4]], commit:'yes', telegramConsent:'Yes', pdpa:true};
+const MENTOR_OK = {email:'t.mentor@example.com', firstName:'Test', lastName:'Mentor', phone:'+65 9876 5432',
+  nationality:'Singaporean', heard:FORM_OPTS.heardMentor[2], org:'DBS', designation:'Director',
+  industry:INDUSTRIES[2], linkedin:'linkedin.com/in/test-mentor', yearsExp:FORM_OPTS.yearsExp[2],
+  ledTeam:'Yes', leadership:'Led a regional team of 12.', crossIndustry:FORM_OPTS.crossIndustry[0],
+  priorMentoring:'Yes', draws:[FORM_OPTS.draws[0]], interests:'Fintech careers', commit:'yes',
+  whatsappConsent:'Yes', pdpa:true};
+
+console.log('— seed integrity (R5 model) —');
 let db = fresh();
-T('60 accepted-side mentors (incl. bench)', db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length===60);
-T('60 accepted mentees', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length===60);
-T('reserve bench = 6 mentors (10%)', db.people.filter(p=>p.appStatus==='reserve_bench').length===6);
-T('mentee waitlist populated', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='waitlisted').length===8);
+T('60 accepted mentors', db.people.filter(p=>p.kind==='mentor'&&p.appStatus==='accepted').length===60);
+T('60 accepted mentees (the cap)', db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length===60
+  && db.config.selection.menteeCap===60);
+T('Reserve lists populated (8 mentors + 8 mentees, invited)', db.people.filter(p=>p.kind==='mentor'&&p.appStatus==='reserve_invited').length===8
+  && db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='reserve_invited').length===8);
+T('reserve replies staged: opted-in, awaiting and one declined', db.people.some(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true)
+  && db.people.some(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===null)
+  && db.people.some(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===false));
+T('mentee decline variants staged (not-selected + ineligible)', db.people.filter(p=>p.appStatus==='declined_not_selected').length===3
+  && db.people.filter(p=>p.appStatus==='declined_ineligible').length===1);
 T('fresh submitted applicants for screening demo (2 mentees + 2 mentors)', db.people.filter(p=>p.appStatus==='submitted'&&p.kind==='mentee').length===2 && db.people.filter(p=>p.appStatus==='submitted'&&p.kind==='mentor').length===2);
-T('every pair is same-track', db.pairs.every(x=>D.person(db,x.mentorId).track===D.person(db,x.menteeId).track));
+T('every mentor industry comes from the 17-option list', db.people.filter(p=>p.kind==='mentor'&&p.industry).every(p=>INDUSTRIES.includes(p.industry)));
+T('every mentee carries 3 DISTINCT industry preferences from the same list', db.people.filter(p=>p.kind==='mentee'&&p.appStatus!=='submitted'||p.industryPrefs).filter(p=>p.kind==='mentee').every(p=>
+  (p.industryPrefs||[]).length===3 && new Set(p.industryPrefs).size===3 && p.industryPrefs.every(i=>INDUSTRIES.includes(i))));
+T('every mentee faculty comes from the 7 verified schools', db.people.filter(p=>p.kind==='mentee'&&p.faculty).every(p=>FACULTIES.includes(p.faculty)));
+T('exactly 2 accepted people have not completed the gate (demo material)', db.people.filter(p=>D.gateBlocked(p)).length===2);
+T('confirmed people carry three separate ISO timestamps (rules/coi/kickoff)', db.people.filter(p=>p.appStatus==='accepted'&&D.placeConfirmed(p)).every(p=>
+  ['rules','coi','kickoff'].every(k=>/^\d{4}-\d{2}-\d{2}T/.test(p.ack[k]))));
+T('everyone non-fresh has a PDPA timestamp from the application', db.people.filter(p=>p.appStatus!=='submitted').every(p=>!!p.pdpaAt));
+T('a Kick-Off exception is staged open, another resolved', D.kickoffExceptionsOpen(db).length===1
+  && db.people.some(p=>p.kickoff&&p.kickoff.status==='exception_requested'&&p.kickoff.resolved));
+T('a declared COI is staged for the matching page', db.people.some(p=>p.appStatus==='accepted'&&p.coi&&p.coi.declared&&p.coi.details));
+T('all applications submitted inside the 1–10 Sept window', db.people.filter(p=>p.submittedAt&&p.appStatus!=='submitted').every(p=>
+  p.submittedAt>=db.config.registration.opens && p.submittedAt<=db.config.registration.closes));
 T('capacity ≤2 respected in seed', (()=>{const c={};for(const x of db.pairs.filter(p=>p.status!=='replaced')){const k=x.rotation+'/'+x.mentorId;c[k]=(c[k]||0)+1;if(c[k]>2)return false}return true})());
 T('no repeat mentor across rotations', (()=>{const h={};for(const x of db.pairs.filter(p=>['approved','closed'].includes(p.status))){const k=x.menteeId+'/'+x.mentorId;h[k]=(h[k]||0)+1;if(h[k]>1)return false}return true})());
+T('only confirmed places were ever matched in the seed', db.pairs.every(x=>{const e=D.person(db,x.menteeId); return !e || !D.gateBlocked(e);}));
 T('R1 has 3 missing close-offs (exception queue)', db.pairs.filter(x=>x.rotation===1&&x.status==='approved').length===3);
 T('a dropout case is staged', db.people.some(p=>p.droppedOut) && db.pairs.some(x=>x.status==='rematch_needed'));
 T('2 fast-forward preview mentees with 3 closed rotations', db.people.filter(p=>p.previewFastForward).every(p=>D.menteeCloseoffs(db,p.id).length===3));
 
-console.log('— application lifecycle —');
+console.log('— application intake: no drafts, spec validation —');
 db = fresh();
-let r = D.submitApplication(db,'mentee',{name:'Test Person',email:'t@x.com',track:'ai',course:'CS',goals:'learn',consent:true});
-T('complete application → submitted', r.person.appStatus==='submitted' && r.missing.length===0);
-T('confirmation email queued', db.emails.some(e=>e.kind==='confirm'&&e.to==='t@x.com'));
-r = D.submitApplication(db,'mentee',{name:'Half Done',email:'h@x.com',track:null,course:'',goals:'',consent:false});
-// Owner decision F0806-205424: incomplete = a draft the applicant returns to; NO reminder
-// email, and drafts never enter selection.
-T('missing fields → saved as draft, no reminder email', r.person.appStatus==='draft'
-  && r.missing.length>=3 && !db.emails.some(e=>e.to==='h@x.com'));
-T('drafts never appear in review queues', !db.people.some(p=>p.appStatus==='draft'
-  && db.people.filter(x=>x.appStatus==='submitted').includes(p)));
-D.score(db, r.person.id, 'Portia', 4, 'ok');
-T('review recorded', db.reviews.some(v=>v.personId===r.person.id&&v.reviewer==='Portia'));
-D.decide(db, r.person.id, 'accepted', 'Esther');
-T('decision applied + outcome email', D.person(db,r.person.id).appStatus==='accepted' && db.emails.some(e=>e.kind==='decision'&&e.to==='h@x.com'));
+let r = D.submitApplication(db,'mentee',MENTEE_OK);
+T('complete mentee application → submitted + receipt email (verbatim template)', r.person && r.person.appStatus==='submitted'
+  && db.emails.some(e=>e.tpl==='mentee_receipt'&&e.to===MENTEE_OK.email));
+T('submitted person composes name from first + last', r.person.name==='Test Mentee');
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x2@smu.example.edu', prompt2:''});
+T('incomplete application creates NOTHING (no drafts — spec-confirmed)', r.person===null
+  && r.missing.includes('prompt2') && !db.people.some(p=>p.email==='x2@smu.example.edu'));
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x3@smu.example.edu', prompt1:Array(201).fill('word').join(' ')});
+T('a 201-word prompt is rejected (hard cap at 200)', r.person===null && r.missing.includes('prompt1'));
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x4@smu.example.edu', industryPrefs:[INDUSTRIES[0],INDUSTRIES[0],INDUSTRIES[1]]});
+T('duplicate industry preferences are rejected (three distinct required)', r.person===null && r.missing.includes('industryPrefs'));
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x5@smu.example.edu', eligibilityConfirmed:false});
+T('the undergraduate eligibility checkbox is a hard gate', r.person===null && r.missing.includes('eligibilityConfirmed'));
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x6@smu.example.edu', telegramConsent:'No'});
+T('declining the Telegram group requires a contact preference', r.person===null && r.missing.includes('contactPref'));
+r = D.submitApplication(db,'mentor',MENTOR_OK);
+T('complete mentor application → submitted + receipt', r.person && r.person.appStatus==='submitted'
+  && db.emails.some(e=>e.tpl==='mentor_receipt'&&e.to===MENTOR_OK.email));
+r = D.submitApplication(db,'mentor',{...MENTOR_OK, email:'m2@example.com', yearsExp:''});
+T('non-returning mentor without screening fields is rejected', r.person===null && r.missing.includes('yearsExp'));
+r = D.submitApplication(db,'mentor',{...MENTOR_OK, email:'m3@example.com', heard:FORM_OPTS.heardMentor[0], yearsExp:'', ledTeam:'', leadership:'', crossIndustry:'', priorMentoring:''});
+T('returning mentor skips the screening fields (grandfathered path)', r.person && r.person.returning===true);
+r = D.submitApplication(db,'mentor',{...MENTOR_OK, email:'m4@example.com', draws:[]});
+T('at least one "what draws you" selection is required', r.person===null && r.missing.includes('draws'));
+const first = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'dup@smu.example.edu'}).person;
+const second = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'DUP@smu.example.edu'}).person;
+T('A3 a repeat email flags BOTH records, merging or rejecting neither',
+  second.duplicateFlag && D.person(db,first.id).duplicateFlag
+  && second.duplicateOf===first.id && db.people.filter(p=>p.id===first.id).length===1);
+T('A3 the flag is auditable', db.audit.some(a=>a.action==='duplicate_email_flagged'));
+T('no mutation ever leaves undefined field values (shared-database write safety)', (()=>{
+  const d=fresh();
+  // conditional form fields arrive as explicit undefined when their branch never rendered
+  const r1=D.submitApplication(d,'mentee',{...MENTEE_OK, email:'safe@smu.example.edu',
+    referrer:undefined, contactPref:undefined});
+  const r2=D.submitApplication(d,'mentor',{...MENTOR_OK, email:'safe2@example.com',
+    referrer:undefined, lastCycleEmail:undefined, contactPref:undefined, industryOther:undefined});
+  const clean=o=>o && !Object.values(o).some(v=>v===undefined);
+  // and the whole seed must be Firestore-safe too (deep scan)
+  let deepBad=false;
+  const scan=o=>{ if(o===undefined){deepBad=true;return;} if(o&&typeof o==='object') Object.values(o).forEach(scan); };
+  ['people','pairs','reviews','emails','events','config'].forEach(s=>scan(d[s]));
+  return clean(r1.person) && clean(r2.person) && !deepBad;
+})());
 
-console.log('— acknowledgement & orientation gates —');
+console.log('— criteria scoring + decisions issue the verbatim outcome emails —');
 db = fresh();
-const gated = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&!D.ackComplete(p));
-T('seed has a gate-blocked mentee', !!gated);
-T('gateBlocked() true before ack', D.gateBlocked(gated));
-['rules','pdpa','coi'].forEach(k=>D.acknowledge(db,gated.id,k));
-T('ackComplete after 3 docs (Charter & Grievance folded into Rules by reference),', D.ackComplete(D.person(db,gated.id)));
-T('still gate-blocked without orientation', D.gateBlocked(D.person(db,gated.id)));
-D.completeOrientation(db,gated.id,'recorded');
-T('gate clears after orientation', !D.gateBlocked(D.person(db,gated.id)));
+const cand = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted');
+D.score(db, cand.id, 'Portia', 4.2, 'ok', {'Readiness to Learn':4,'Global Curiosity':5,'Values Awareness':4,'Ownership':4,'Community Mindset':4});
+T('review stores the per-criteria breakdown', db.reviews.some(v=>v.personId===cand.id&&v.criteria&&v.criteria['Global Curiosity']===5));
+D.decide(db, cand.id, 'accepted', 'Esther');
+T('accept → status + mentee acceptance email with personal link', D.person(db,cand.id).appStatus==='accepted'
+  && db.emails.some(e=>e.tpl==='mentee_accept'&&e.to===cand.email&&e.vars.link==='#/me/'+cand.id));
+const mcand = db.people.find(p=>p.kind==='mentor'&&p.appStatus==='submitted');
+T('a mentee cannot get the mentor decline (variant guard)', D.decide(db, db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted').id, 'declined', 'Esther')===null);
+D.decide(db, mcand.id, 'reserve_invited', 'Esther');
+T('reserve decision → reserve_invited, opt-in unknown, reserve email', D.person(db,mcand.id).appStatus==='reserve_invited'
+  && D.person(db,mcand.id).reserveOptIn===null && db.emails.some(e=>e.tpl==='mentor_reserve'&&e.to===mcand.email));
+const e2 = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted');
+D.decide(db, e2.id, 'declined_ineligible', 'Esther');
+T('the ineligible decline sends its own honest variant', db.emails.some(e=>e.tpl==='mentee_decline_ineligible'&&e.to===e2.email));
 
-console.log('— matching engine —');
+console.log('— OTP link login (personalized link + emailed one-time code) —');
 db = fresh();
-const before = db.pairs.length;
-const sugg = D.suggestMatches(db, 2, 'general');
-T('AI suggests for unmatched general-track mentees', sugg.length>0);
+const gated = db.people.find(p=>p.appStatus==='accepted'&&!D.placeConfirmed(p));
+T('seed has a gate-ahead person', !!gated);
+T('a wrong email is refused with a message', !!D.requestOtp(db, gated.id, 'not@theirs.com').error);
+T('the application email (case-insensitive) gets a code by email', (()=>{
+  const r0=D.requestOtp(db, gated.id, gated.email.toUpperCase());
+  return r0.ok && /^\d{6}$/.test(gated.otp.code) && db.emails.some(e=>e.tpl==='otp_code'&&e.to===gated.email&&e.vars.code===gated.otp.code);
+})());
+T('a wrong code is refused; the right one verifies and audits', D.verifyOtp(db, gated.id, '000000')===false
+  && D.verifyOtp(db, gated.id, gated.otp.code)===true
+  && db.audit.some(a=>a.action==='link_signin'&&a.entity===gated.id));
+
+console.log('— the acceptance gate: three items, separately timestamped, completion confirms —');
+db = fresh();
+const g2 = db.people.find(p=>p.appStatus==='accepted'&&!D.placeConfirmed(p));
+T('gateBlocked before the gate', D.gateBlocked(g2));
+D.ackRules(db, g2.id);
+T('rules alone do not confirm', !D.placeConfirmed(D.person(db,g2.id)) && !g2.placeConfirmedAt);
+T('a declared conflict requires details', D.submitCoi(db, g2.id, true, '  ')===null);
+D.submitCoi(db, g2.id, true, 'My employer sponsors a mentee applicant.');
+T('COI declaration stored with the ack timestamp', g2.coi.declared===true && /sponsors/.test(g2.coi.details) && !!g2.ack.coi);
+T('an exception without a reason is refused', D.submitKickoff(db, g2.id, false, '')===null);
+D.submitKickoff(db, g2.id, false, 'I am overseas that week.');
+T('gate completion → place confirmed + onboarding email', !!g2.placeConfirmedAt && D.placeConfirmed(g2)
+  && db.emails.some(e=>e.tpl==='onboarding'&&e.to===g2.email));
+T('three timestamps are individually recorded', ['rules','coi','kickoff'].every(k=>/^\d{4}-\d{2}-\d{2}T/.test(g2.ack[k])));
+T('the exception routed to the named owners (email fallback fired)', db.emails.some(e=>e.kind==='kickoff_exception'&&/Esther Koh, Wei Kiat Koh/.test(e.to)));
+T('the exception sits in the open queue', D.kickoffExceptionsOpen(db).some(p=>p.id===g2.id));
+D.resolveKickoffException(db, g2.id, 'waived', 'Wei Kiat');
+T('resolving records outcome/by/at and notifies the participant', g2.kickoff.resolved.outcome==='waived'
+  && db.emails.some(e=>e.kind==='kickoff_exception'&&e.to===g2.email));
+T('gate no longer blocks matching', !D.gateBlocked(g2));
+const g3 = db.people.find(p=>p.appStatus==='accepted'&&!D.placeConfirmed(p));
+D.demoCompleteGate(db, g3.id);
+T('demo shortcut completes all three and confirms', D.placeConfirmed(g3) && g3.kickoff.status==='confirmed');
+T('kick-off logistics stores arrival + dietary (catering only)', (()=>{
+  const l=D.saveKickoffLogistics(db, g3.id, 'arriving late', 'vegetarian');
+  return l.arrival==='arriving late' && l.dietary==='vegetarian';
+})());
+
+console.log('— Reserve lists: reply, activation, later deadline —');
+db = fresh();
+const awaiting = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===null);
+D.recordReserveReply(db, awaiting.id, true, 'Wei Kiat');
+T('a reply is recorded with the date', awaiting.reserveOptIn===true && awaiting.reserveRepliedAt===db.today);
+const act = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
+D.activateReserve(db, act.id, 'Esther');
+T('activation → accepted + activation acceptance email with the personal link', act.appStatus==='accepted'
+  && db.emails.some(e=>e.tpl===act.kind+'_reserve_activation'&&e.to===act.email));
+T('an activated reserve gets the LATER deadline', D.deadlineFor(db,act)===db.config.selection.reserveAcceptBy
+  && D.deadlineFor(db, db.people.find(p=>p.appStatus==='accepted'&&!p.activatedFromReserve))===db.config.selection.acceptBy);
+T('activating a non-reserve person is refused', D.activateReserve(db, db.people.find(p=>p.appStatus==='accepted'&&!p.activatedFromReserve).id, 'Esther')===null);
+
+console.log('— acceptance reminders: once each, only the unconfirmed —');
+db = fresh();
+const targets0 = D.reminderTargets(db);
+T('targets are exactly the accepted-but-unconfirmed without a prior reminder', targets0.length>0
+  && targets0.every(p=>p.appStatus==='accepted'&&!D.placeConfirmed(p)&&!p.acceptReminderAt));
+const sent = D.sendAcceptanceReminders(db, 'Wei Kiat');
+T('reminders sent with the verbatim template + stamped', sent.length===targets0.length
+  && sent.every(p=>p.acceptReminderAt===db.today)
+  && db.emails.filter(e=>e.kind==='reminder'&&e.at===db.today).length===sent.length);
+T('sending twice sends nothing more (once per person, confirmed rule)', D.sendAcceptanceReminders(db,'Wei Kiat').length===0);
+db = fresh();
+const resAct = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
+D.activateReserve(db, resAct.id, 'Esther');
+T('an activated-but-unconfirmed reserve gets the activation reminder variant', (()=>{
+  const out=D.sendAcceptanceReminders(db,'Wei Kiat');
+  return out.some(p=>p.id===resAct.id) && db.emails.some(e=>e.tpl===resAct.kind+'_reserve_activation_reminder'&&e.to===resAct.email);
+})());
+
+console.log('— release rule: per-person deadline, human-owned —');
+db = fresh();
+db.today = '2026-09-25';
+T('before the deadline nobody is releasable', D.pendingWithdrawal(db).length===0 && !D.acceptDeadlinePassed(db));
+db.today = '2026-09-27';
+const pending = D.pendingWithdrawal(db);
+T('past 26 Sept the unconfirmed are listed', D.acceptDeadlinePassed(db) && pending.length>0
+  && pending.every(p=>!D.placeConfirmed(p)));
+const resAct2 = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
+D.activateReserve(db, resAct2.id, 'Esther');
+T('an activated reserve is NOT releasable before 29 Sept', !D.pendingWithdrawal(db).some(p=>p.id===resAct2.id));
+db.today = '2026-09-30';
+T('past 29 Sept the activated reserve becomes releasable too', D.pendingWithdrawal(db).some(p=>p.id===resAct2.id));
+const released = D.withdrawUnacknowledged(db, 'Wei Kiat');
+T('releasing sets withdrawn, notifies, and logs', released.length>0
+  && released.every(p=>p.appStatus==='withdrawn')
+  && db.emails.some(e=>e.kind==='withdrawn')
+  && db.audit.some(a=>a.action==='withdrawn_place_not_confirmed'));
+T('running it twice releases nothing more', D.withdrawUnacknowledged(db,'Wei Kiat').length===0);
+
+console.log('— matching engine: industry preference → breadth → diversity —');
+db = fresh();
+const sugg = D.suggestMatches(db, 2);
+T('suggestions produced for unmatched confirmed mentees', sugg.length>0);
 T('suggestions are proposed (not auto-approved)', sugg.every(s=>s.status==='proposed'));
 T('suggestions never breach capacity', sugg.every(s=>D.capacityLeft(db,s.mentorId,2)>=0));
 T('suggestions never repeat a past mentor', sugg.every(s=>db.pairs.filter(x=>x!==s&&x.menteeId===s.menteeId&&x.mentorId===s.mentorId&&['approved','closed'].includes(x.status)).length===0));
-T('gate-blocked mentees excluded from suggestions', sugg.every(s=>!D.gateBlocked(D.person(db,s.menteeId))));
-// R2-Q3: the card promises development-need fit → industry → diversity. Prove it runs.
+T('unconfirmed places are excluded from suggestions', sugg.every(s=>!D.gateBlocked(D.person(db,s.menteeId))));
 T('every suggestion records its rank and pool size', sugg.every(s=>typeof s.score==='number' && s.rankedOutOf>0));
-// Scores must be compared against the state at decision time — suggestMatches consumes
-// capacity as it goes, so only the first mentee it processes can be checked post-hoc.
 T('the first proposal picks the argmax of its eligible pool', (()=>{
   const d2=fresh();
-  const e=d2.people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&p.track==='general'
+  const e=d2.people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'
     && !D.gateBlocked(p) && !d2.pairs.some(x=>x.rotation===2&&x.menteeId===p.id&&['proposed','approved','closed'].includes(x.status)));
-  const cands=d2.people.filter(m=>m.kind==='mentor'&&m.appStatus==='accepted'&&!m.droppedOut&&m.track==='general'
+  const cands=d2.people.filter(m=>m.kind==='mentor'&&m.appStatus==='accepted'&&!m.droppedOut
     && D.capacityLeft(d2,m.id,2)>0 && !D.repeatMentor(d2,e.id,m.id));
   const want=D.rankMentors(d2,cands,e)[0].m.id;
-  const got=D.suggestMatches(d2,2,'general').find(s=>s.menteeId===e.id);
+  const got=D.suggestMatches(d2,2).find(s=>s.menteeId===e.id);
   return got && got.mentorId===want;
 })());
-// Working Design names four criteria: industry, culture, development needs, diversity.
-T('cross-cultural exposure is scored, not just stored', (()=>{
-  const e=db.people.find(p=>p.kind==='mentee'&&p.track==='general'&&p.appStatus==='accepted');
-  const m=db.people.find(x=>x.kind==='mentor'&&x.track==='general'&&x.xcultural);
+T('a first-preference industry strictly outranks second, second outranks third', (()=>{
+  const e=db.people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&(p.industryPrefs||[]).length===3);
+  const any=db.people.find(m=>m.kind==='mentor'&&m.appStatus==='accepted');
+  const at=i=>D.matchScore(db, Object.assign({},any,{id:any.id+i,industry:e.industryPrefs[i]}), e).score;
+  const off=D.matchScore(db, Object.assign({},any,{id:any.id+'X',industry:INDUSTRIES.find(x=>!e.industryPrefs.includes(x))}), e).score;
+  return at(0)>at(1) && at(1)>at(2) && at(2)>off
+    && D.matchScore(db, Object.assign({},any,{id:any.id+'0',industry:e.industryPrefs[0]}), e).reasons.some(r=>/First-preference industry/.test(r));
+})());
+T('significant cross-industry breadth is scored, not just stored', (()=>{
+  const e=db.people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted');
+  const m=db.people.find(x=>x.kind==='mentor'&&x.crossIndustry==='Yes, significantly');
   if(!m) return false;
-  const without=Object.assign({},m,{id:m.id+'X',xcultural:''});
+  const without=Object.assign({},m,{id:m.id+'X',crossIndustry:'Somewhat'});
   return D.matchScore(db,m,e).score > D.matchScore(db,without,e).score
-     && D.matchScore(db,m,e).reasons.some(r=>/Cross-cultural/.test(r));
+     && D.matchScore(db,m,e).reasons.some(r=>/Breadth/.test(r));
 })());
-// Industry is not an independent knob: some development-need rules key off it too
-// (a Communications mentor answers "communication and presence"). So the baseline has
-// to be an industry that triggers no need-rule, or the comparison measures two things.
-T('an industry match strictly outranks the same mentor in an unrelated industry', (()=>{
-  const e=db.people.find(p=>p.kind==='mentee'&&p.track==='general'&&p.appStatus==='accepted');
-  const any=db.people.find(m=>m.kind==='mentor'&&m.track==='general');
-  const neutral=['Healthcare','Education','Finance'].find(i=>i!==e.industryInterest);
-  const base=Object.assign({},any,{id:any.id+'B',industry:neutral});
-  const twin=Object.assign({},any,{id:any.id+'T',industry:e.industryInterest});
-  const sb=D.matchScore(db,base,e), st=D.matchScore(db,twin,e);
-  return st.score === sb.score + 6 && st.reasons.some(r=>/Industry fit/.test(r));
-})());
-T('rationale quotes the reason it scored, or says it did not', sugg.every(s=>
-  s.rationale.length>=2 && /Ranked 1st of \d+/.test(s.rationale[s.rationale.length-1])));
-// Re-scoring an existing proposal must reproduce its score, minus only the 0.5 load
-// credit the pair legitimately consumed. A 3-point drop would mean the proposal was
-// counted as the mentee's own history and stole its mentor's diversity credit.
+T('rationale quotes the reason it scored + the ranking line', sugg.every(s=>
+  s.rationale.length>=2 && /Ranked 1st of \d+ eligible mentors \(industry preference → breadth → diversity\)/.test(s.rationale[s.rationale.length-1])));
 T('a proposal does not cost its own mentor the diversity credit', sugg.every(s=>{
   const e=D.person(db,s.menteeId), m=D.person(db,s.mentorId);
   return D.matchScore(db,m,e).score >= s.score - 0.5 - 0.001;
 }));
-// 5.3 the Lead must be able to say no, or swap, not only approve
 const alts = D.alternativesFor(db, sugg[0].id, 3);
-T('alternatives offered for a proposal', alts.length>0 && alts.every(a=>a.m.id!==sugg[0].mentorId));
-T('alternatives are ranked, best first', alts.every((a,i)=>i===0||alts[i-1].score>=a.score));
+T('alternatives offered for a proposal, ranked best first', alts.length>0 && alts.every(a=>a.m.id!==sugg[0].mentorId)
+  && alts.every((a,i)=>i===0||alts[i-1].score>=a.score));
 const swapped = D.reassignProposal(db, sugg[0].id, alts[0].m.id, 'Esther');
 T('swap replaces the mentor and re-explains the choice',
   swapped && swapped.mentorId===alts[0].m.id && /Chosen by Esther/.test(swapped.rationale.join(' ')));
@@ -118,22 +270,19 @@ T('discard removes the proposal and frees the mentee',
   && !db.pairs.some(p=>p.menteeId===menteeOfDoomed&&p.rotation===2&&p.status==='proposed'));
 T('discarding twice is a no-op, not a crash', D.discardProposal(db, doomed.id, 'Esther')===null);
 T('a discarded mentee can be suggested again',
-  D.suggestMatches(db,2,D.person(db,menteeOfDoomed).track).some(s=>s.menteeId===menteeOfDoomed));
+  D.suggestMatches(db,2).some(s=>s.menteeId===menteeOfDoomed));
 D.approvePair(db, sugg[0].id, 'Esther');
 T('approval flips status + notifies both', db.pairs.find(x=>x.id===sugg[0].id).status==='approved' && db.emails.some(e=>e.kind==='match'&&e.at===db.today));
 
-console.log('— PRD gaps: duplicate applications, seat release, audit —');
-// Sign-in was writing straight to db.audit and so carried no real timestamp, while the
-// page claimed those rows were "seeded". Guard the rule, not just the one call site.
+console.log('— audit discipline —');
 T('I3 every audit entry carries a real timestamp', (()=>{
   const d=fresh();
-  D.decide(d,d.people[0].id,'accepted','Esther');
+  D.decide(d,d.people.find(p=>p.appStatus==='submitted').id,'accepted','Esther');
   D.setToday(d,'2027-02-01');
-  D.acknowledge(d,d.people[0].id,'rules');
+  D.ackRules(d,d.people[0].id);
   return d.audit.length>0 && d.audit.every(a=>typeof a.ts==='string' && !isNaN(Date.parse(a.ts)));
 })());
 T('I3 no source file writes db.audit directly — every write goes through logAudit', (()=>{
-  const fs=require('fs'), path=require('path');
   const root=path.join(__dirname,'..');
   return ['data.js','app.js','views_console.js','views_public.js','platform/server.gs']
     .every(f=>{
@@ -141,31 +290,8 @@ T('I3 no source file writes db.audit directly — every write goes through logAu
       return !/audit\.push\((?!\{\s*at,\s*ts:)/.test(src);
     });
 })());
-db = fresh();
-const first = D.submitApplication(db,'mentee',{name:'Test One',email:'dup@smu.example.edu',track:'general',course:'Law',goals:'x',consent:true}).person;
-T('A3 first application is not flagged', !first.duplicateFlag);
-const second = D.submitApplication(db,'mentee',{name:'Test Two',email:'DUP@smu.example.edu',track:'general',course:'Law',goals:'x',consent:true}).person;
-T('A3 a repeat email flags BOTH records, merging or rejecting neither',
-  second.duplicateFlag && D.person(db,first.id).duplicateFlag
-  && second.duplicateOf===first.id && db.people.filter(p=>p.id===first.id).length===1);
-T('A3 the flag is auditable', db.audit.some(a=>a.action==='duplicate_email_flagged'));
-db = fresh();
-T('Q5 nobody can be withdrawn before the final reminder date',
-  D.finalReminderPassed(db) ? true : D.pendingWithdrawal(db).length===0);
-db.today = '2026-09-20';                                  // past Sept W3 final reminder
-const pending = D.pendingWithdrawal(db);
-T('Q5 unacknowledged accepted participants are listed after the final reminder', pending.length>0);
-T('Q5 people who did acknowledge are never listed', pending.every(p=>!D.ackComplete(p)));
-const released = D.withdrawUnacknowledged(db, 'Wei Kiat');
-T('Q5 releasing a seat sets withdrawn, notifies, and logs',
-  released.length===pending.length
-  && released.every(p=>p.appStatus==='withdrawn')
-  && db.emails.some(e=>e.kind==='withdrawn')
-  && db.audit.some(a=>a.action==='withdrawn_no_acknowledgement'));
-T('Q5 a withdrawn person can no longer be matched',
-  D.suggestMatches(db,2,'general').every(s=>D.person(db,s.menteeId).appStatus==='accepted'));
-T('Q5 running it twice releases nothing more', D.withdrawUnacknowledged(db,'Wei Kiat').length===0);
 
+console.log('— rotation guides (F1) —');
 db = fresh();
 const r3start = db.config.rotations.find(r=>r.n===3).start;
 const beforeGuides = db.emails.filter(e=>e.kind==='guide').length;
@@ -176,9 +302,7 @@ T('F1 crossing a rotation start releases the guide to that rotation\'s pairs',
 D.setToday(db, r3start);
 T('F1 releasing is idempotent — the same rotation never sends twice',
   db.emails.filter(e=>e.kind==='guide').length === afterGuides);
-// The R3 shape: the sweep runs before any R3 pair exists, so the guide must ride
-// along with each later approval instead.
-const lateSugg = D.suggestMatches(db, 3, 'general');
+const lateSugg = D.suggestMatches(db, 3);
 T('F1 a pair approved after its rotation started still gets the guide', (()=>{
   if(!lateSugg.length) return false;
   const before = db.emails.filter(e=>e.kind==='guide').length;
@@ -187,17 +311,15 @@ T('F1 a pair approved after its rotation started still gets the guide', (()=>{
 })());
 
 console.log('— no hardcoded cohort facts in the views —');
-// Every cohort-specific literal must come from cohortFacts(db). The proof this guard
-// protects: start a new cycle and every page follows without an edit.
 T('view files carry no year / institution / count / month literals', (()=>{
-  const fs=require('fs'), path=require('path'), root=path.join(__dirname,'..');
+  const root=path.join(__dirname,'..');
   const banned=[/\b20\d\d\b/, /\bSMU\b/, /\b60\b/,
     /\b(February|April|June|July|August|September|October|November|December)\b/,
     /\b(Sept|Oct|Nov|Dec|Feb|Jan|Mar)\b/, /\bJanuary\b/, /\bMarch\b/];
   return ['views_public.js','views_console.js','app.js'].every(f=>{
     const src=fs.readFileSync(path.join(root,f),'utf8');
     const hit=banned.find(re=>re.test(src));
-    if(hit) console.log(`    LEAK in ${f}:`, (src.match(hit)||[])[0], '…', src.split('\n').findIndex(l=>hit.test(l))+1);
+    if(hit) console.log(`    LEAK in ${f}:`, (src.match(hit)||[])[0], 'line', src.split('\n').findIndex(l=>hit.test(l))+1);
     return !hit;
   });
 })());
@@ -211,15 +333,12 @@ T('cohortFacts derives a different cycle end-to-end', (()=>{
   const F2=D.cohortFacts(d2);
   return F1.inst==='SMU' && F2.inst==='NTU' && /2031/.test(F2.spanLong)
     && F2.mentees===0 && F2.label==='GRMP 2031 (NTU pilot)'
-    && !D.finalReminderPassed(d2);          // the shifted ladder keeps Q5 from misfiring
+    && F2.acceptBy==='2031-09-26'            // selection timeline shifted with the cycle
+    && !D.acceptDeadlinePassed(d2);
 })());
 
 console.log('— close-off & certificate rule (Owner decision F0806-172216) —');
 db = fresh();
-// The two preview mentees split the certificate story: preview #1 ships with the FULL
-// set (3 close-offs + mid-prog review + end-prog evaluation + Builder's Commitment →
-// the happy path is visible on day one); preview #2 deliberately misses the end-prog
-// evaluation, so the Exception report has a live case in the seed.
 const pvReady = db.people.find(p=>p.previewFastForward && db.builderReflections.some(b=>b.menteeId===p.id));
 const pv = db.people.find(p=>p.previewFastForward && !db.builderReflections.some(b=>b.menteeId===p.id));
 T('seed ships sample submissions (mentor mid-reviews + mentee mid-reviews + end-evals + one BC)',
@@ -265,100 +384,200 @@ T('exception approval records by/reason/missing + audit + email', !!exc && exc.b
   && db.emails.some(e=>/by exception/.test(e.subject||'')));
 T('already certified → second exception refused', D.approveByException(db, exMentee.id, 'again', 'Esther')===null);
 
-console.log('— dropout replacement —');
+console.log('— dropout replacement from the Reserve Mentor list —');
 db = fresh();
 const broken = db.pairs.find(x=>x.status==='rematch_needed');
-const benchSameTrack = db.people.find(p=>p.appStatus==='reserve_bench'&&p.track===D.person(db,broken.mentorId).track) || db.people.find(p=>p.appStatus==='reserve_bench');
-const np = D.replaceMentor(db, broken.id, benchSameTrack.id, 'Wei Kiat');
+const reserveMentor = db.people.find(p=>p.kind==='mentor'&&p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
+const np = D.replaceMentor(db, broken.id, reserveMentor.id, 'Wei Kiat');
 T('old pair marked replaced', db.pairs.find(x=>x.id===broken.id).status==='replaced');
-T('new pair approved with bench mentor', np.status==='approved' && np.mentorId===benchSameTrack.id && np.menteeId===broken.menteeId);
-T('mentee hand-over email queued', db.emails.some(e=>e.kind==='match'&&e.subject.includes('new mentor')));
-
-console.log('— waitlist & concern —');
-db = fresh();
-const wl = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='waitlisted');
-D.promoteWaitlist(db, wl.id, 'Wei Kiat');
-T('waitlist promotion → accepted + email', D.person(db,wl.id).appStatus==='accepted' && db.emails.some(e=>e.subject.includes('place has opened')));
-const c = D.raiseConcern(db,'test concern');
-T('concern referral recorded (restricted)', db.concerns.some(x=>x.id===c.id));
+T('the reserve mentor is ACTIVATED (accepted + activation email), then paired', reserveMentor.appStatus==='accepted'
+  && db.emails.some(e=>e.tpl==='mentor_reserve_activation'&&e.to===reserveMentor.email)
+  && np.status==='approved' && np.mentorId===reserveMentor.id && np.menteeId===broken.menteeId);
+T('mentee hand-over email queued', db.emails.some(e=>e.kind==='match'&&e.subject&&e.subject.includes('new mentor')));
 
 console.log('— cohort model, accounts & new-cycle —');
 db = fresh();
 T('11 preset accounts, all resolvable', db.config.accounts.length===11 &&
   db.config.accounts.filter(a=>a.kind==='person').every(a=>db.people.some(p=>p.id===a.personId)) &&
   db.config.accounts.filter(a=>a.kind==='admin').every(a=>db.config.admins.some(x=>x.name===a.name)));
+T('the mentor.bench persona maps to an opted-in Reserve mentor', (()=>{
+  const a=db.config.accounts.find(x=>x.u==='mentor.bench');
+  const p=D.person(db,a.personId);
+  return p.appStatus==='reserve_invited' && p.reserveOptIn===true;
+})());
 T('cohort C2026 active, no archives', db.config.cohort.id==='C2026' && db.archives.length===0);
-const beforeMentors = db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length;
+const beforeMentors = db.people.filter(p=>p.kind==='mentor'&&p.appStatus==='accepted').length;
 const newId = D.startNewCycle(db, {label:'GRMP 2027 (SMU)', today:'2027-09-01', actor:'Esther',
   rotations:[{n:1,label:'Know Yourself',start:'2027-10-01',end:'2027-11-30'},
              {n:2,label:'Know Your World',start:'2027-12-01',end:'2028-01-31'},
              {n:3,label:'Know Your Path',start:'2028-02-01',end:'2028-03-31'}]});
 T('new cycle id derived from dates', newId==='C2027' && db.config.cohort.id==='C2027');
 T('old cycle archived with stats', db.archives.length===1 && db.archives[0].id==='C2026' && db.archives[0].stats.mentees===60);
-T('mentors carried over as invited, mentees cleared', db.people.length===beforeMentors &&
-  db.people.every(p=>p.kind==='mentor'&&p.appStatus==='invited'&&!p.ack&&!p.orientation));
+T('mentors carried over as invited, gate state cleared', db.people.length===beforeMentors &&
+  db.people.every(p=>p.kind==='mentor'&&p.appStatus==='invited'&&!p.ack&&!p.coi&&!p.kickoff&&!p.placeConfirmedAt));
 T('pairs/reviews/certs cleared', db.pairs.length===0 && db.reviews.length===0 && db.certificates.length===0);
-T('rotations replaced', db.config.rotations[0].start==='2027-10-01' && db.today==='2027-09-01');
+T('rotations + selection dates shifted into the new cycle', db.config.rotations[0].start==='2027-10-01' && db.today==='2027-09-01'
+  && db.config.selection.acceptBy==='2027-09-26' && db.config.selection.reserveAcceptBy==='2027-09-29');
 const inv = db.people[0];
 T('confirmReturn flips invited→accepted + email', D.confirmReturn(db, inv.id)===true &&
-  D.person(db,inv.id).appStatus==='accepted' && db.emails.some(e=>e.subject.includes('Welcome back')));
-T('returning mentor re-blocked by gates until re-ack', D.gateBlocked(D.person(db,inv.id)));
-['rules','charter','governance','pdpa','coi'].forEach(k=>D.acknowledge(db,inv.id,k));
-D.completeOrientation(db,inv.id,'live');
-T('gates clear after re-onboarding', !D.gateBlocked(D.person(db,inv.id)));
+  D.person(db,inv.id).appStatus==='accepted' && db.emails.some(e=>e.subject&&e.subject.includes('Welcome back')));
+T('returning mentor re-blocked by the gate until they complete it again', D.gateBlocked(D.person(db,inv.id)));
+D.demoCompleteGate(db, inv.id);
+T('gate clears after re-onboarding', !D.gateBlocked(D.person(db,inv.id)));
+
+console.log('— briefing recordings: configurable resource, not a gate —');
 db = fresh();
-D.toggleAttendance(db,'kickoff', db.people.find(p=>p.appStatus==='accepted').id);
-T('toggleAttendance adds then removes', (()=>{const id=db.people.find(p=>p.appStatus==='accepted').id;
-  const n0=db.events.kickoff.attendance.length; D.toggleAttendance(db,'kickoff',id);
-  return db.events.kickoff.attendance.length===n0-0-((db.events.kickoff.attendance.includes(id))?0:0)||true})());
-D.remindCloseoff(db,'x@y.com');
-T('remindCloseoff logs email', db.emails.some(e=>e.kind==='closeoff'&&e.to==='x@y.com'));
-
-
-console.log('— manual 6.6: marking a dropout (the half that had no UI) —');
-db = fresh();
-// Scope to the CURRENT rotation: a finished rotation with only a close-off pending is
-// not re-matched when its mentor drops — only live pairings are.
-const curRot = D.currentRotation(db).n;
-const servingMentor = db.people.find(m=>m.kind==='mentor'&&m.appStatus==='accepted'&&!m.droppedOut
-  && db.pairs.filter(p=>p.mentorId===m.id&&p.status==='approved'&&p.rotation===curRot).length>0);
-const activeBefore = db.pairs.filter(p=>p.mentorId===servingMentor.id&&p.status==='approved'&&p.rotation===curRot).length;
-const drop = D.markDropout(db, servingMentor.id, 'family emergency', 'Wei Kiat');
-T('markDropout moves every active pair to the re-match queue',
-  drop && drop.affected===activeBefore
-  && db.pairs.filter(p=>p.mentorId===servingMentor.id&&p.status==='rematch_needed').length===activeBefore);
-T('a dropped mentor never appears in new suggestions',
-  D.suggestMatches(db,2,servingMentor.track).every(s=>s.mentorId!==servingMentor.id));
-T('the drop is audited with the reason',
-  db.audit.some(a=>/mentor_dropped:family emergency/.test(a.action)&&a.entity===servingMentor.id));
-T('marking twice is a no-op', D.markDropout(db, servingMentor.id, 'again', 'Wei Kiat')===null);
-
-
-console.log('— D1: the recordings the players open are configurable, not code —');
-db = fresh();
-T('seed ships without links (placeholder player)', db.config.orientationVideo==='' && db.config.orientationVideoMentor==='');
+T('seed ships without links', db.config.orientationVideo==='' && db.config.orientationVideoMentor==='');
 const savedUrls = D.setOrientationVideos(db, '  https://youtu.be/grmp-mentees  ', 'https://youtu.be/grmp-mentors', 'Wei Kiat');
 T('links saved trimmed + audited', savedUrls.mentee==='https://youtu.be/grmp-mentees'
   && savedUrls.mentor==='https://youtu.be/grmp-mentors'
   && db.audit.some(a=>a.action==='orientation_videos_set'));
 const aMentor = db.people.find(p=>p.kind==='mentor');
 const aMentee = db.people.find(p=>p.kind==='mentee');
-T('each kind opens its own session', D.orientationVideoFor(db,aMentor)==='https://youtu.be/grmp-mentors'
+T('each kind opens its own briefing', D.orientationVideoFor(db,aMentor)==='https://youtu.be/grmp-mentors'
   && D.orientationVideoFor(db,aMentee)==='https://youtu.be/grmp-mentees');
 D.setOrientationVideos(db, 'https://youtu.be/grmp-shared', '', 'Wei Kiat');
-T('empty mentor slot falls back to the shared session', D.orientationVideoFor(db,aMentor)==='https://youtu.be/grmp-shared');
-T('clearing works and is audited', (()=>{const v=D.setOrientationVideos(db,'','','Wei Kiat');
-  return v.mentee==='' && v.mentor==='' && db.audit.some(a=>a.action==='orientation_videos_cleared');})());
-D.setOrientationVideos(db, 'https://youtu.be/x', 'https://youtu.be/y', 'Wei Kiat');
-D.startNewCycle(db,{label:'GRMP 2031 (NTU pilot)',today:'2031-09-01',actor:'t',
-  rotations:[{n:1,label:'Know Yourself',start:'2031-10-01',end:'2031-11-30'},
-             {n:2,label:'Know Your World',start:'2031-12-01',end:'2032-01-31'},
-             {n:3,label:'Know Your Path',start:'2032-02-01',end:'2032-03-31'}]});
-T('a new cycle clears both recordings (new sessions)', db.config.orientationVideo==='' && db.config.orientationVideoMentor==='');
+T('empty mentor slot falls back to the shared briefing', D.orientationVideoFor(db,aMentor)==='https://youtu.be/grmp-shared');
+T('the recording never blocks anyone (no gate involvement)', (()=>{
+  const p = db.people.find(x=>x.appStatus==='accepted'&&D.placeConfirmed(x));
+  return !D.gateBlocked(p);
+})());
+
+/* ================= VERBATIM GUARD =================
+   The legal text and email copy shipped in data.js must match Joanne's specs
+   EXACTLY. Where the spec .md files are present locally, the legal blocks are
+   diffed wholesale (normalised for markdown/quote style); the email set is
+   spot-checked against embedded expected strings either way. */
+console.log('— verbatim guard: subjects + signature rules on all templates —');
 db = fresh();
-const gated2 = db.people.find(p=>p.appStatus==='accepted'&&!p.orientation);
-D.completeOrientation(db, gated2.id, 'recorded');
-T('open-tracking still records completion regardless of link', !!D.person(db,gated2.id).orientation);
+const CF = D.cohortFacts(db);
+const rm = tpl => D.renderMail(db, {tpl, vars:{name:'[Name]', link:'[personalized link]', code:'123456'}});
+const SUBJECTS = {
+  mentor_invite:'Shape a Global-Ready Leader as an SMU–SMC GRMP Mentor',
+  mentee_invite:'An Invitation to Grow: Join the SMU–SMC Global-Ready Mentoring Programme',
+  mentor_receipt:'We have received your GRMP mentor application',
+  mentee_receipt:'We have received your GRMP mentee application',
+  mentor_accept:'Welcome as an SMU–SMC GRMP mentor',
+  mentee_accept:'Welcome to the SMU–SMC Global-Ready Mentoring Programme',
+  mentor_accept_reminder:'A reminder to confirm your place as a GRMP mentor',
+  mentee_accept_reminder:'A reminder to confirm your place in GRMP',
+  mentor_reserve:'Your GRMP mentor application: an update',
+  mentee_reserve:'Your GRMP mentee application: an update',
+  mentor_reserve_activation:'A place has opened, welcome as an SMU–SMC GRMP mentor',
+  mentee_reserve_activation:'A place has opened, welcome to the SMU–SMC GRMP',
+  mentor_reserve_activation_reminder:'A reminder to confirm your place as a GRMP mentor',
+  mentee_reserve_activation_reminder:'A reminder to confirm your place in GRMP',
+  mentor_decline:'Your GRMP mentor application',
+  mentee_decline_not_selected:'Your GRMP mentee application',
+  mentee_decline_ineligible:'Your GRMP mentee application',
+};
+T('all 17 participant templates exist (+ otp/onboarding operational)', Object.keys(SUBJECTS).every(k=>MAILS[k]) && MAILS.otp_code && MAILS.onboarding);
+Object.entries(SUBJECTS).forEach(([k,subj])=>{
+  T(`subject verbatim · ${k}`, rm(k).subject===subj);
+});
+const BODY_SPOT = {
+  mentor_accept:['We are delighted to let you know that your application to mentor with the SMU–SMC Global-Ready Mentoring Programme (GRMP) is successful. Thank you for the care you put into your application, and welcome.',
+    'Please complete this by 26 September 2026.'],
+  mentee_accept:['and to confirm your attendance at the Kick-Off. This confirms your place.',
+    'The GRMP portal is the one place to track your GRMP participation and your wider SMC journey, and you will use it throughout the programme.'],
+  mentor_accept_reminder:['If you did not receive the verification code, please check your spam or junk folder, or email us at smu.smc@sa.smu.edu.sg and we will help.',
+    'we would be grateful if you could let us know, so that we may offer your place to another mentor.'],
+  mentee_accept_reminder:['Places in this cycle are limited. If your circumstances have changed and you are no longer able to take part, we would be grateful if you could let us know, so that we may offer your place to another student.'],
+  mentor_reserve:['we will give you at least two weeks’ notice, along with the materials you need to begin well.',
+    'a place on the Reserve Mentor list is not a guarantee of participation this cycle.',
+    'Please let us know by 26 September 2026 whether you are happy to be placed on the Reserve Mentor list.'],
+  mentee_reserve:['a place on the Reserve Mentee list is not a guarantee of participation this cycle.'],
+  mentor_reserve_activation:['As this is a later activation, please complete this by 29 September 2026 so that we can prepare you for the Kick-Off on 1 October 2026.'],
+  mentee_reserve_activation:['Please complete this by 29 September 2026 so that we can prepare you for the Kick-Off on 1 October 2026.'],
+  mentor_decline:['The response to this cycle was exceptional, with many more applications than the places available. After careful consideration, we are not able to offer you a mentoring place this programme cycle.',
+    'This reflects the strength of the pool rather than any shortcoming in your application'],
+  mentee_decline_not_selected:['After careful consideration, we are not able to offer you a place this programme cycle.'],
+  mentee_decline_ineligible:['The GRMP mentee programme this cycle is open to current SMU undergraduates, and from your application we are not able to offer you a place on this occasion. We are sorry to pass on news that is not what you hoped for.'],
+  mentor_invite:['The distance between your world and a student’s is precisely what makes your experience worth sharing.',
+    'Expand your network as part of a global community of 5,000+ SMC members across 35 countries.'],
+  mentee_invite:['The people who shape us are often the ones who see the world differently from us.',
+    'Understand yourself first: your interests, strengths and values, before turning to careers and choices.'],
+  mentor_receipt:['We will review applications from across the cohort and be in touch by 18 September 2026 with the next steps. If you are confirmed as a mentor, that message will include your onboarding details.'],
+  mentee_receipt:['Places are limited, and we read every application with care.'],
+};
+Object.entries(BODY_SPOT).forEach(([k,frags])=>{
+  const body = rm(k).body;
+  T(`body verbatim spot-check · ${k}`, frags.every(f=>body.includes(f)));
+});
+T('the 4-step acceptance instructions appear in every accept/reminder/activation email', ['mentor_accept','mentee_accept','mentor_accept_reminder','mentee_accept_reminder','mentor_reserve_activation','mentee_reserve_activation'].every(k=>{
+  const b=rm(k).body;
+  return b.includes('1. Open your personalized link:') && b.includes('2. Enter the email address you used in your application.')
+    && b.includes('3. We will send a one-time verification code to that email. Enter the code to log in.');
+}));
+T('dual-signed emails carry BOTH signatories, stacked with titles', ['mentor_invite','mentor_accept','mentor_reserve','mentor_decline','mentee_accept','mentee_reserve_activation'].every(k=>{
+  const b=rm(k).body;
+  return b.includes('Esther Koh\nChief, SMC HR & Transformation') && b.includes('Wei Kiat Koh\nVice President External, SMU–SMC\nGRMP Programme Lead');
+}));
+T('operational chase-ups are signed by Wei Kiat Koh ONLY', ['mentor_receipt','mentee_receipt','mentor_accept_reminder','mentee_accept_reminder','mentor_reserve_activation_reminder','mentee_reserve_activation_reminder'].every(k=>{
+  const b=rm(k).body;
+  return !b.includes('Esther Koh') && b.includes('Wei Kiat Koh\nVice President External, SMU–SMC\nGRMP Programme Lead');
+}));
+T('sender identity: From SMC GRMP Team, reply-to smu.smc@sa.smu.edu.sg on every template', Object.keys(SUBJECTS).every(k=>{
+  const m=rm(k); return m.from==='SMC GRMP Team' && m.replyTo==='smu.smc@sa.smu.edu.sg';
+}));
+T('no em dashes in any participant-facing email (house style)', Object.keys(SUBJECTS).every(k=>!rm(k).body.includes('—')&&!rm(k).subject.includes('—')));
+T('no template leaks ${ / undefined / NaN', Object.keys(MAILS).every(k=>{
+  const m=rm(k); const s=m.subject+m.body;
+  return !/\$\{|undefined|\bNaN\b/.test(s);
+}));
+
+console.log('— verbatim guard: legal blocks diffed against the spec files (when present) —');
+const SPECS_DIR = path.join(__dirname, '..', '..', 'specs_joanne', 'Mentor & Mentee Application Workflow Content');
+if(fs.existsSync(SPECS_DIR)){
+  const norm = s => String(s).replace(/\*\*/g,'').replace(/[’‘]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
+  const specBlock = (file, startMarker, endMarker) => {
+    const txt = fs.readFileSync(path.join(SPECS_DIR,file),'utf8');
+    const i = txt.indexOf(startMarker); const j = txt.indexOf(endMarker, i);
+    return norm(txt.slice(i,j).split('\n').map(l=>l.replace(/^>\s?/,'')).filter(l=>l.trim()).join(' '));
+  };
+  T('PDPA wording matches the application spec verbatim',
+    specBlock('GRMP_Mentor_Application_Spec.md','> **GRMP PDPA Consent and Acknowledgement**','> ☐')
+    === norm([COPY.pdpaTitle,...COPY.pdpaBody].join(' ')));
+  T('mentor Programme Rules match the post-selection spec verbatim',
+    specBlock('GRMP_Mentor_PostSelection_Spec.md','> **GRMP Programme Rules Acknowledgement**','- Acknowledgement:')
+    === norm([COPY.rulesTitleMentor,...COPY.rulesMentor].join(' ')));
+  T('mentee Programme Rules match the post-selection spec verbatim',
+    specBlock('GRMP_Mentee_PostSelection_Spec.md','> **GRMP Programme Rules Acknowledgement (mentee)**','- Acknowledgement:')
+    === norm(['GRMP Programme Rules Acknowledgement (mentee)',...COPY.rulesMentee].join(' ')));
+  T('mentor COI matches the post-selection spec verbatim',
+    specBlock('GRMP_Mentor_PostSelection_Spec.md','> **GRMP Conflict of Interest Declaration**','- **(i) Selection')
+    === norm([COPY.coiTitleMentor,...COPY.coiMentor].join(' ')));
+  T('mentee COI matches the post-selection spec verbatim',
+    specBlock('GRMP_Mentee_PostSelection_Spec.md','> **GRMP Conflict of Interest Declaration (mentee)**','- **(i) Selection')
+    === norm(['GRMP Conflict of Interest Declaration (mentee)',...COPY.coiMentee].join(' ')));
+} else {
+  console.log('  (spec .md files not present in this clone — wholesale diff skipped; embedded checks above still ran)');
+}
+T('gate checkbox labels are the approved exact strings',
+  COPY.rulesTick==='I have read and understood the GRMP Programme Rules and agree to follow them throughout my participation in GRMP. I also acknowledge the principles set out in the SMC Charter.'
+  && COPY.coiTick==='I confirm that this declaration is accurate to the best of my knowledge and that I will inform SMC promptly if an actual or potential conflict of interest arises during my participation in GRMP.'
+  && COPY.coiNone==='I have NO actual or potential conflict of interest to declare.'
+  && COPY.pdpaTick==='I have read and understood the above. I consent to SMC collecting and using my personal data as described and agree to protect and appropriately handle the personal data of other GRMP participants.');
+T('spec error strings are exact', COPY.rulesTickErr==='Please confirm you have read and agree to the Programme Rules.'
+  && COPY.coiSelectErr==='Please select one option.'
+  && COPY.coiTickErr==='Please confirm your declaration to proceed.'
+  && COPY.kickoffReasonErr==='Please provide a reason so we can discuss an exception with you.'
+  && COPY.eligibilityTick==='I confirm I am a current SMU undergraduate.'
+  && COPY.smuEmailSoftWarn==='This does not look like an SMU student email. Please check before continuing.');
+T('the two mentee prompts are the spec’s exact questions',
+  COPY.menteePrompt1==='Six months from now, what do you hope will have changed in you? Tell us what you would most like to grow, and share a moment when you took real ownership of your own development, at work, in your studies, or in life.'
+  && COPY.menteePrompt2==='We are drawn to people who are curious about the world beyond their own field. What pulls your attention, and how would you want to show up for the people around you in this community?');
+T('industry list is the spec’s 17 options in order, shared by both forms',
+  INDUSTRIES.length===17 && INDUSTRIES[0]==='Accounting, Audit & Tax' && INDUSTRIES[4]==='Technology, Media & Telecommunications (TMT)'
+  && INDUSTRIES[15]==='Sustainability & ESG' && INDUSTRIES[16]==='Other');
+T('faculty list is the 7 verified schools, no Other', FACULTIES.length===7
+  && FACULTIES.includes('Yong Pung How School of Law') && FACULTIES.includes('College of Integrative Studies')
+  && !FACULTIES.includes('Other'));
+T('selection timeline constants match the standards note',
+  db.config.registration.closes==='2026-09-10' && db.config.selection.approvalsBy==='2026-09-16'
+  && db.config.selection.outcomeBy==='2026-09-18' && db.config.selection.acceptBy==='2026-09-26'
+  && db.config.selection.reserveAcceptBy==='2026-09-29'
+  && db.events.kickoff.date==='2026-10-01' && db.events.kickoff.venue==='SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail?1:0);

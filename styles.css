@@ -276,3 +276,40 @@ a.stat-go:hover .go{opacity:1;color:var(--ai)}
 @media(max-width:900px){.cards3{grid-template-columns:1fr}.co-shell{grid-template-columns:1fr}
  .co-side{position:relative;height:auto}.funnel-grid{grid-template-columns:repeat(2,1fr)}
  .ms-hero h1{font-size:32px}.f-grid2{grid-template-columns:1fr}}
+
+/* ---------- R5: staged application form ---------- */
+.stepper{display:flex;gap:6px;align-items:flex-start;margin:14px 0 18px;flex-wrap:wrap}
+.st-node{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:86px;flex:1}
+.st-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12.5px;font-weight:800;
+  background:var(--surface-2);border:2px solid var(--line);color:var(--ink-3)}
+.st-node.cur .st-dot{background:var(--red);border-color:var(--red);color:#fff}
+.st-node.done .st-dot{background:var(--ok-wash);border-color:#7FC79B;color:var(--ok)}
+.st-lab{font-size:10.5px;text-align:center;color:var(--ink-3);font-weight:650;line-height:1.25}
+.st-node.cur .st-lab{color:var(--ink)}
+.st-txt{flex-basis:100%;font-size:11px;color:var(--ink-3);text-align:right;margin-top:-4px}
+.f-err{color:var(--red);font-size:12px;margin-top:4px;font-weight:650}
+.f-warn{color:#9A6A00;background:#FFF7E0;border:1px solid #F0DFA0;border-radius:7px;font-size:12px;margin-top:5px;padding:6px 9px}
+.f-micro{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+.f-secnote{font-size:12px;color:var(--ink-3);background:var(--surface-2);border-radius:8px;padding:8px 11px;margin:2px 0 12px}
+.wc{font-weight:800}
+
+/* ---------- R5: acceptance gate ---------- */
+.gate-item{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin:10px 0;background:#fff}
+.gate-item.g-done{background:var(--ok-wash);border-color:#BFE3CE}
+.g-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:14px}
+.g-scroll{max-height:260px;overflow-y:auto;border:1px solid var(--line-2);border-radius:8px;padding:4px 14px;margin:8px 0;background:var(--surface)}
+.g-tick{display:flex;gap:8px;margin:7px 0;font-size:13px;align-items:flex-start}
+.g-tick input{margin-top:3px}
+
+/* ---------- R5: industry chip + criteria scoring ---------- */
+.ind-chip{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.02em;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:999px;padding:2px 9px;max-width:230px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.crit-grid{display:flex;flex-direction:column;gap:6px}
+.crit-row{display:flex;gap:12px;align-items:center;justify-content:space-between;border-top:1px solid var(--line-2);padding:7px 0}
+.crit-lab{flex:1;font-size:12.5px}
+.crit-hint{font-size:11px;color:var(--ink-3);font-weight:400}
+.crit-row select{border:1px solid var(--line);border-radius:8px;padding:6px 9px;min-width:150px}
+.rv-app{border-top:1px dashed var(--line-2);margin-top:8px;padding-top:8px}
+/* a11y: links inside prose must not rely on colour alone */
+.qcard p a, .co-sub a, .doc-card p a{text-decoration:underline}
