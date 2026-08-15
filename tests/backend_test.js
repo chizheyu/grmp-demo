@@ -26,7 +26,12 @@ let r = D.submitApplication(db,'mentee',{name:'Test Person',email:'t@x.com',trac
 T('complete application → submitted', r.person.appStatus==='submitted' && r.missing.length===0);
 T('confirmation email queued', db.emails.some(e=>e.kind==='confirm'&&e.to==='t@x.com'));
 r = D.submitApplication(db,'mentee',{name:'Half Done',email:'h@x.com',track:null,course:'',goals:'',consent:false});
-T('missing fields → incomplete + reminder', r.person.appStatus==='incomplete' && r.missing.length>=3 && db.emails.some(e=>e.kind==='missing_info'&&e.to==='h@x.com'));
+// Owner decision F0806-205424: incomplete = a draft the applicant returns to; NO reminder
+// email, and drafts never enter selection.
+T('missing fields → saved as draft, no reminder email', r.person.appStatus==='draft'
+  && r.missing.length>=3 && !db.emails.some(e=>e.to==='h@x.com'));
+T('drafts never appear in review queues', !db.people.some(p=>p.appStatus==='draft'
+  && db.people.filter(x=>x.appStatus==='submitted').includes(p)));
 D.score(db, r.person.id, 'Portia', 4, 'ok');
 T('review recorded', db.reviews.some(v=>v.personId===r.person.id&&v.reviewer==='Portia'));
 D.decide(db, r.person.id, 'accepted', 'Esther');
@@ -37,8 +42,8 @@ db = fresh();
 const gated = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&!D.ackComplete(p));
 T('seed has a gate-blocked mentee', !!gated);
 T('gateBlocked() true before ack', D.gateBlocked(gated));
-['rules','charter','governance','pdpa','coi'].forEach(k=>D.acknowledge(db,gated.id,k));
-T('ackComplete after 5 docs', D.ackComplete(D.person(db,gated.id)));
+['rules','pdpa','coi'].forEach(k=>D.acknowledge(db,gated.id,k));
+T('ackComplete after 3 docs (Charter & Grievance folded into Rules by reference),', D.ackComplete(D.person(db,gated.id)));
 T('still gate-blocked without orientation', D.gateBlocked(D.person(db,gated.id)));
 D.completeOrientation(db,gated.id,'recorded');
 T('gate clears after orientation', !D.gateBlocked(D.person(db,gated.id)));
@@ -123,7 +128,7 @@ console.log('— PRD gaps: duplicate applications, seat release, audit —');
 T('I3 every audit entry carries a real timestamp', (()=>{
   const d=fresh();
   D.decide(d,d.people[0].id,'accepted','Esther');
-  D.setToday(d,'2026-02-01');
+  D.setToday(d,'2027-02-01');
   D.acknowledge(d,d.people[0].id,'rules');
   return d.audit.length>0 && d.audit.every(a=>typeof a.ts==='string' && !isNaN(Date.parse(a.ts)));
 })());
@@ -147,7 +152,7 @@ T('A3 the flag is auditable', db.audit.some(a=>a.action==='duplicate_email_flagg
 db = fresh();
 T('Q5 nobody can be withdrawn before the final reminder date',
   D.finalReminderPassed(db) ? true : D.pendingWithdrawal(db).length===0);
-db.today = '2025-09-20';                                  // past Sept W3 final reminder
+db.today = '2026-09-20';                                  // past Sept W3 final reminder
 const pending = D.pendingWithdrawal(db);
 T('Q5 unacknowledged accepted participants are listed after the final reminder', pending.length>0);
 T('Q5 people who did acknowledge are never listed', pending.every(p=>!D.ackComplete(p)));
@@ -209,27 +214,56 @@ T('cohortFacts derives a different cycle end-to-end', (()=>{
     && !D.finalReminderPassed(d2);          // the shifted ladder keeps Q5 from misfiring
 })());
 
-console.log('— close-off & certificate rule —');
+console.log('— close-off & certificate rule (Owner decision F0806-172216) —');
 db = fresh();
-// The two preview mentees split the certificate story: one ships with her Builder
-// Reflection in the seed (Ready to issue — the happy path is visible on day one),
-// the other without (the ✗ shows what the rule still demands).
+// The two preview mentees split the certificate story: preview #1 ships with the FULL
+// set (3 close-offs + mid-prog review + end-prog evaluation + Builder's Commitment →
+// the happy path is visible on day one); preview #2 deliberately misses the end-prog
+// evaluation, so the Exception report has a live case in the seed.
 const pvReady = db.people.find(p=>p.previewFastForward && db.builderReflections.some(b=>b.menteeId===p.id));
 const pv = db.people.find(p=>p.previewFastForward && !db.builderReflections.some(b=>b.menteeId===p.id));
-T('seed ships sample submissions (mid-reviews + one Builder Reflection)',
-  db.midreviews.length>=2 && db.builderReflections.length===1);
-T('the BR-seeded preview mentee is Ready to issue on day one', !!pvReady && D.certEligible(db,pvReady));
-T('preview mentee without BR: 3 close-offs but NOT yet eligible', D.menteeCloseoffs(db,pv.id).length===3 && !D.certEligible(db,pv));
+T('seed ships sample submissions (mentor mid-reviews + mentee mid-reviews + end-evals + one BC)',
+  db.midreviews.length>=2 && db.menteeMidReviews.length===2 && db.endEvaluations.length>=2 && db.builderReflections.length===1);
+T('full-set preview mentee is Ready on day one', !!pvReady && D.certEligible(db,pvReady) && D.certMissing(db,pvReady).length===0);
+T('preview mentee #2 misses exactly end-eval + BC', (()=>{const m=D.certMissing(db,pv);
+  return m.length===2 && m.some(x=>/end-prog/.test(x)) && m.some(x=>/Builder/.test(x));})());
 D.submitBuilderReflection(db, pv.id, 'I will mentor juniors in my CCA.');
-T('eligible after Builder Reflection', D.certEligible(db,pv));
+T('BC alone does not qualify — end-prog evaluation still missing', !D.certEligible(db,pv) && D.certMissing(db,pv).join()==='end-prog evaluation (R3 close-off)');
+db.endEvaluations.push({personId:pv.id, kind:'mentee', text:'Great programme.', at:db.today});
+T('eligible once all four criteria are in', D.certEligible(db,pv));
 let issued = D.issueCertificates(db,'Esther');
 T('certificate issued exactly for eligible people', issued.some(p=>p.id===pv.id) && db.certificates.some(c=>c.personId===pv.id));
 issued = D.issueCertificates(db,'Esther');
 T('idempotent — no double issuance', !issued.some(p=>p.id===pv.id));
 const someMentor = db.pairs.find(x=>x.rotation===2&&x.status==='approved') && D.person(db, db.pairs.find(x=>x.rotation===2&&x.status==='approved').mentorId);
-T('mentor not eligible without mid-review', !D.certEligible(db,someMentor));
+T('mentor not eligible without both checkpoints', !D.certEligible(db,someMentor) && D.certMissing(db,someMentor).length===2);
 D.submitMidReview(db, someMentor.id, 'Going well.');
-T('mentor eligible after mid-review', D.certEligible(db,someMentor));
+T('mid-review alone: end-prog evaluation still missing', !D.certEligible(db,someMentor) && D.certMissing(db,someMentor).join()==='end-prog evaluation');
+D.submitEndEvaluation(db, someMentor.id, 'Would gladly serve again.');
+T('mentor eligible after mid-review + end evaluation', D.certEligible(db,someMentor));
+
+console.log('— close-off carries the R2/R3 artefacts (F0806-173822) —');
+db = fresh();
+const r2pair = db.pairs.find(x=>x.rotation===2 && x.status==='approved' && !db.people.find(q=>q.id===x.menteeId).previewFastForward);
+D.closeoff(db, r2pair.id, true, true, 'good rotation', 'Halfway check: learning a lot.');
+T('R2 close-off stores the mentee mid-prog review', db.menteeMidReviews.some(m=>m.menteeId===r2pair.menteeId && /Halfway/.test(m.text)));
+const r3pair = {id:'PRX', menteeId:r2pair.menteeId, mentorId:'whoever', rotation:3, status:'approved'};
+db.pairs.push(r3pair);
+D.closeoff(db, 'PRX', true, true, '', 'End evaluation: transformed how I network.');
+T('R3 close-off stores the end-prog evaluation', db.endEvaluations.some(e=>e.personId===r2pair.menteeId && /transformed/.test(e.text)));
+
+console.log('— approve by exception (F0806-232836) —');
+db = fresh();
+const exMentee = db.people.find(p=>p.previewFastForward && !db.builderReflections.some(b=>b.menteeId===p.id));
+T('no reason → refused', D.approveByException(db, exMentee.id, '   ', 'Esther')===null && !db.certificates.some(c=>c.personId===exMentee.id));
+const fullOK = db.people.find(p=>p.previewFastForward && db.builderReflections.some(b=>b.menteeId===p.id));
+T('fully-eligible person → refused (nothing exceptional)', D.approveByException(db, fullOK.id, 'reason', 'Esther')===null);
+const exc = D.approveByException(db, exMentee.id, 'Overseas exchange in March; evaluated verbally with the Lead.', 'Esther');
+T('exception approval records by/reason/missing + audit + email', !!exc && exc.byException.by==='Esther'
+  && exc.byException.missing.length===2
+  && db.audit.some(a=>a.action.startsWith('certificate_by_exception') && a.entity===exMentee.id && a.actor==='Esther')
+  && db.emails.some(e=>/by exception/.test(e.subject||'')));
+T('already certified → second exception refused', D.approveByException(db, exMentee.id, 'again', 'Esther')===null);
 
 console.log('— dropout replacement —');
 db = fresh();
@@ -253,18 +287,18 @@ db = fresh();
 T('11 preset accounts, all resolvable', db.config.accounts.length===11 &&
   db.config.accounts.filter(a=>a.kind==='person').every(a=>db.people.some(p=>p.id===a.personId)) &&
   db.config.accounts.filter(a=>a.kind==='admin').every(a=>db.config.admins.some(x=>x.name===a.name)));
-T('cohort C2025 active, no archives', db.config.cohort.id==='C2025' && db.archives.length===0);
+T('cohort C2026 active, no archives', db.config.cohort.id==='C2026' && db.archives.length===0);
 const beforeMentors = db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length;
-const newId = D.startNewCycle(db, {label:'GRMP 2026 (SMU)', today:'2026-09-01', actor:'Esther',
-  rotations:[{n:1,label:'Know Yourself',start:'2026-10-01',end:'2026-11-30'},
-             {n:2,label:'Know Your World',start:'2026-12-01',end:'2027-01-31'},
-             {n:3,label:'Know Your Path',start:'2027-02-01',end:'2027-03-31'}]});
-T('new cycle id derived from dates', newId==='C2026' && db.config.cohort.id==='C2026');
-T('old cycle archived with stats', db.archives.length===1 && db.archives[0].id==='C2025' && db.archives[0].stats.mentees===60);
+const newId = D.startNewCycle(db, {label:'GRMP 2027 (SMU)', today:'2027-09-01', actor:'Esther',
+  rotations:[{n:1,label:'Know Yourself',start:'2027-10-01',end:'2027-11-30'},
+             {n:2,label:'Know Your World',start:'2027-12-01',end:'2028-01-31'},
+             {n:3,label:'Know Your Path',start:'2028-02-01',end:'2028-03-31'}]});
+T('new cycle id derived from dates', newId==='C2027' && db.config.cohort.id==='C2027');
+T('old cycle archived with stats', db.archives.length===1 && db.archives[0].id==='C2026' && db.archives[0].stats.mentees===60);
 T('mentors carried over as invited, mentees cleared', db.people.length===beforeMentors &&
   db.people.every(p=>p.kind==='mentor'&&p.appStatus==='invited'&&!p.ack&&!p.orientation));
 T('pairs/reviews/certs cleared', db.pairs.length===0 && db.reviews.length===0 && db.certificates.length===0);
-T('rotations replaced', db.config.rotations[0].start==='2026-10-01' && db.today==='2026-09-01');
+T('rotations replaced', db.config.rotations[0].start==='2027-10-01' && db.today==='2027-09-01');
 const inv = db.people[0];
 T('confirmReturn flips invited→accepted + email', D.confirmReturn(db, inv.id)===true &&
   D.person(db,inv.id).appStatus==='accepted' && db.emails.some(e=>e.subject.includes('Welcome back')));

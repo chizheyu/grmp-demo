@@ -4,7 +4,7 @@ const root = path.join(__dirname, '..');
 const dist = path.join(root, 'fsdist');
 fs.mkdirSync(dist, { recursive: true });
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-for (const f of ['styles.css','data.js','ai.js','fire.js','views_public.js','views_console.js','app.js'])
+for (const f of ['styles.css','data.js','ai.js','fire.js','views_public.js','views_console.js','app.js','USER_MANUAL.md'])
   fs.writeFileSync(path.join(dist, f), read(f));
 const cfg = JSON.parse(fs.readFileSync(path.join(root,'platform','fb_config.json'),'utf8'));
 // The AI proxy endpoint is public (it holds no secret — the key lives in Script

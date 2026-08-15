@@ -6,6 +6,11 @@ service cloud.firestore {
     match /state/{doc} {
       allow read, write: if true;
     }
+    // Feedback conversation threads (changelog page). Deliberately outside /state
+    // so a demo-data reset never erases the acceptance dialogue.
+    match /feedback_comments/{doc} {
+      allow read, write: if true;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }

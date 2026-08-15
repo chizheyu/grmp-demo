@@ -7,7 +7,7 @@
    Firebase Auth + rules/Functions. */
 
 const FIRE = {
-  slices: ['people','pairs','reviews','midreviews','builderReflections','certificates',
+  slices: ['people','pairs','reviews','midreviews','menteeMidReviews','endEvaluations','builderReflections','certificates',
            'concerns','emails','audit','events','config','archives','aiCache','today','version'],
   fs: null,
   last: {},            // sliceName -> last JSON string seen (from snapshot or own write)
@@ -18,13 +18,22 @@ const FIRE = {
     if(typeof firebase==='undefined' || !window.FIREBASE_CONFIG) return false;
     firebase.initializeApp(window.FIREBASE_CONFIG);
     this.fs = firebase.firestore();
+    /* Proxied networks can wedge Firestore's streaming WebChannel (requests hang,
+       REST works). Auto-detect falls back to long-polling when that happens. */
+    try{ this.fs.settings({experimentalForceLongPolling:true, useFetchStreams:false, merge:true}); }catch(e){}
     return true;
   },
 
   assemble(docs){
     const db = {};
     docs.forEach(d => { db[d.id] = d.data().v; });
-    return this.slices.every(s => s in db) ? db : null;
+    if(!('people' in db)) return null;            // genuinely empty / mid-seed — wait
+    /* Schema evolution: a newly-added slice won't exist in a database written by the
+       previous build. Default it locally ([] — every optional slice is a collection)
+       instead of returning null, which would hang every client on "Connecting…"
+       until someone hand-wiped Firestore. persist() writes the backfill on first use. */
+    this.slices.forEach(s => { if(!(s in db)) db[s] = []; });
+    return db;
   },
 
   async seedIfEmpty(){

@@ -99,7 +99,11 @@ function toast(msg, ok=true){
 const DOC_TEXT = {
   rules:`<p>What the programme expects of you: attend your rotations, meet your mentor at least twice
     per rotation, and complete your close-off within the rotation window.</p>
-    <p>Missing a close-off after the final reminder frees your seat for someone on the waitlist.</p>`,
+    <p>Missing a close-off after the final reminder frees your seat for someone on the waitlist.</p>
+    <p>These Rules incorporate, by reference, the <b>SMC Charter</b> (conduct, respect and
+    confidentiality for everyone in the programme) and the <b>Grievance &amp; Misconduct
+    Procedure</b> (how concerns are raised and handled). Acknowledging the Rules acknowledges
+    all three.</p>`,
   charter:`<p>SMC is a volunteer-run committee. Everyone in GRMP — mentors, mentees and the programme
     team — is bound by the Committee's charter on conduct, respect and confidentiality.</p>`,
   governance:`<p>How decisions are made and escalated: the Programme Lead decides matches and outcomes;
@@ -204,7 +208,7 @@ function renderFeedbackBtn(){
   if(!FEEDBACK_URL) return '';
   return `<button class="fb-btn" data-act="openFeedback">💬 Feedback</button>`;
 }
-function openFeedbackModal(){
+function openFeedbackModal(prefill){
   const ctx = feedbackContext();
   const root = document.getElementById('overlay-root');
   const wrap = document.createElement('div');
@@ -214,7 +218,7 @@ function openFeedbackModal(){
      <h3 style="margin:0 0 4px;font-size:16px">Feedback on this screen</h3>
      <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:10px">Attached automatically: <b>${esc(ctx.page)}</b> · viewing as <b>${esc(ctx.role)}</b></div>
      <div class="f-row"><label>Your name (optional)</label><input type="text" id="fb-name" placeholder="so we can follow up"></div>
-     <div class="f-row"><label>What should change? <span class="req">*</span></label><textarea id="fb-text" placeholder="Describe what you expected, what you saw, or what's missing"></textarea></div>
+     <div class="f-row"><label>What should change? <span class="req">*</span></label><textarea id="fb-text" placeholder="Describe what you expected, what you saw, or what's missing">${esc(prefill||'')}</textarea></div>
      <div style="display:flex;gap:8px;justify-content:flex-end">
        <button class="btn sm btn-ghost" id="fb-cancel">Cancel</button>
        <button class="btn sm btn-primary" id="fb-send">Send feedback</button>
@@ -292,12 +296,18 @@ function demoBanner(){
     <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a>${who}</div>`;
 }
 
+/* SGT display for machine timestamps (feedback/decisions come back as UTC ISO) */
+function fmtSGT(iso){
+  try{ const d=new Date(iso); if(isNaN(d)) return iso;
+    return d.toLocaleString('en-SG',{timeZone:'Asia/Singapore',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})+' SGT';
+  }catch(e){ return iso; }
+}
 /* ---------- router ---------- */
 const routes = [
   {re:/^#\/$/,                view:()=>Views.landing()},
   {re:/^#\/guide\/mentee$/,   view:()=>Views.guideMentee()},
   {re:/^#\/guide\/mentor$/,   view:()=>Views.guideMentor()},
-  {re:/^#\/reflection$/,      view:()=>Views.reflection()},
+  {re:/^#\/reflection(?:\/(.+))?$/, view:m=>Views.reflection(m[1])},
   {re:/^#\/concern$/,         view:()=>Views.concern()},
   {re:/^#\/apply\/(mentee|mentor)$/, view:m=>Views.apply(m[1])},
   {re:/^#\/applied\/(.+)$/,   view:m=>Views.applied(m[1])},
@@ -437,11 +447,17 @@ function bindGlobal(){
   linkFormLabels();
   const t = document.getElementById('openas-toggle');
   if(t) t.onclick = ()=>{ openasOpen = !openasOpen; render(); };
-  document.querySelectorAll('[data-goto]').forEach(b=>b.onclick = ()=>{ openasOpen=false; location.hash = b.dataset.goto; });
-  document.querySelectorAll('[data-act]').forEach(b=>b.onclick = ()=>{
-    const fn = Actions[b.dataset.act]; if(fn) fn(b.dataset);
-  });
 }
+/* Single document-level delegation instead of per-element onclick at render time:
+   markup injected AFTER render (changelog threads, decision cards, anything async)
+   gets working buttons too. Registered once — per-element rebinding was how the
+   thread Reply buttons shipped dead. */
+document.addEventListener('click', e=>{
+  const g = e.target.closest('[data-goto]');
+  if(g){ openasOpen=false; location.hash = g.dataset.goto; return; }
+  const b = e.target.closest('[data-act]');
+  if(b){ const fn = Actions[b.dataset.act]; if(fn) fn(b.dataset); }
+});
 window.addEventListener('hashchange', render);
 window.addEventListener('DOMContentLoaded', ()=>{
   if(FS){
@@ -550,7 +566,7 @@ const Actions = {
       .then(()=>toast(d.title+' acknowledged — timestamp and version recorded.')); };
     root.appendChild(wrap);
   },
-  ackAll(d){ if(REMOTE){ call('ackAllDocs', d.person); } else { act(x=>{['rules','charter','governance','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); } },
+  ackAll(d){ if(REMOTE){ call('ackAllDocs', d.person); } else { act(x=>{['rules','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); } },
   saveOrientVideo(d){
     const mentee=(document.getElementById('ov-url')||{}).value||'';
     const mentor=(document.getElementById('ov-url-mentor')||{}).value||'';
@@ -566,8 +582,49 @@ const Actions = {
     const met = document.getElementById('co-met').checked;
     const ref = document.getElementById('co-ref').checked;
     if(!met || !ref){ toast('Both confirmations are required to close off the rotation.', false); return; }
+    const extraEl = document.getElementById('co-extra');
+    const extra = extraEl ? extraEl.value.trim() : '';
+    if(extraEl && !extra){
+      toast(d.rot==='2' ? 'Your mid-programme review is part of the Rotation 2 close-off.'
+                        : 'Your end-of-programme evaluation is part of the Rotation 3 close-off.', false);
+      return;
+    }
     const c = document.getElementById('co-comment').value;
-    call('closeoff', d.pair, true, true, c);
+    call('closeoff', d.pair, true, true, c, extra);
+  },
+  endeval(d){
+    const t = document.getElementById('ee-text').value.trim();
+    if(!t){ toast('Please write your end-of-programme evaluation first.', false); return; }
+    call('submitEndEvaluation', d.person, t).then(()=>toast('End-of-programme evaluation submitted — thank you.'));
+  },
+  fbReply(d){
+    const inp=document.getElementById('cl-reply-'+d.fid);
+    const text=(inp&&inp.value.trim())||'';
+    if(!text){ toast('Write the reply first.', false); return; }
+    if(!(typeof NET!=='undefined'&&NET&&FIRE&&FIRE.fs)){ toast('Replies need the shared database (online mode).', false); return; }
+    let who='SMC team';
+    if(SESSION&&SESSION.identity){
+      who = SESSION.identity.name
+         || (SESSION.identity.kind==='person' && (GRMP.D.person(__demo.db, SESSION.identity.personId)||{}).name)
+         || 'SMC team';
+    }
+    const btn=document.querySelector(`button[data-act="fbReply"][data-fid="${d.fid}"]`); if(btn) btn.disabled=true;
+    FIRE.fs.collection('feedback_comments').add({fid:d.fid, by:who, text:text.slice(0,1500), ts:new Date().toISOString()})
+      .then(()=>{ toast('Reply posted — it appears for everyone on this page.'); Views.__clCache=null; render(); })
+      .catch(()=>{ if(btn) btn.disabled=false; toast('Could not post right now — try again in a minute.', false); });
+  },
+  fbDiscuss(d){ openFeedbackModal(`[${d.q}] `); },
+  certException(d){
+    const inp = document.getElementById('exc-reason-'+d.person);
+    const reason = inp ? inp.value.trim() : '';
+    if(!reason){ toast('A reason is required — it is recorded on the certificate and audited.', false); return; }
+    const nm = (GRMP.D.person(__demo.db, d.person)||{}).name || d.person;
+    confirmBox(`Approve ${nm}'s certificate by exception?`,
+      `Reason: “${reason}” — recorded on the certificate and written to the audit log under your name.`, false, ()=>{
+      call('approveByException', d.person, reason, d.actor).then(r=>{
+        toast(r? 'Approved by exception — recorded and audited.' : 'Nothing to approve — already certified or fully eligible.', !!r);
+      });
+    });
   },
   midreview(d){
     const t = document.getElementById('mr-text').value.trim();
@@ -576,7 +633,7 @@ const Actions = {
   },
   builder(d){
     const t = document.getElementById('br-text').value.trim();
-    if(!t){ toast('Please write your Builder Reflection first.', false); return; }
+    if(!t){ toast('Please write your Builder’s Commitment first.', false); return; }
     call('submitBuilderReflection', d.person, t);
   },
   score(d){
@@ -631,6 +688,10 @@ const Actions = {
         .then(out=>toast(`${(out||[]).length} seat(s) released and notified.`)));
   },
   replaceMentor(d){ call('replaceMentor', d.pair, d.bench, d.actor); },
+  replaceMentorSel(d){
+    const sel = document.getElementById('bench-'+d.pair);
+    if(sel) Actions.replaceMentor({pair:d.pair, bench:sel.value, actor:d.actor});
+  },
   markDropout(d){
     // bindGlobal passes only the button's dataset — the two form inputs are read here,
     // in one place, so the button cannot be wired twice with different argument shapes.
@@ -644,7 +705,7 @@ const Actions = {
       true, ()=>call('markDropout', mentorId, reason, d.actor)
         .then(out=>toast(out? `${out.affected} mentee(s) queued for re-match.` : 'Already marked as dropped.', !!out)));
   },
-  issueCerts(d){ call('issueCertificates', d.actor).then(out=>toast((out&&out.length)? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.', !!(out&&out.length))); },
+  issueCerts(d){ call('issueCertificates', d.actor).then(out=>toast((out&&out.length)? out.length+' certificate(s) marked ready — presented at the Appreciation Night; participants got a heads-up email.' : 'Nobody newly qualifies yet — check the exception report below for who misses what.', !!(out&&out.length))); },
   remindCloseoff(d){ call('remindCloseoff', d.email).then(()=>toast('Reminder queued.')); },
   checkin(d){ call('toggleAttendance', d.event, d.person); },
   setToday(d){ call('setToday', d.date); },

@@ -345,7 +345,7 @@ v_reminders(admin){
     <tr><td>rotation end −7d</td><td>Close-off reminder</td><td>mentees with open close-off</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
     <tr><td>rotation end +1d</td><td>Close-off escalation</td><td>coordinator queue</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
     <tr><td>${CF.midMonth} window</td><td>Mid-programme review request</td><td>mentors</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
-    <tr><td>${CF.closingMonth} window</td><td>Builder Reflection request</td><td>mentees</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
+    <tr><td>${CF.closingMonth} window</td><td>Builder’s Commitment request</td><td>mentees</td><td><span class="badge b-neut"><span class="d"></span>scheduled</span></td></tr>
   </table>
   ${(()=>{
     const pend = D.pendingWithdrawal(db);
@@ -448,38 +448,58 @@ v_events(admin){
 
 /* ---------- 5.4 certificates ---------- */
 v_certificates(admin){
-  const db = __demo.db, D = GRMP.D;
+  const db = __demo.db, D = GRMP.D, CF = D.cohortFacts(db);
+  const isLead = admin.roles.includes('lead');
   const acc = db.people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus));
   const rows = acc.map(p=>{
-    const closeoffs = p.kind==='mentee'? D.menteeCloseoffs(db,p.id).length : null;
-    const br = db.builderReflections.some(b=>b.menteeId===p.id);
-    const mr = db.midreviews.some(m=>m.mentorId===p.id);
-    const has = db.certificates.some(c=>c.personId===p.id);
-    const eligible = D.certEligible(db,p);
-    // How far along the certificate rule this person is — used to rank, so the rows
-    // worth looking at come first instead of whoever the seed happened to create first.
-    const progress = p.kind==='mentee' ? (closeoffs||0)/3 + (br?1:0) : 0.5 + (mr?1:0);
-    return {p,closeoffs,br,mr,has,eligible,progress};
-  }).sort((a,b)=> (b.has?1:0)-(a.has?1:0) || (b.eligible?1:0)-(a.eligible?1:0)
+    const missing = D.certMissing(db,p);
+    const total = p.kind==='mentee'?4:2;
+    const cert = db.certificates.find(c=>c.personId===p.id);
+    return {p, missing, cert, eligible:!missing.length, progress:(total-missing.length)/total};
+  }).sort((a,b)=> (b.cert?1:0)-(a.cert?1:0) || (b.eligible?1:0)-(a.eligible?1:0)
                 || b.progress-a.progress || a.p.name.localeCompare(b.p.name));
-  const eligibleN = rows.filter(r=>r.eligible&&!r.has).length;
+  const eligibleN = rows.filter(r=>r.eligible&&!r.cert).length;
+  const excRows = rows.filter(r=>!r.cert&&!r.eligible).slice(0,15);
+  const excTotal = rows.filter(r=>!r.cert&&!r.eligible).length;
+  const crit = p=>p.kind==='mentee'
+    ? '3 close-offs · mid-prog review (R2) · end-prog evaluation (R3) · Builder’s Commitment'
+    : 'mid-prog feedback · end-prog evaluation';
   return `<h1 class="co-title">Certificates</h1>
-  <p class="co-sub">The rule runs itself — you press one button and everyone who qualifies gets their certificate by email, logged.</p>
+  <p class="co-sub">Certificates are <b>printed and presented at the Appreciation Night</b> (${CF.appreciationDate||CF.closingMonth}).
+  This page tracks who qualifies under the completion criteria and records the decision; the email participants get is a heads-up, not the certificate itself.</p>
   ${inferred('Q2')}
-  <div style="margin:0 0 14px"><button class="btn btn-primary" data-act="issueCerts" data-actor="${admin.name}">Issue all qualifying certificates (${eligibleN} ready)</button></div>
-  <table class="tb"><tr><th>Name</th><th>Kind</th><th>Progress against the rule</th><th>Status</th></tr>
+  <div style="margin:0 0 14px"><button class="btn btn-primary" data-act="issueCerts" data-actor="${admin.name}">Mark all qualifying certificates ready (${eligibleN})</button></div>
+  <table class="tb"><tr><th>Name</th><th>Kind</th><th>Progress against the criteria</th><th>Status</th></tr>
   ${(()=>{
     const row = r=>`<tr><td><b>${r.p.name}</b>${r.p.previewFastForward?' <span class="badge b-ai">fast-forward preview</span>':''}</td><td>${r.p.kind}</td>
-      <td style="font-size:12px">${r.p.kind==='mentee' ? `${r.closeoffs}/3 close-offs · Builder Reflection ${r.br?'✓':'✗'}` : `serving rotations ✓ · mid-review ${r.mr?'✓':'✗'}`}</td>
-      <td>${r.has?'<span class="badge b-ok"><span class="d"></span>Issued</span>' : r.eligible?'<span class="badge b-warn"><span class="d"></span>Ready to issue</span>':'<span class="badge b-neut"><span class="d"></span>In progress</span>'}</td></tr>`;
+      <td style="font-size:12px">${r.missing.length?`missing: ${r.missing.join(' · ')}`:'all criteria met ✓'}</td>
+      <td>${r.cert? (r.cert.byException
+              ? `<span class="badge b-warn" title="${(r.cert.byException.reason||'').replace(/"/g,'&quot;')}"><span class="d"></span>By exception · ${r.cert.byException.by}</span>`
+              : '<span class="badge b-ok"><span class="d"></span>Ready · presented at Appreciation Night</span>')
+          : r.eligible?'<span class="badge b-warn"><span class="d"></span>Qualifies — not yet marked</span>'
+          :'<span class="badge b-neut"><span class="d"></span>In progress</span>'}</td></tr>`;
     const head = rows.slice(0,25), tail = rows.slice(25);
     const mentees = head.filter(r=>r.p.kind==='mentee').length;
     return head.map(row).join('') + `</table>
-    <p style="font-size:11.5px;color:var(--ink-3);margin-top:8px">Showing the 25 furthest along (${mentees} mentees, ${head.length-mentees} mentors) of ${rows.length}. Most of the cohort is naturally “in progress” at this point in the cycle; the fast-forward preview mentees are at the top so you can see the whole path today.</p>
+    <p style="font-size:11.5px;color:var(--ink-3);margin-top:8px">Criteria — mentee: ${crit({kind:'mentee'})}. Mentor: ${crit({kind:'mentor'})}.
+    Showing the 25 furthest along (${mentees} mentees, ${head.length-mentees} mentors) of ${rows.length}; most of the cohort is naturally “in progress” at this point in the cycle.</p>
     ${tail.length?`<details class="alts"><summary>Show the remaining ${tail.length}</summary>
-      <table class="tb" style="margin-top:6px"><tr><th>Name</th><th>Kind</th><th>Progress against the rule</th><th>Status</th></tr>
+      <table class="tb" style="margin-top:6px"><tr><th>Name</th><th>Kind</th><th>Progress against the criteria</th><th>Status</th></tr>
       ${tail.map(row).join('')}</table></details>`:''}`;
-  })()}`;
+  })()}
+  <h3 style="font-size:14.5px;margin:20px 0 6px">Exception report — close to qualifying, or needs a call</h3>
+  <p style="font-size:12.5px;color:var(--ink-3);margin:0 0 10px">Everyone below misses at least one criterion. ${isLead
+    ? 'As Programme Lead you can approve a certificate <b>by exception</b> — the reason is mandatory, shown on the record and written to the audit log.'
+    : 'Only the Programme Lead can approve a certificate by exception.'}</p>
+  ${excRows.length?`<table class="tb"><tr><th>Name</th><th>Kind</th><th>Missing</th>${isLead?'<th>Approve by exception</th>':''}</tr>
+    ${excRows.map(r=>`<tr><td><b>${r.p.name}</b>${r.p.previewFastForward?' <span class="badge b-ai">fast-forward preview</span>':''}</td><td>${r.p.kind}</td>
+      <td style="font-size:12px">${r.missing.join(' · ')}</td>
+      ${isLead?`<td style="min-width:260px"><div style="display:flex;gap:6px">
+        <input type="text" id="exc-reason-${r.p.id}" placeholder="Reason (required, audited)" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--line-2);border-radius:7px">
+        <button class="btn sm" data-act="certException" data-person="${r.p.id}" data-actor="${admin.name}">Approve</button></div></td>`:''}</tr>`).join('')}
+  </table>
+  ${excTotal>excRows.length?`<p style="font-size:11.5px;color:var(--ink-3)">Showing the ${excRows.length} closest to qualifying of ${excTotal}. The rest are early in the cycle — this report matters most in ${CF.closingMonth}.</p>`:''}`
+  :'<p style="font-size:13px;color:var(--ink-3)">Everyone has either qualified or been marked ready — nothing to review.</p>'}`;
 },
 
 /* ---------- submissions: reviews, reflections, close-off notes ---------- */
@@ -494,7 +514,17 @@ v_submissions(admin){
     <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
     <span style="font-size:11.5px;color:var(--ink-3)"> · ${m.at}</span>
     <p style="font-size:13px;margin:6px 0 0">${m.text}</p></div>`}).join('')||`<p style="color:var(--ink-3);font-size:13px">None yet — mentors submit these in the ${CF.midMonth} window. <span style="color:var(--ink-3)">(See one today: advance the demo clock in Configuration, then submit as <b>mentor.active</b>.)</span></p>`}
-  <h3 style="font-size:14.5px;margin:16px 0 8px">Builder Reflections — mentees (${db.builderReflections.length})</h3>
+  <h3 style="font-size:14.5px;margin:16px 0 8px">Mid-programme reviews — mentees, with their R2 close-off (${(db.menteeMidReviews||[]).length})</h3>
+  ${(db.menteeMidReviews||[]).map(m=>{const p=D.person(db,m.menteeId);return `<div class="qcard" style="padding:12px 16px">
+    <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
+    <span style="font-size:11.5px;color:var(--ink-3)"> · ${m.at}</span>
+    <p style="font-size:13px;margin:6px 0 0">${m.text}</p></div>`}).join('')||`<p style="color:var(--ink-3);font-size:13px">None yet — mentees write these as part of the Rotation 2 close-off.</p>`}
+  <h3 style="font-size:14.5px;margin:16px 0 8px">End-of-programme evaluations (${(db.endEvaluations||[]).length})</h3>
+  ${(db.endEvaluations||[]).map(e=>{const p=D.person(db,e.personId);return p?`<div class="qcard" style="padding:12px 16px">
+    <b style="font-size:13.5px">${p.name}</b> <span style="font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em">${p.kind}</span>
+    <span style="font-size:11.5px;color:var(--ink-3)"> · ${e.at}</span>
+    <p style="font-size:13px;margin:6px 0 0">${e.text}</p></div>`:''}).join('')||`<p style="color:var(--ink-3);font-size:13px">None yet — mentees submit theirs with the R3 close-off, mentors from their personal page at closing (${CF.closingMonth}).</p>`}
+  <h3 style="font-size:14.5px;margin:16px 0 8px">Builder’s Commitments — mentees (${db.builderReflections.length})</h3>
   ${db.builderReflections.map(b=>{const p=D.person(db,b.menteeId);return `<div class="qcard" style="padding:12px 16px">
     <b style="font-size:13.5px">${p.name}</b> <span class="track-chip track-${p.track}">${GRMP.TRACKS[p.track].label}</span>
     <span style="font-size:11.5px;color:var(--ink-3)"> · ${b.at}</span>
@@ -509,7 +539,7 @@ v_submissions(admin){
 v_concerns(admin){
   const db = __demo.db;
   return `<h1 class="co-title">Concern inbox 🔒</h1>
-  <p class="co-sub">Visible to you alone as Escalation Owner. The platform stores the referral record only —
+  <p class="co-sub">Visible to the Programme Lead (primary) and Programme Owner (alternate escalation) only. The platform stores the referral record only —
   the case itself is handled in SMC's Grievance &amp; Misconduct process. AI never reads this store.</p>
   ${inferred('Q6')}
   ${db.concerns.map(c=>`<div class="qcard" style="border-left:3px solid var(--red)">
@@ -536,7 +566,7 @@ v_config(admin){
   const [R0,R1,R2] = __demo.db.config.rotations;
   const db = __demo.db, CF = GRMP.D.cohortFacts(db);
   return `<h1 class="co-title">Configuration</h1>
-  <p class="co-sub">Everything a new cycle needs — dates, windows, reminders, roles — is configuration, not code. Cycle 2 or another university launches by editing this page.</p>
+  <p class="co-sub">Everything a new cycle needs — dates, windows, reminders, roles — is configuration, not code. The next cycle or another university launches by editing this page.</p>
   ${inferred('Q8')}
   <div class="qcard"><b>Cycle</b><table class="tb" style="margin-top:8px"><tr><th>Rotation</th><th>Theme</th><th>Window</th></tr>
     ${db.config.rotations.map(r=>`<tr><td>R${r.n}</td><td>${r.label}</td><td>${r.start} → ${r.end}</td></tr>`).join('')}</table></div>
@@ -586,12 +616,4 @@ v_config(admin){
 },
 };
 
-/* selector-based replacement action (needs the select value) */
-Actions_replaceMentorSel_init = false;
-document.addEventListener('click', e=>{
-  const b = e.target.closest('[data-act="replaceMentorSel"]');
-  if(!b) return;
-  const sel = document.getElementById('bench-'+b.dataset.pair);
-  if(sel) window.__demo.Actions.replaceMentor({pair:b.dataset.pair, bench:sel.value, actor:b.dataset.actor});
-});
 

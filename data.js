@@ -1,9 +1,9 @@
 /* GRMP Demo — state engine + seeded cohort.
    Single source of truth in localStorage. Deterministic seed (mulberry32) so tests are stable.
-   Demo date is fixed at 2025-12-15 (mid-cycle: R1 closed, R2 running) so every view has life. */
+   Demo date is fixed at 2026-12-15 (mid-cycle: R1 closed, R2 running) so every view has life. */
 
 const DB_KEY = 'grmp_demo_v5';   // bumped: submitted mentors + sign-out
-const TODAY = '2025-12-15';
+const TODAY = '2026-12-15';
 
 /* Node compatibility: same file runs headless for CLI backend tests (localStorage shim). */
 if (typeof localStorage === 'undefined') {
@@ -17,7 +17,7 @@ if (typeof localStorage === 'undefined') {
 
 /* ---------- deterministic PRNG ---------- */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-const rnd = mulberry32(20251215);
+const rnd = mulberry32(20261215);
 const pick = arr => arr[Math.floor(rnd()*arr.length)];
 const pickN = (arr,n)=>{const c=[...arr],out=[];while(out.length<n&&c.length)out.push(c.splice(Math.floor(rnd()*c.length),1)[0]);return out};
 
@@ -71,7 +71,7 @@ function buildSeed(){
     const p = {id, kind, track, name,
       email: name.toLowerCase().replace(/[^a-z ]/g,'').replace(/ +/g,'.') + (kind==='mentor'?'@example.com':'@smu.example.edu'),
       mobile: '+65 9'+String(100+Math.floor(rnd()*900))+' '+String(1000+Math.floor(rnd()*9000)),
-      appStatus, submittedAt:'2025-08-'+String(20+Math.floor(rnd()*10)),
+      appStatus, submittedAt:'2026-08-'+String(20+Math.floor(rnd()*10)),
       ack:null, orientation:null, source:'form'};
     if(kind==='mentor'){
       Object.assign(p,{org:posting[0], role:pick(MENTOR_ROLES[track]), industry:ind,
@@ -107,12 +107,12 @@ function buildSeed(){
   for(let i=0;i<2;i++) mk('mentee',pick(['general','ai']),'submitted');   // still in screening
 
   /* acknowledgement + orientation: all accepted done EXCEPT 2 late mentees (gate demo) */
-  const DOCS = ['rules','charter','governance','pdpa','coi'];
+  const DOCS = ['rules','pdpa','coi'];   // Owner F0806-235605: Charter & Grievance folded into Rules by reference
   const lateAck = pickN(mentees.filter(e=>e.appStatus==='accepted'),2);
   people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus)).forEach(p=>{
-    if(lateAck.includes(p)){ p.ack = {rules:'2025-09-08'}; p.orientation=null; return; }   // partial ack, blocked
-    p.ack = Object.fromEntries(DOCS.map(d=>[d,'2025-09-0'+(2+Math.floor(rnd()*7))]));
-    p.orientation = {mode: rnd()<0.7?'live':'recorded', at:'2025-09-'+String(15+Math.floor(rnd()*10))};
+    if(lateAck.includes(p)){ p.ack = {rules:'2026-09-08'}; p.orientation=null; return; }   // partial ack, blocked
+    p.ack = Object.fromEntries(DOCS.map(d=>[d,'2026-09-0'+(2+Math.floor(rnd()*7))]));
+    p.orientation = {mode: rnd()<0.7?'live':'recorded', at:'2026-09-'+String(15+Math.floor(rnd()*10))};
   });
 
   /* reviews: every non-new applicant has 2 reviewer scores */
@@ -141,8 +141,8 @@ function buildSeed(){
       // Spread over the approval window. A Programme Lead works through a matching board
       // across several evenings; 43 pairs stamped with one identical date reads as generated.
       status:statusPlan,
-      approvedAt: rotation===1 ? '2025-09-'+String(24+Math.floor(rnd()*5)).padStart(2,'0')
-                               : '2025-11-'+String(26+Math.floor(rnd()*5)).padStart(2,'0'),
+      approvedAt: rotation===1 ? '2026-09-'+String(24+Math.floor(rnd()*5)).padStart(2,'0')
+                               : '2026-11-'+String(26+Math.floor(rnd()*5)).padStart(2,'0'),
       rationale:[`Same track (${TRACKS[mentee.track].label}) and mentee's development needs match the mentor's background`,
                  `Mentee aims to ${mentee.goals}; mentor brings ${mentor.background}`,
                  `Capacity and no-repeat checks passed`]};
@@ -152,7 +152,7 @@ function buildSeed(){
   const r1=[]; activeMentees.filter(e=>!lateAck.includes(e)).forEach(e=>{const p=pairUp(1,e,'approved'); if(p)r1.push(p)});
   const r1Missing = pickN(r1,3);
   r1.forEach(p=>{ if(!r1Missing.includes(p)){ p.status='closed';
-      p.closeoff={metTwice:true,reflectionDone:true,at:'2025-11-'+String(25+Math.floor(rnd()*5)),comment:pick(['Great pairing.','Learned a lot.','We clicked well.',''])};}});
+      p.closeoff={metTwice:true,reflectionDone:true,at:'2026-11-'+String(25+Math.floor(rnd()*5)),comment:pick(['Great pairing.','Learned a lot.','We clicked well.',''])};}});
   // R2: most paired; 8 mentees left unmatched (live matching demo); 1 mentor dropout staged
   const unmatchedR2 = pickN(activeMentees.filter(e=>!lateAck.includes(e)),6).concat(lateAck); // 8 total, incl. 2 gate-blocked
   activeMentees.forEach(e=>{ if(!unmatchedR2.includes(e)) pairUp(2,e,'approved'); });
@@ -160,7 +160,7 @@ function buildSeed(){
   const byMentor={}; pairs.filter(p=>p.rotation===2).forEach(p=>{(byMentor[p.mentorId]=byMentor[p.mentorId]||[]).push(p)});
   const dropMentorId = Object.keys(byMentor).find(k=>byMentor[k].length===2) || Object.keys(byMentor)[0];
   const dropped = people.find(p=>p.id===dropMentorId);
-  dropped.droppedOut = {at:'2025-12-10', reason:'work relocation'};
+  dropped.droppedOut = {at:'2026-12-10', reason:'work relocation'};
   byMentor[dropMentorId].forEach(p=>{p.status='rematch_needed'});
 
   /* fast-forward previews: 2 mentees with all 3 rotations closed (certificate/builder-reflection demo) */
@@ -170,56 +170,66 @@ function buildSeed(){
   const preview = pickN(activeMentees.filter(e=>!unmatchedR2.includes(e) && !r1MissingMentees.has(e.id)),2);
   preview.forEach(e=>{
     const pr2 = pairs.find(p=>p.rotation===2 && p.menteeId===e.id);
-    if(pr2){pr2.status='closed'; pr2.closeoff={metTwice:true,reflectionDone:true,at:'2025-12-14',comment:''};}
-    const p3=pairUp(3,e,'closed'); if(p3){p3.approvedAt='2026-02-01';p3.closeoff={metTwice:true,reflectionDone:true,at:'2026-03-10',comment:''};p3.preview=true;}
+    if(pr2){pr2.status='closed'; pr2.closeoff={metTwice:true,reflectionDone:true,at:'2026-12-14',comment:''};}
+    const p3=pairUp(3,e,'closed'); if(p3){p3.approvedAt='2027-02-01';p3.closeoff={metTwice:true,reflectionDone:true,at:'2027-03-10',comment:''};p3.preview=true;}
     e.previewFastForward = true;
   });
   /* The fast-forward pairs exist so every late-cycle surface has something real to show
      TODAY. They close R3 in the seed — so their paperwork must exist too, or Submissions
      sits empty and the whole preview idea stops half-way. One preview mentee gets her
-     Builder Reflection (→ "Ready to issue" demonstrates the happy path on Certificates);
+     Builder’s Commitment (→ "Ready to issue" demonstrates the happy path on Certificates);
      the other stays without (→ the ✗ shows what the rule still demands). */
   const midreviews=[], builderReflections=[];
   const pvMentors=[...new Set(pairs.filter(p=>p.preview||p.rotation===2&&preview.some(e=>e.id===p.menteeId))
     .map(p=>p.mentorId))].slice(0,2);
   const MIDTEXT=['Pairing is going well — we have met twice and are working through interview preparation. No support needed.',
                  'Good engagement from my mentee; we agreed on a networking plan for the new year. One scheduling wobble, resolved.'];
-  pvMentors.forEach((mid,i)=>midreviews.push({mentorId:mid, text:MIDTEXT[i%MIDTEXT.length], at:'2026-01-1'+(8+i)}));
-  if(preview[0]) builderReflections.push({menteeId:preview[0].id, at:'2026-03-12',
+  pvMentors.forEach((mid,i)=>midreviews.push({mentorId:mid, text:MIDTEXT[i%MIDTEXT.length], at:'2027-01-1'+(8+i)}));
+  const menteeMidReviews=[], endEvaluations=[];
+  if(preview[0]){
+    menteeMidReviews.push({menteeId:preview[0].id, text:'Mid-programme check-in: rotation pace works well; my mentor pushes me to prepare better questions.', at:'2027-01-20'});
+    endEvaluations.push({personId:preview[0].id, kind:'mentee', text:'GRMP delivered exactly what it promised — three genuinely different mentors and a habit of structured reflection.', at:'2027-03-11'});
+    endEvaluations.push({personId:pvMentors[0], kind:'mentor', text:'A strong close to the programme; my mentee arrived prepared every single session.', at:'2027-03-12'});
+  }
+  if(preview[1]){
+    menteeMidReviews.push({menteeId:preview[1].id, text:'Enjoying the rotations; the switch of mentors each rotation is the best part.', at:'2027-01-21'});
+    // deliberately NO end evaluation for preview[1] — the exception report needs a live case
+  }
+  if(preview[0]) builderReflections.push({menteeId:preview[0].id, at:'2027-03-12',
     text:'GRMP gave me three very different mirrors. I will pay it forward by mentoring two juniors in my CCA and starting a monthly peer career circle.'});
 
   /* events */
   const attendedKickoff = people.filter(p=>['accepted','reserve_bench'].includes(p.appStatus) && p.orientation).map(p=>p.id);
   const events = {
     // Dates below are CONFIRMED by the programme team (Wei Kiat, 4 Aug) — no longer placeholders.
-    kickoff:      {name:'Kickoff Night', date:'2025-10-01', time:'7.30–9.00 pm', venue:'Alcove', attendance:pickN(attendedKickoff, Math.floor(attendedKickoff.length*0.9))},
-    appreciation: {name:'Appreciation Night', date:'2026-03-26', venue:'to be confirmed', attendance:[]},
+    kickoff:      {name:'Kickoff Night', date:'2026-10-01', time:'7.30–9.00 pm', venue:'Alcove', attendance:pickN(attendedKickoff, Math.floor(attendedKickoff.length*0.9))},
+    appreciation: {name:'Appreciation Night', date:'2027-03-26', venue:'to be confirmed', attendance:[]},
   };
 
   /* concerns: 1 sample referral */
-  const concerns = [{id:'C001', at:'2025-11-18', from:'(mentee — identity visible to Escalation Owner only)',
+  const concerns = [{id:'C001', at:'2026-11-18', from:'(mentee — identity visible to Escalation Owner only)',
     summary:'Raised a concern about repeated last-minute cancellations', status:'referred to SMC Grievance process'}];
 
   /* email log (what would have been sent) */
   const emails = [
-    {at:'2025-09-01', to:'all accepted', subject:'Welcome to the programme — please acknowledge the Programme Rules', kind:'ack_notify'},
-    {at:'2025-09-08', to:'12 outstanding', subject:'Reminder: acknowledgement outstanding', kind:'ack_remind'},
-    {at:'2025-09-15', to:'4 outstanding', subject:'Final reminder: acknowledgement required to be matched', kind:'ack_final'},
-    {at:'2025-09-28', to:'all matched pairs', subject:'Your Rotation 1 match — Know Yourself', kind:'match'},
-    {at:'2025-11-25', to:'mentees', subject:'Rotation 1 close-off — two quick confirmations', kind:'closeoff'},
-    {at:'2025-11-30', to:'all matched pairs', subject:'Your Rotation 2 match — Know Your World', kind:'match'},
+    {at:'2026-09-01', to:'all accepted', subject:'Welcome to the programme — please acknowledge the Programme Rules', kind:'ack_notify'},
+    {at:'2026-09-08', to:'12 outstanding', subject:'Reminder: acknowledgement outstanding', kind:'ack_remind'},
+    {at:'2026-09-15', to:'4 outstanding', subject:'Final reminder: acknowledgement required to be matched', kind:'ack_final'},
+    {at:'2026-09-28', to:'all matched pairs', subject:'Your Rotation 1 match — Know Yourself', kind:'match'},
+    {at:'2026-11-25', to:'mentees', subject:'Rotation 1 close-off — two quick confirmations', kind:'closeoff'},
+    {at:'2026-11-30', to:'all matched pairs', subject:'Your Rotation 2 match — Know Your World', kind:'match'},
   ];
 
   /* preset accounts: 6 admins + 5 participant personas (picked deterministically) */
-  const DOCS5=['rules','charter','governance','pdpa','coi'];
+  const DOCS5=['rules','pdpa','coi'];
   const acctGate = people.find(p=>p.kind==='mentee'&&p.appStatus==='accepted'&&!(p.ack&&DOCS5.every(k=>p.ack[k])));
   const acctFF   = people.find(p=>p.previewFastForward);
   const acctMid  = (pairs.find(x=>x.rotation===2&&x.status==='approved'&&!people.find(pp=>pp.id===x.menteeId).previewFastForward)||{}).menteeId;
   const acctMentor = (pairs.find(x=>x.rotation===2&&x.status==='approved')||{}).mentorId;
   const acctBench  = people.find(p=>p.appStatus==='reserve_bench');
   const accounts = [
-    {u:'esther',   pass:'grmp2026', kind:'admin', name:'Esther',    label:'Programme Lead'},
-    {u:'weikiat',  pass:'grmp2026', kind:'admin', name:'Wei Kiat',  label:'Programme Coordinator'},
+    {u:'esther',   pass:'grmp2026', kind:'admin', name:'Esther',    label:'Programme Owner'},
+    {u:'weikiat',  pass:'grmp2026', kind:'admin', name:'Wei Kiat',  label:'Programme Lead'},
     {u:'kenzie',   pass:'grmp2026', kind:'admin', name:'Kenzie',    label:'Mentor Reviewer (SMU)'},
     {u:'yutong',   pass:'grmp2026', kind:'admin', name:'Yu Tong',   label:'Mentor Reviewer (SMU)'},
     {u:'portia',   pass:'grmp2026', kind:'admin', name:'Portia',    label:'Mentee Reviewer (SMU)'},
@@ -235,40 +245,41 @@ function buildSeed(){
     version:1, today:TODAY,
     archives:[], aiCache:{}, sessions:{},
     config:{
-      cohort:{id:'C2025', label:'GRMP 2025 (SMU pilot)'},
+      cohort:{id:'C2026', label:'GRMP 2026 (SMU pilot)'},
       // Working Design: onboarding = "online guide, video briefing and acknowledgement".
       // The team pastes real recording links in Configuration; empty = placeholder player.
       // Two slots because mentor and mentee orientations are usually different sessions —
       // the mentor slot is optional and falls back to the shared/mentee one.
       orientationVideo:'', orientationVideoMentor:'',
-      registration:{opens:'2025-09-01', closes:'2025-09-10'},   // confirmed 4 Aug
+      registration:{opens:'2026-09-01', closes:'2026-09-10'},   // confirmed 4 Aug
       accounts,
-      cycle:'GRMP 2025 (SMU pilot)',
-      rotations:[{n:1,label:'Know Yourself',start:'2025-10-01',end:'2025-11-30'},
-                 {n:2,label:'Know Your World',start:'2025-12-01',end:'2026-01-31'},
-                 {n:3,label:'Know Your Path',start:'2026-02-01',end:'2026-03-31'}],
-      ackLadder:[{week:'Sept W1',date:'2025-09-01',what:'Acknowledgement notification'},
-                 {week:'Sept W2',date:'2025-09-08',what:'First reminder'},
-                 {week:'Sept W3',date:'2025-09-15',what:'Final reminder'}],
-      admins:[{name:'Esther', role:'Programme Lead', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
-              {name:'Wei Kiat', role:'Programme Coordinator', roles:['coordinator','mentor_reviewer','mentee_reviewer']},
+      cycle:'GRMP 2026 (SMU pilot)',
+      rotations:[{n:1,label:'Know Yourself',start:'2026-10-01',end:'2026-11-30'},
+                 {n:2,label:'Know Your World',start:'2026-12-01',end:'2027-01-31'},
+                 {n:3,label:'Know Your Path',start:'2027-02-01',end:'2027-03-31'}],
+      ackLadder:[{week:'Sept W1',date:'2026-09-01',what:'Acknowledgement notification'},
+                 {week:'Sept W2',date:'2026-09-08',what:'First reminder'},
+                 {week:'Sept W3',date:'2026-09-15',what:'Final reminder'}],
+      admins:[{name:'Esther', role:'Programme Owner', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
+              {name:'Wei Kiat', role:'Programme Lead', roles:['lead','coordinator','mentor_reviewer','mentee_reviewer','escalation']},
               {name:'Kenzie', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer']},
               {name:'Yu Tong', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer','dashboard_viewer']},
               {name:'Portia', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']},
               {name:'Sapranshu', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']}],
       openItems:{
-        Q1:{title:'Reflection Sheet is a public page participants use privately; the system records close-offs only, never the content', inferred:true},
-        Q2:{title:'Certificate after all 3 rotations (mentee: 3 close-offs + Builder Reflection; mentor: all rotations + mid-programme review)', inferred:true},
-        Q3:{title:'Matching follows your four Working Design criteria (development-need fit → industry → cross-cultural → diversity). Two parts are OURS and need your call: (1) the three tracks (General / Entrepreneurship / AI, matching strictly within track) are not in the Working Design — confirm or drop them; (2) the scoring weights and keyword rules are a first cut built on sample data — to be re-tuned with you once the real 2026 form fields are fixed.', inferred:true},
+        Q0:{title:'Roles: Esther is the Programme Owner (full access, final decisions); Wei Kiat is the Programme Lead running GRMP operations — he now holds the full operational permission set (decisions, matching, certificates, audit) on top of coordinator tools.', inferred:true, settled:{by:'Esther', on:'2026-08-06', via:'feedback F0806-181128'}},
+        Q1:{title:'Privacy boundary (Esther, F0806-173822): the system records close-offs only, never reflection content. The mid-prog review travels with the R2 close-off, the end-prog evaluation with the R3 close-off. Reflection Sheet & Conversation Guides are participant-only — opened from personal links, no longer public.', inferred:true, settled:{by:'Esther', on:'2026-08-06', via:'feedback F0806-173822 — built as decided'}},
+        Q2:{title:'Completion criteria (Esther, F0806-172216): certificates are printed & presented at Appreciation Night. Mentor: mid-prog review + end-prog evaluation. Mentee: 3 rotation close-offs + mid-prog review + end-prog evaluation + Builder’s Commitment. Near-misses go through the exception report with an audited approve-by-exception.', inferred:true, settled:{by:'Esther', on:'2026-08-06', via:'feedback F0806-172216 — built as decided'}},
+        Q3:{title:'Esther (F0806-175411): include AI matching wherever possible — direction accepted; scope, guardrails and what stays human-approved to be agreed on the call. Still open underneath: the three tracks are OUR addition (confirm or drop), and scoring weights are a first cut to re-tune with real form fields.', inferred:true},
         Q4:{title:'Form fields follow Working Design §3 until Joanne’s final form arrives', inferred:true},
         Q5:{title:'No acknowledgement after the final reminder → treated as withdrawn, seat freed', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'confirmed in-app'}},
-        Q6:{title:'Concern link on every public page + the acknowledgement page; Esther is sole recipient', inferred:true},
+        Q6:{title:'Concern link on every public page + the acknowledgement page. Primary recipient: Wei Kiat (Programme Lead, first point of contact); Esther as alternate escalation where further review is needed.', inferred:true, settled:{by:'Esther', on:'2026-08-06', via:'feedback F0806-174654'}},
         Q7:{title:'Lean scope: no pair/meeting/availability tracking, no kickoff-goals form, no reflection content stored', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'confirmed in-app'}},
-        Q8:{title:'For the real 2026 cycle: registration 1–10 Sept 2026 · Kick-Off Night 1 Oct 2026, 7.30–9.00 pm at Alcove · Appreciation Night 26 Mar 2027. (Rotation windows remain inferred; the site launch date sits with Esther.)', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'group message — dates entered into the system'}},
+        Q8:{title:'Registration 1–10 Sept 2026 · Kick-Off Night 1 Oct 2026, 7.30–9.00 pm at Alcove · Appreciation Night 26 Mar 2027. (Rotation windows remain inferred; the site launch date sits with Esther.)', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'group message — dates entered into the system'}},
       },
     },
     people, reviews, pairs, events, concerns, emails,
-    midreviews, builderReflections, certificates:[], audit:[],
+    midreviews, builderReflections, menteeMidReviews, endEvaluations, certificates:[], audit:[],
   };
 }
 
@@ -287,7 +298,7 @@ const D = {
   person:(db,id)=>db.people.find(p=>p.id===id),
   mentors:db=>db.people.filter(p=>p.kind==='mentor'),
   mentees:db=>db.people.filter(p=>p.kind==='mentee'),
-  ackComplete:p=>p.ack && ['rules','charter','governance','pdpa','coi'].every(d=>p.ack[d]),
+  ackComplete:p=>p.ack && ['rules','pdpa','coi'].every(d=>p.ack[d]),
   gateBlocked:p=>['accepted'].includes(p.appStatus) && !(D.ackComplete(p) && p.orientation),
   currentRotation:db=>{const t=db.today;return db.config.rotations.find(r=>t>=r.start&&t<=r.end)||null},
   pairsFor:(db,personId)=>db.pairs.filter(p=>p.mentorId===personId||p.menteeId===personId),
@@ -317,7 +328,9 @@ const D = {
     const inst=(label.match(/\(([^)]*?)(?:\s+pilot)?\)/i)||[])[1]||'';
     const ackStart=(c.ackLadder&&c.ackLadder[0]&&c.ackLadder[0].date)||r[0].start;
     const kickoff=(db.events&&db.events.kickoff&&db.events.kickoff.date)||r[0].start;
+    const appre = db.events && db.events.appreciation && db.events.appreciation.date;
     return {label, short, inst,
+      appreciationDate: appre ? `${D.monthName(appre)} ${appre.slice(8,10).replace(/^0/,'')}, ${appre.slice(0,4)}` : null,
       mentors: db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)).length,
       mentees: db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length,
       bench:   db.people.filter(p=>p.appStatus==='reserve_bench').length,
@@ -335,13 +348,39 @@ const D = {
   capacityLeft:(db,mentorId,rotation)=>2 - db.pairs.filter(p=>p.rotation===rotation&&p.mentorId===mentorId&&p.status!=='rejected').length,
   repeatMentor:(db,menteeId,mentorId)=>db.pairs.some(p=>p.menteeId===menteeId&&p.mentorId===mentorId&&p.status!=='rejected'),
   menteeCloseoffs:(db,menteeId)=>db.pairs.filter(p=>p.menteeId===menteeId&&p.status==='closed'&&p.closeoff),
-  certEligible:(db,p)=>{
+  /* Owner-decided rule (F0806-172216). Certificates are presented physically at
+     Appreciation Night; "issuing" here records qualification and readiness.
+     Mentee: 3 close-offs + mid-prog review + end-prog evaluation + Builder's Commitment.
+     Mentor: mid-prog feedback + end-prog evaluation. */
+  certMissing:(db,p)=>{
+    const miss=[];
     if(p.kind==='mentee'){
-      return D.menteeCloseoffs(db,p.id).length>=3 && db.builderReflections.some(b=>b.menteeId===p.id);
+      const co=D.menteeCloseoffs(db,p.id).length;
+      if(co<3) miss.push(`${3-co} rotation close-off${3-co>1?'s':''}`);
+      if(!(db.menteeMidReviews||[]).some(m=>m.menteeId===p.id)) miss.push('mid-prog review (R2 close-off)');
+      if(!(db.endEvaluations||[]).some(e=>e.personId===p.id)) miss.push('end-prog evaluation (R3 close-off)');
+      if(!db.builderReflections.some(b=>b.menteeId===p.id)) miss.push("Builder's Commitment");
+    } else {
+      if(!db.midreviews.some(m=>m.mentorId===p.id)) miss.push('mid-prog feedback');
+      if(!(db.endEvaluations||[]).some(e=>e.personId===p.id)) miss.push('end-prog evaluation');
     }
-    const served = db.pairs.some(x=>x.mentorId===p.id&&['approved','closed'].includes(x.status));
-    const earlyServed = db.pairs.some(x=>x.mentorId===p.id&&x.rotation<=2&&['approved','closed','replaced'].includes(x.status));
-    return served && (!earlyServed || db.midreviews.some(m=>m.mentorId===p.id));
+    return miss;
+  },
+  certEligible:(db,p)=>D.certMissing(db,p).length===0,
+  /* Approve-by-exception (F0806-232836): a lead may certify someone who misses a
+     criterion, with a mandatory reason — recorded on the certificate and audited. */
+  approveByException(db, personId, reason, actor){
+    const p=D.person(db,personId);
+    if(!p || db.certificates.some(c=>c.personId===personId)) return null;
+    const missing=D.certMissing(db,p);
+    if(!missing.length) return null;                       // nothing exceptional about it
+    if(!reason || !String(reason).trim()) return null;     // the audit trail needs a why
+    db.certificates.push({personId, at:db.today,
+      byException:{by:actor, reason:String(reason).trim().slice(0,300), missing}});
+    db.emails.push({at:db.today,to:p.email,kind:'certificate',
+      subject:`Your ${db.config.cohort.label.replace(/\s*\(.*\)\s*/,'')} certificate (approved by exception), ${p.name}`});
+    D.logAudit(db, db.today, actor, 'certificate_by_exception:'+missing.join('+'), personId);
+    return db.certificates[db.certificates.length-1];
   },
   aiSummary:p=>{                                   // simulated AI output, clearly labelled in UI
     if(p.kind==='mentor')
@@ -412,7 +451,7 @@ const D = {
     const missing = required.filter(k=>!fields[k]);
     const id=(kind==='mentor'?'M':'E')+String(900+db.people.filter(p=>p.id[0]===(kind==='mentor'?'M':'E')).length);
     const p={id,kind,track:fields.track||null,name:fields.name||'(no name)',email:fields.email||'',mobile:fields.mobile||'',
-      appStatus:missing.length?'incomplete':'submitted',submittedAt:db.today,ack:null,orientation:null,source:'form',...fields};
+      appStatus:missing.length?'draft':'submitted',submittedAt:db.today,ack:null,orientation:null,source:'form',...fields};
     // A3: a second application on a known email flags BOTH records for a human to look
     // at — never silently merged (loses data) and never rejected (locks out a genuine
     // re-submission after a typo).
@@ -424,9 +463,11 @@ const D = {
       D.logAudit(db, db.today, 'system', 'duplicate_email_flagged', id);
     }
     db.people.push(p);
-    db.emails.push({at:db.today,to:p.email||'(applicant)',kind:missing.length?'missing_info':'confirm',
-      subject:missing.length?`Your GRMP application is missing: ${missing.join(', ')}`:`GRMP: application received — thank you, ${p.name}`});
-    D.logAudit(db, db.today, 'system', missing.length?'application_incomplete':'application_submitted', id);
+    if(!missing.length){
+      db.emails.push({at:db.today,to:p.email||'(applicant)',kind:'confirm',
+        subject:`GRMP: application received — thank you, ${p.name}`});
+    }
+    D.logAudit(db, db.today, 'system', missing.length?'application_draft_saved':'application_submitted', id);
     return {person:p,missing};
   },
   score(db, personId, reviewer, score, comment){
@@ -546,10 +587,22 @@ const D = {
     }
     D.logAudit(db, db.today, actor, 'pair_approved', pairId);
   },
-  closeoff(db, pairId, metTwice, reflectionDone, comment){
+  closeoff(db, pairId, metTwice, reflectionDone, comment, extraText){
     const pr=db.pairs.find(p=>p.id===pairId);
     pr.status='closed'; pr.closeoff={metTwice,reflectionDone,comment:comment||'',at:db.today};
+    // Owner F0806-173822: the R2 close-off carries the mentee's mid-prog review,
+    // the R3 close-off carries their end-prog evaluation.
+    if(extraText && String(extraText).trim()){
+      const t=String(extraText).trim().slice(0,2000);
+      if(pr.rotation===2) db.menteeMidReviews=(db.menteeMidReviews||[]), db.menteeMidReviews.push({menteeId:pr.menteeId,text:t,at:db.today});
+      if(pr.rotation===3) db.endEvaluations=(db.endEvaluations||[]), db.endEvaluations.push({personId:pr.menteeId,kind:'mentee',text:t,at:db.today});
+    }
     D.logAudit(db, db.today, pr.menteeId, 'closeoff', pairId);
+  },
+  submitEndEvaluation(db, personId, text){
+    db.endEvaluations=(db.endEvaluations||[]);
+    db.endEvaluations.push({personId, kind:(D.person(db,personId)||{}).kind||'mentor', text:String(text||'').trim().slice(0,2000), at:db.today});
+    D.logAudit(db, db.today, personId, 'end_evaluation', personId);
   },
   submitMidReview(db, mentorId, text){
     db.midreviews.push({mentorId,text,at:db.today});
@@ -633,7 +686,7 @@ const D = {
     const keep = carry ? db.people.filter(p=>p.kind==='mentor'&&['accepted','reserve_bench'].includes(p.appStatus)) : [];
     keep.forEach(m=>{ m.appStatus='invited'; m.ack=null; m.orientation=null; delete m.droppedOut; });
     db.people = keep;
-    db.reviews=[]; db.pairs=[]; db.midreviews=[]; db.builderReflections=[]; db.certificates=[]; db.concerns=[];
+    db.reviews=[]; db.pairs=[]; db.midreviews=[]; db.menteeMidReviews=[]; db.endEvaluations=[]; db.builderReflections=[]; db.certificates=[]; db.concerns=[];
     db.emails=[{at:opts.today,to:carry?keep.length+' returning mentors':'—',kind:'decision',
       subject:`${opts.label}: invitation to return as a mentor`}];
     const newId = 'C'+(opts.rotations[0].start||'').slice(0,4);

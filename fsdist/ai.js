@@ -1,20 +1,46 @@
-/* GRMP Demo — live AI layer (Gemini free tier), with graceful degradation.
-   Design: pages render instantly with the simulated text, then upgrade in place
-   when Gemini responds. Any failure (timeout / quota / offline) silently keeps
-   the simulated version — the demo can never break because of the AI.
-   The key is a free-tier demo key by deliberate choice; responses are cached
-   per browser so each summary is generated once. Automated test runs
+/* GRMP Demo — live AI layer, with graceful degradation.
+   Design: pages render instantly with the deterministic text, then upgrade in place
+   when the model responds. Any failure (timeout / quota / offline / no key) silently
+   keeps the deterministic version — the demo can never break because of the AI.
+
+   No API key ever reaches this file or the browser. Calls go to a server-side proxy
+   (Apps Script) that holds the key in Script Properties. The previous build shipped a
+   key in client JS; a public repo plus a vendor secret-scanner killed it inside a day.
+
+   Results are cached per browser, and pair rationales are additionally written back to
+   the shared database, so each one is generated once for everyone. Automated test runs
    (navigator.webdriver) skip live calls entirely. */
 
 const AI = {
-  key: 'AIzaSyB6OATmFTq1xAZvkAqA1Ch_FJUQHNSoFsw',
-  model: 'gemini-flash-latest',
-  enabled: (typeof navigator!=='undefined' && !navigator.webdriver),
+  proxy: (typeof window!=='undefined' && window.AI_PROXY_URL) || '',
+  enabled: (typeof navigator!=='undefined' && !navigator.webdriver
+            && !!(typeof window!=='undefined' && window.AI_PROXY_URL)),
   cache: (()=>{ try{ return JSON.parse(localStorage.getItem('grmp_ai_cache')||'{}'); }catch(e){ return {}; } })(),
+  cooldown: 0,                                   // set only after repeated hard failures
+  misses: 0,
+  _chain: Promise.resolve(),                     // Apps Script serialises executions per user;
+                                                 // firing six at once makes most of them fail
 
-  async gen(id, prompt){
+  /* One at a time, in the order the cards appear. Each card still upgrades the
+     moment its own call returns, so the page fills in progressively. */
+  gen(id, prompt){
+    const run = async () => {
+      const first = await this._gen(id, prompt);
+      if(first !== null) return first;
+      // Apps Script hands back a one-shot redirect URL that intermittently 404s on
+      // rapid successive calls. One retry after a breath clears almost all of them.
+      await new Promise(r=>setTimeout(r, 1500));
+      return this._gen(id, prompt);
+    };
+    const next = this._chain.then(run, run);
+    this._chain = next.then(()=>new Promise(r=>setTimeout(r,400))).catch(()=>{});
+    return next;
+  },
+
+  async _gen(id, prompt){
     if(this.cache[id]) return this.cache[id];
     if(!this.enabled) return null;
+    if(Date.now() < this.cooldown) return null;
     if(typeof google!=='undefined' && google.script && google.script.run){
       try{
         const txt = await new Promise((res,rej)=>google.script.run
@@ -25,21 +51,28 @@ const AI = {
       }catch(e){ return null; }
     }
     try{
-      const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 10000);
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`, {
+      const ctl = new AbortController(); const t = setTimeout(()=>ctl.abort(), 15000);
+      const r = await fetch(this.proxy, {
         method:'POST',
-        headers:{'Content-Type':'application/json','X-goog-api-key':this.key},
-        body:JSON.stringify({contents:[{parts:[{text:prompt}]}]}),
+        headers:{'Content-Type':'text/plain;charset=utf-8'},   // keeps it a CORS simple request
+        body:JSON.stringify({op:'ai', prompt}),
         signal:ctl.signal});
       clearTimeout(t);
-      if(!r.ok) return null;
+      if(!r.ok) return this.miss();
       const j = await r.json();
-      const txt = ((((j.candidates||[])[0]||{}).content||{}).parts||[]).map(p=>p.text||'').join('').trim();
-      if(!txt) return null;
-      this.cache[id]=txt;
+      if(!j.ok || !j.text) return this.miss();
+      this.misses = 0;
+      this.cache[id]=j.text;
       try{ localStorage.setItem('grmp_ai_cache', JSON.stringify(this.cache)); }catch(e){}
-      return txt;
-    }catch(e){ return null; }
+      return j.text;
+    }catch(e){ return this.miss(); }                 // also covers a non-JSON reply
+  },
+
+  /* One bad call is normal (a slow upstream, a queued Apps Script execution).
+     Only back off once failures repeat, so a single blip never silences the page. */
+  miss(){
+    if(++this.misses >= 2) this.cooldown = Date.now() + 60000;
+    return null;
   },
 
   summaryPrompt(p){
@@ -56,12 +89,23 @@ Do NOT recommend accepting or rejecting. No greetings, no markdown, plain text o
 Application data: ${JSON.stringify(data)}`;
   },
 
-  rationalePrompt(mentor, mentee){
-    return `A Singapore mentorship programme pairs mentees with mentors inside the same track.
-In exactly 3 short plain-language lines (one reason per line, no markdown, no numbering),
-explain why this pairing could work well. Be specific to the data.
-Mentee: ${JSON.stringify({course:mentee.course, year:mentee.year, goals:mentee.goals, needs:mentee.devNeeds, industryInterest:mentee.industryInterest, track:mentee.track})}
-Mentor: ${JSON.stringify({role:mentor.role, organisation:mentor.org, industry:mentor.industry, background:mentor.background, motivation:mentor.motivation, track:mentor.track})}`;
+  /* The system decides the pairing and computes why. The model's only job is to make
+     that reasoning readable. It is never asked to find reasons of its own — given raw
+     profiles it will invent alignments that are not there ("communications background
+     aligns with an interest in finance"), and the Programme Lead would be reading a
+     fabricated justification for a real decision. */
+  rationalePrompt(mentor, mentee, reasons){
+    return `Rewrite the following match reasons for a Singapore mentorship programme so a
+busy volunteer can scan them. Output exactly ${reasons.length} lines, one per input reason,
+in the same order. Plain text, no markdown, no numbering, no preamble.
+
+Rules you must follow:
+- Rephrase only. Do not add a reason, drop a reason, or merge them.
+- Do not claim any similarity, alignment or fit that is not stated in the input.
+- Keep every concrete fact (years, organisation, role, the named development need).
+
+Reasons:
+${reasons.map((r,i)=>`${i+1}. ${r}`).join('\n')}`;
   },
 };
 if (typeof window!=='undefined') window.AI = AI;

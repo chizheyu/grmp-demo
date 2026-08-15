@@ -7,7 +7,7 @@
    Firebase Auth + rules/Functions. */
 
 const FIRE = {
-  slices: ['people','pairs','reviews','midreviews','builderReflections','certificates',
+  slices: ['people','pairs','reviews','midreviews','menteeMidReviews','endEvaluations','builderReflections','certificates',
            'concerns','emails','audit','events','config','archives','aiCache','today','version'],
   fs: null,
   last: {},            // sliceName -> last JSON string seen (from snapshot or own write)
@@ -18,13 +18,22 @@ const FIRE = {
     if(typeof firebase==='undefined' || !window.FIREBASE_CONFIG) return false;
     firebase.initializeApp(window.FIREBASE_CONFIG);
     this.fs = firebase.firestore();
+    /* Proxied networks can wedge Firestore's streaming WebChannel (requests hang,
+       REST works). Auto-detect falls back to long-polling when that happens. */
+    try{ this.fs.settings({experimentalForceLongPolling:true, useFetchStreams:false, merge:true}); }catch(e){}
     return true;
   },
 
   assemble(docs){
     const db = {};
     docs.forEach(d => { db[d.id] = d.data().v; });
-    return this.slices.every(s => s in db) ? db : null;
+    if(!('people' in db)) return null;            // genuinely empty / mid-seed — wait
+    /* Schema evolution: a newly-added slice won't exist in a database written by the
+       previous build. Default it locally ([] — every optional slice is a collection)
+       instead of returning null, which would hang every client on "Connecting…"
+       until someone hand-wiped Firestore. persist() writes the backfill on first use. */
+    this.slices.forEach(s => { if(!(s in db)) db[s] = []; });
+    return db;
   },
 
   async seedIfEmpty(){
@@ -56,22 +65,28 @@ const FIRE = {
     });
   },
 
-  /* persist: diff current db against last-seen slice JSON; batch-write changes. */
+  /* persist: diff current db against last-seen slice JSON; batch-write changes.
+     `last` is updated ONLY after the commit resolves. The previous version updated it
+     optimistically before the write — one failed commit then poisoned the baseline, and
+     every later mutation that produced the same JSON diffed as "no change" and was
+     silently never written again. That is a data-loss machine, not an optimisation. */
   async persist(db){
     if(!this.ready) return;
     const col = this.fs.collection('state');
     const batch = this.fs.batch();
-    let n = 0;
+    const staged = [];
     this.slices.forEach(s=>{
       const now = JSON.stringify(db[s]===undefined?null:db[s]);
       if(this.last[s] !== now){
         batch.set(col.doc(s), {v: db[s]===undefined?null:db[s]});
-        this.last[s] = now;
-        n++;
+        staged.push([s, now]);
       }
     });
-    if(n) await batch.commit();
-    return n;
+    if(staged.length){
+      await batch.commit();                       // throws → last untouched → retried next persist
+      staged.forEach(([s, now])=>{ this.last[s] = now; });
+    }
+    return staged.length;
   },
 
   async resetAll(){

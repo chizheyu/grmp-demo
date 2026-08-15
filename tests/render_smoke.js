@@ -104,13 +104,29 @@ G.GRMP.D.startNewCycle(db, { label: 'GRMP 2031 (NTU pilot)', today: '2031-09-01'
 check('landing (new cycle)', () => {
   const html = V.landing();
   if (!/2031|2032/.test(html)) throw new Error('new-cycle dates missing from the page');
-  if (/\b2025\b|\b2026\b/.test(html)) throw new Error('old-cycle dates still rendered');
+  if (/\b2026\b|\b2027\b/.test(html)) throw new Error('old-cycle dates still rendered');
   if (!/NTU/.test(html)) throw new Error('institution not derived');
   return html;
 });
 for (const admin of db.config.admins)
   for (const [key] of C.navItems(db, admin.roles))
     check(`new-cycle ${admin.name} → ${key}`, () => C.shell(admin.name, key));
+
+console.log('— every data-act in shipped markup has a real Action behind it —');
+// The thread Reply buttons shipped dead because per-element binding missed
+// async-injected markup. Delegation fixed the wiring; this guard catches the
+// other failure mode — a data-act value with no Actions handler at all.
+{
+  const src = ['views_public.js','views_console.js','app.js']
+    .map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+  const used = new Set([...src.matchAll(/data-act="([a-zA-Z]+)"/g)].map(m => m[1]));
+  const actionsSrc = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const bodyStart = actionsSrc.indexOf('const Actions');
+  const defined = new Set([...actionsSrc.slice(bodyStart).matchAll(/^  ([a-zA-Z]+)\(/gm)].map(m => m[1]));
+  const missing = [...used].filter(a => !defined.has(a));
+  T('all data-act values resolve to Actions (' + used.size + ' wired)', missing.length === 0,
+    missing.length ? 'no handler for: ' + missing.join(', ') : '');
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

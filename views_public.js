@@ -13,7 +13,6 @@ msNav(){
     <span class="spacer"></span>
     <a href="#/guide/mentee">For Mentees</a>
     <a href="#/guide/mentor">For Mentors</a>
-    <a href="#/reflection">Reflection Sheet</a>
     <a href="#/apply/mentee" class="btn sm" style="background:#fff;color:var(--red);border-radius:8px">Apply</a>
     ${(typeof NET!=='undefined'&&NET)?(SESSION?`<a href="${SESSION.identity&&SESSION.identity.kind==='person'?'#/me/'+SESSION.identity.personId:'#/console/'+encodeURIComponent((SESSION.identity&&SESSION.identity.name)||'')}" style="font-size:12px;opacity:.95">👤 ${esc((SESSION.identity&&SESSION.identity.name)||'me')}</a>`:`<a href="#/login" style="font-size:12.5px;font-weight:700">Sign in</a>`):''}
   </div></nav>`;
@@ -112,7 +111,7 @@ landing(){
   </div></section>
 
   <section class="ms-section" style="background:var(--ai-wash);border-top:1px solid var(--line)"><div class="wrap" style="text-align:center">
-    <h2 style="margin-bottom:6px">Applications for Cycle 1 are open</h2>
+    <h2 style="margin-bottom:6px">Applications are open</h2>
     <p class="lede" style="margin:0 auto 18px">Reviewed by the programme team, with an outcome by email. One form, no account.</p>
     <div class="cta" style="justify-content:center">
       <a class="btn btn-primary" href="#/apply/mentee" style="text-decoration:none">Apply as Mentee</a>
@@ -136,7 +135,7 @@ guideMentee(){
     <div class="doc-card"><h3>Conduct</h3><ul>
       <li>Respect your mentor's time and confidentiality. Mentorship is guidance, not job placement.</li>
       <li>Concerns can be raised privately via the link in the footer.</li></ul></div>
-    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — final wording comes from the programme team's mentee guide.</p>
+    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — the final Mentee Guide comes from Marylyn, GRMP’s content creator.</p>
   </div>` + this.msFooter();
 },
 guideMentor(){
@@ -151,12 +150,23 @@ guideMentor(){
       <li>Mentorship is not recruitment; avoid conflicts of interest.</li></ul></div>
     <div class="doc-card"><h3>Your one checkpoint</h3><ul>
       <li>A single short mid-programme review in ${F().midMonth} — two minutes, on your personal page.</li></ul></div>
-    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — final wording comes from the programme team's mentor brief.</p>
+    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — the final Mentor Brief comes from Marylyn, GRMP’s content creator.</p>
   </div>` + this.msFooter();
 },
 
 /* ---------- 1.3 reflection sheet ---------- */
-reflection(){
+reflection(pid){
+  const db=__demo.db;
+  const asPerson = pid && GRMP.D.person(db, pid);
+  const asAdmin = (typeof SESSION!=='undefined') && SESSION && SESSION.identity && SESSION.identity.kind!=='person';
+  if(!asPerson && !asAdmin){
+    return this.msNav() + `<div class="doc-page"><h1>Reflection Sheet</h1>
+      <div class="doc-card"><h3>🔒 For programme participants</h3>
+      <p style="font-size:13.5px">The Reflection Sheet and Conversation Guides are shared with accepted participants only —
+      open this page from <b>your personal link</b> (the one in your acceptance email). Decided by the Programme Owner.</p>
+      <p style="font-size:12.5px;color:var(--ink-3)">Not in the programme yet? <a href="#/apply/mentee">Apply as a mentee</a> or <a href="#/apply/mentor">register as a mentor</a>.</p></div>
+    </div>` + this.msFooter();
+  }
   return this.msNav() + `<div class="doc-page">
     <h1>Reflection Sheet</h1>
     <div class="privacy-note">🔒 <span>This reflection is <b>yours</b>. The platform never stores what you write here —
@@ -249,7 +259,7 @@ apply(kind){
         <span>I consent to SMC collecting and using this information to run GRMP, per the PDPA consent statement. <span class="req">*</span></span></label>
       <button class="btn btn-primary" data-act="submitApply" data-kind="${kind}">Submit ${mentee?'application':'registration'}</button>
       <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Submitting with missing required fields saves your application as
-        <b>incomplete</b> and sends a reminder — try it: that behaviour is part of the demo.</p>
+        a <b>draft</b> you can return to and finish — no reminder emails. Only complete, submitted applications enter selection.</p>
     </div>
   </div>` + this.msFooter();
 },
@@ -261,7 +271,7 @@ applied(personId){
   const ok = p.appStatus==='submitted';
   return this.msNav() + `<div class="doc-page" style="max-width:560px;text-align:center">
     <div style="font-size:44px;margin:16px 0">${ok?'✅':'🟡'}</div>
-    <h1 style="font-size:24px">${ok?'Application received':'Saved — but incomplete'}</h1>
+    <h1 style="font-size:24px">${ok?'Application received':'Saved as a draft'}</h1>
     <p class="lede">${ok
       ? `Thank you, ${esc(p.name)}. A confirmation email is on its way. The programme team reviews applications and you'll hear the outcome by email — every next step will arrive as a personal link, no account needed.`
       : `We saved what you entered, ${esc(p.name)}, and emailed you a reminder listing what's missing. Your application enters review once it's complete.`}</p>
@@ -289,28 +299,57 @@ changelog(){
   setTimeout(async ()=>{
     const box = document.getElementById('cl-body');
     if(!box) return;
+    /* Re-renders arrive constantly (every remote onSnapshot). Serve the cached list
+       instantly so the page never flashes back to Loading, and never write into a
+       box that a newer render has already replaced. */
+    if(Views.__clCache && Date.now()-Views.__clCacheAt<60000){
+      box.innerHTML = Views.__clCache; return;
+    }
     const url = (typeof FEEDBACK_URL!=='undefined') && FEEDBACK_URL;
     if(!url){ box.innerHTML = '<p style="color:var(--ink-3)">The feedback channel is being connected — check back shortly.</p>'; return; }
     try{
       const r = await fetch(url+'?list=1'); const j = await r.json();
       j.items = (j.items||[]).filter(it=>!String(it.page||'').startsWith('DECISION:'));
       if(!j.ok || !j.items.length){ box.innerHTML='<p style="color:var(--ink-3)">No feedback yet — be the first: every screen has a 💬 Feedback button.</p>'; return; }
+      /* conversation threads live in Firestore (outside /state, so demo resets keep them) */
+      let threads={};
+      const live = (typeof NET!=='undefined'&&NET&&typeof FIRE!=='undefined'&&FIRE.fs);
+      if(live){
+        try{
+          const snap = await FIRE.fs.collection('feedback_comments').get();
+          snap.docs.map(d=>d.data()).sort((a,b)=>String(a.ts).localeCompare(String(b.ts)))
+            .forEach(c=>{ (threads[c.fid]=threads[c.fid]||[]).push(c); });
+        }catch(e){}
+      }
       const chip = s => s==='fixed' ? '<span class="badge b-ok"><span class="d"></span>Fixed</span>'
         : s==='in_progress' ? '<span class="badge b-warn"><span class="d"></span>In progress</span>'
         : s==='wont_fix' ? '<span class="badge b-neut"><span class="d"></span>Not planned</span>'
         : '<span class="badge b-ai">New</span>';
-      box.innerHTML = j.items.map(it=>`<div class="doc-card" style="padding:14px 18px">
+      const html = j.items.map(it=>{
+        const th = threads[it.id]||[];
+        return `<div class="doc-card" style="padding:14px 18px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${chip(it.status)}
           <b style="font-size:13px">${it.author&&it.author!=='anonymous'?it.author:'Someone'}</b>
-          <span style="font-size:11.5px;color:var(--ink-3)">${it.ts} · on ${it.page} · as ${it.role}</span></div>
+          <span style="font-size:11.5px;color:var(--ink-3)">${fmtSGT(it.ts)} · on ${it.page} · as ${it.role}</span></div>
         <p style="font-size:13.5px;margin:8px 0 0">${it.text}</p>
-        ${it.note?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--ok);background:var(--ok-wash);border-radius:8px;padding:8px 12px"><b>Build team:</b> ${it.note}${it.resolvedAt?' · '+it.resolvedAt:''}</p>`:''}
-      </div>`).join('');
-    }catch(e){ box.innerHTML='<p style="color:var(--ink-3)">Could not load right now — refresh in a minute.</p>'; }
+        ${it.note?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--ok);background:var(--ok-wash);border-radius:8px;padding:8px 12px"><b>Build team:</b> ${it.note}${it.resolvedAt?' · '+fmtSGT(it.resolvedAt):''}</p>`:''}
+        ${th.length?`<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">${th.map(c=>{
+          const build=/build team/i.test(c.by||'');
+          return `<div style="font-size:12.5px;border:1px solid var(--line-2);border-radius:9px;padding:8px 12px;background:${build?'var(--surface-2)':'#FFF'};${build?'':'border-left:3px solid var(--red)'}">
+            <b>${esc(c.by||'')}</b> <span style="color:var(--ink-3);font-size:11px">· ${fmtSGT(c.ts)}</span>
+            <div style="margin-top:3px;white-space:pre-wrap">${esc(c.text||'')}</div></div>`;}).join('')}</div>`:''}
+        ${live?`<div style="display:flex;gap:6px;margin-top:10px">
+          <input type="text" id="cl-reply-${it.id}" placeholder="Reply in this thread — the build team answers here" style="flex:1;font-size:12.5px;padding:8px 11px;border:1px solid var(--line-2);border-radius:8px">
+          <button class="btn sm" data-act="fbReply" data-fid="${it.id}">Reply</button></div>`:''}
+      </div>`;}).join('');
+      Views.__clCache = html; Views.__clCacheAt = Date.now();
+      if(!document.contains(box)){ const b2=document.getElementById('cl-body'); if(b2) b2.innerHTML=html; return; }
+      box.innerHTML = html;
+    }catch(e){ if(document.contains(box)) box.innerHTML='<p style="color:var(--ink-3)">Could not load right now — refresh in a minute.</p>'; }
   }, 50);
   return this.msNav() + `<div class="doc-page">
     <h1>Changelog — your feedback, our fixes</h1>
-    <p class="lede">Every screen has a 💬 Feedback button. What you send lands here with a status; small fixes usually ship within a day.</p>
+    <p class="lede">Every screen has a 💬 Feedback button. What you send lands here with a status — and each item is a conversation: reply in the thread and the build team answers in the same place.</p>
     <div id="cl-body"><p style="color:var(--ink-3)">Loading…</p></div>
   </div>` + this.msFooter();
 },
@@ -325,11 +364,13 @@ decisions(){
       const chip = it.settled
         ? `<span class="badge b-ok"><span class="d"></span>Settled · ${it.settled.by} · ${it.settled.on} · ${it.settled.via}</span>`
         : dec ? (dec.kind==='confirm'
-        ? `<span class="badge b-ok"><span class="d"></span>Confirmed · ${dec.author} · ${dec.ts}</span>`
+        ? `<span class="badge b-ok"><span class="d"></span>Confirmed · ${dec.author} · ${fmtSGT(dec.ts)}</span>`
         : `<span class="badge b-warn"><span class="d"></span>Change requested · ${dec.author}</span>`)
         : '<span class="badge b-ai">Awaiting confirmation</span>';
       return `<div class="doc-card" style="padding:14px 18px">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${q}</b>${chip}</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b>${q}</b>${chip}
+          <span class="spacer" style="flex:1"></span>
+          <button class="btn sm btn-ghost" data-act="fbDiscuss" data-q="${q}">💬 Discuss</button></div>
         <p style="font-size:13.5px;margin:6px 0 0">${it.title}</p>
         ${dec&&dec.kind==='change'?`<p style="font-size:12.5px;margin:6px 0 0;color:var(--warn)">Requested: “${dec.text}”</p>`:''}
       </div>`;
@@ -355,6 +396,8 @@ personal(personId){
   const closed = mentee ? D.menteeCloseoffs(db, personId).length : null;
   const hasBR = db.builderReflections.some(b=>b.menteeId===personId);
   const hasMR = db.midreviews.some(m=>m.mentorId===personId);
+  const hasEE = (db.endEvaluations||[]).some(e=>e.personId===personId);
+  const hasMMR = (db.menteeMidReviews||[]).some(m=>m.menteeId===personId);
   const cert = db.certificates.some(c=>c.personId===personId);
   const eligible = D.certEligible(db, p);
 
@@ -362,9 +405,10 @@ personal(personId){
   const steps = mentee
     ? [['Applied',true],['Accepted',['accepted','reserve_bench'].includes(p.appStatus)],['Acknowledged',ackDone],
        ['Orientation',!!p.orientation],['R1',closed>=1],['R2',closed>=2],['R3',closed>=3],
-       ['Builder Reflection',hasBR],['Certificate',cert||eligible]]
+       ['Builder’s Commitment',hasBR],['Certificate',cert||eligible]]
     : [['Registered',true],['Accepted',['accepted','reserve_bench'].includes(p.appStatus)],['Acknowledged',ackDone],
-       ['Orientation',!!p.orientation],['Matched',myPairs.length>0],['Mid-programme review',hasMR],['Certificate',cert||eligible]];
+       ['Orientation',!!p.orientation],['Matched',myPairs.length>0],['Mid-prog feedback',hasMR],
+       ['End-prog evaluation',hasEE],['Certificate',cert||eligible]];
   let curIdx = steps.findIndex(s=>!s[1]); if(curIdx<0) curIdx = steps.length-1;
 
   /* --- next-step card --- */
@@ -383,11 +427,11 @@ personal(personId){
       ${nextCard}
     </div>`;
   }
-  const DOCS = [['rules','GRMP Programme Rules','v2.0'],['charter','SMC Charter','v1.3'],['governance','Governance Guidelines','v1.1'],['pdpa','PDPA Consent','v1.0'],['coi','Conflict-of-Interest Declaration','v1.0']];
+  const DOCS = [['rules','GRMP Programme Rules','v2.1'],['pdpa','PDPA Consent','v1.0'],['coi','Conflict-of-Interest Declaration','v1.0']];   // Rules v2.1 incorporates the SMC Charter and the Grievance & Misconduct Procedure by reference (Owner F0806-235605)
   if(!ackDone){
     nextCard = `<div class="card"><h3>📄 Acknowledge the programme documents</h3>
-      <p style="font-size:13px;color:var(--ink-2)">Five documents, each recorded with a timestamp and version.
-      <b>You can't be matched until all five are done.</b></p>
+      <p style="font-size:13px;color:var(--ink-2)">Three documents, each recorded with a timestamp and version. The Programme Rules incorporate the SMC Charter and the Grievance &amp; Misconduct Procedure by reference.
+      <b>You can't be matched until all three are done.</b></p>
       <div class="acklist">${DOCS.map(([k,nm,ver])=>{
         const done = p.ack && p.ack[k];
         return `<div class="ackrow"><span class="nm">${nm}</span><span class="ver">${ver}</span>
@@ -425,20 +469,26 @@ personal(personId){
         <p style="font-size:13px;color:var(--ink-2)">At the end of the rotation, confirm two things. The platform tracks nothing else about your meetings — it's on the two of you.</p>
         <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-met"><span>We met at least <b>twice</b> this rotation</span></label>
         <label class="f-check" style="margin:8px 0"><input type="checkbox" id="co-ref"><span>I completed my private reflection</span></label>
-        <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px 26px"><a href="#/reflection">Open the Reflection Sheet ↗</a></div>
+        <div style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px 26px"><a href="#/reflection/${p.id}">Open the Reflection Sheet ↗</a></div>
+        ${openPair.rotation===2?`<label class="f-label" style="margin-top:6px">Your mid-programme review <span style="color:var(--red)">*</span>
+          <span style="font-weight:400;color:var(--ink-3)"> — part of the R2 close-off; the programme team reads these</span></label>
+        <div class="f-row"><textarea id="co-extra" placeholder="How is the programme going for you at the halfway mark?"></textarea></div>`:''}
+        ${openPair.rotation===3?`<label class="f-label" style="margin-top:6px">Your end-of-programme evaluation <span style="color:var(--red)">*</span>
+          <span style="font-weight:400;color:var(--ink-3)"> — part of the R3 close-off; counts toward your certificate</span></label>
+        <div class="f-row"><textarea id="co-extra" placeholder="What did GRMP change for you? What should the next cohort know?"></textarea></div>`:''}
         <div class="f-row"><input type="text" id="co-comment" placeholder="Optional comment"></div>
-        <button class="btn btn-primary" data-act="closeoff" data-pair="${openPair.id}">Submit close-off</button>
+        <button class="btn btn-primary" data-act="closeoff" data-pair="${openPair.id}" data-rot="${openPair.rotation}">Submit close-off</button>
         ${rotEnded?'':`<p style="font-size:11.5px;color:var(--ink-3);margin:8px 0 0">Rotation ${openPair.rotation} runs until ${rotNow.end} — in the demo you can close off early.</p>`}</div>`;
     } else if(closed>=3 && !hasBR){
-      nextCard = `<div class="card"><h3>🏗 Your Builder Reflection</h3>
+      nextCard = `<div class="card"><h3>🏗 Your Builder’s Commitment</h3>
         <p style="font-size:13px;color:var(--ink-2)">You've completed all three rotations. Close the programme with a free-text
         reflection: how will you contribute back to the ecosystem that mentored you?</p>
-        <div class="f-row"><textarea id="br-text" placeholder="Write freely — there are no categories to pick (deferred to Cycle 2)"></textarea></div>
-        <button class="btn btn-primary" data-act="builder" data-person="${p.id}">Submit Builder Reflection</button></div>`;
+        <div class="f-row"><textarea id="br-text" placeholder="Write freely — no categories to pick"></textarea></div>
+        <button class="btn btn-primary" data-act="builder" data-person="${p.id}">Submit Builder’s Commitment</button></div>`;
     } else if(eligible && !cert){
       nextCard = `<div class="card"><h3>🎉 You qualify for your certificate</h3>
-        <p style="font-size:13px;color:var(--ink-2)">All three rotations closed + Builder Reflection submitted.
-        The Programme Lead issues certificates from the console — yours will arrive by email.</p></div>`;
+        <p style="font-size:13px;color:var(--ink-2)">Three close-offs, mid-programme review, end-of-programme evaluation and your Builder’s Commitment — all in.
+        Certificates are printed and presented at the Appreciation Night; you'll get an email when yours is ready.</p></div>`;
     } else if(!myPairs.length){
       nextCard = `<div class="card"><h3>🤝 Matching in progress</h3>
         <p style="font-size:13px;color:var(--ink-2)">You're cleared (acknowledged + orientated). The programme team is preparing
@@ -447,11 +497,18 @@ personal(personId){
   } else {                                     /* mentor next-steps */
     const servedEarly = GRMP.D.pairsFor(db,personId).some(x=>x.rotation<=2 && x.status!=='rejected');
     if(!hasMR && servedEarly){
-      nextCard = `<div class="card"><h3>📝 Mid-programme review (your one checkpoint)</h3>
+      nextCard = `<div class="card"><h3>📝 Mid-programme review (checkpoint 1 of 2)</h3>
         <p style="font-size:13px;color:var(--ink-2)">Two minutes in ${F().midMonth}: how is the pairing going, anything the team should know?
         (The demo lets you submit early.)</p>
         <div class="f-row"><textarea id="mr-text" placeholder="How is it going with your mentee(s)?"></textarea></div>
         <button class="btn btn-primary" data-act="midreview" data-person="${p.id}">Submit review</button></div>`;
+    } else if(hasMR && !hasEE){
+      nextCard = `<div class="card"><h3>🏁 End-of-programme evaluation</h3>
+        <p style="font-size:13px;color:var(--ink-2)">Your closing checkpoint, due by ${F().closingMonth} — how the mentoring went end-to-end,
+        and whether you'd serve again. Together with your mid-programme review it completes your certificate criteria.
+        (The demo lets you submit early.)</p>
+        <div class="f-row"><textarea id="ee-text" placeholder="How did the programme go, start to finish?"></textarea></div>
+        <button class="btn btn-primary" data-act="endeval" data-person="${p.id}">Submit evaluation</button></div>`;
     }
   }
 
@@ -471,16 +528,22 @@ personal(personId){
           <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+other.background):esc('Goal: '+other.goals)}</div>
         </div></div>
       ${x.status==='closed'&&x.closeoff&&x.closeoff.comment&&mentee?`<div style="margin-top:10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Your close-off note</b><br>“${esc(x.closeoff.comment)}”</div>`:''}
-      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>
+      <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection/${personId}">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>
     </div>`;
   }).join('');
 
   const myBR = db.builderReflections.find(b=>b.menteeId===personId);
   const myMR = db.midreviews.find(m=>m.mentorId===personId);
-  const brCard = (mentee&&myBR)?`<div class="card"><h3>🏗 Your Builder Reflection <span class="badge b-ok"><span class="d"></span>submitted ${myBR.at}</span></h3>
+  const brCard = (mentee&&myBR)?`<div class="card"><h3>🏗 Your Builder’s Commitment <span class="badge b-ok"><span class="d"></span>submitted ${myBR.at}</span></h3>
       <p style="font-size:13.5px;margin:0">“${esc(myBR.text)}”</p></div>`:'';
   const mrCard = (!mentee&&myMR)?`<div class="card"><h3>📝 Your mid-programme review <span class="badge b-ok"><span class="d"></span>submitted ${myMR.at}</span></h3>
       <p style="font-size:13.5px;margin:0">“${esc(myMR.text)}”</p></div>`:'';
+  const myMMR = mentee ? (db.menteeMidReviews||[]).find(m=>m.menteeId===personId) : null;
+  const mmrCard = myMMR?`<div class="card"><h3>📝 Your mid-programme review <span class="badge b-ok"><span class="d"></span>with your R2 close-off · ${myMMR.at}</span></h3>
+      <p style="font-size:13.5px;margin:0">“${esc(myMMR.text)}”</p></div>`:'';
+  const myEE = (db.endEvaluations||[]).find(e=>e.personId===personId);
+  const eeCard = myEE?`<div class="card"><h3>🏁 Your end-of-programme evaluation <span class="badge b-ok"><span class="d"></span>submitted ${myEE.at}</span></h3>
+      <p style="font-size:13.5px;margin:0">“${esc(myEE.text)}”</p></div>`:'';
   const certCard = cert ? `<div class="cert"><div style="font-size:11px;letter-spacing:.18em;font-weight:800;color:var(--gold)">SINGAPORE MENTORSHIP COMMITTEE</div>
       <h2>Certificate of Completion</h2><div class="nm">${esc(p.name)}</div>
       <div class="meta">${F().label} · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
@@ -494,7 +557,7 @@ personal(personId){
     </div>
     <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — no account, no password. That's by design.</div>
     <div class="steps">${steps.map((s,i)=>`<div class="step ${s[1]?'done':(i===curIdx?'cur':'')}"><div class="dot">${s[1]?'✓':i+1}</div><span>${s[0]}</span></div>`).join('')}</div>
-    ${nextCard}${certCard}${brCard}${mrCard}${pairCards}
+    ${nextCard}${certCard}${brCard}${mrCard}${mmrCard}${eeCard}${pairCards}
     ${inferred('Q2')}
   </div>`;
 },

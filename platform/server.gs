@@ -101,6 +101,8 @@ const PERMS = {
   promoteWaitlist: ['lead', 'coordinator'], toggleAttendance: ['lead', 'coordinator'],
   markDropout: ['lead', 'coordinator'],
   setOrientationVideos: ['lead', 'coordinator'],
+  approveByException: ['lead'],
+  submitEndEvaluation: ['participant', 'ADMIN'],
   withdrawUnacknowledged: ['lead', 'coordinator'],
   discardProposal: ['lead'], reassignProposal: ['lead'],
   remindCloseoff: ['lead', 'coordinator'],
@@ -143,7 +145,7 @@ function applyAction(token, fn, args) {
     if (!allowed_(id, fn, args || [], db)) return { ok: false, error: 'Not permitted for your role (' + id.label + ').', db: db };
     let out;
     if (fn === 'ackAllDocs') {
-      ['rules', 'charter', 'governance', 'pdpa', 'coi'].forEach(k => GRMP_EXPORT.D.acknowledge(db, args[0], k));
+      ['rules', 'pdpa', 'coi'].forEach(k => GRMP_EXPORT.D.acknowledge(db, args[0], k));
       out = true;
     } else if (fn === 'adminReset') {
       const fresh = GRMP_EXPORT.buildSeed();

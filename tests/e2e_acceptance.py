@@ -65,8 +65,8 @@ async def goto(pg, h):
 ADMINS = {
     "esther":    ["dashboard", "review-mentors", "review-mentees", "decisions", "matching",
                   "submissions", "exceptions", "certificates", "concerns", "audit", "emails", "config"],
-    "weikiat":   ["dashboard", "review-mentors", "review-mentees", "matching", "submissions",
-                  "reminders", "waitlist", "exceptions", "events", "emails", "config"],
+    "weikiat":   ["dashboard", "review-mentors", "review-mentees", "decisions", "matching", "submissions",
+                  "reminders", "waitlist", "exceptions", "events", "certificates", "concerns", "audit", "emails", "config"],
     "kenzie":    ["review-mentors", "emails", "config"],
     "yutong":    ["dashboard", "review-mentors", "emails", "config"],
     "portia":    ["dashboard", "review-mentees", "emails", "config"],
@@ -94,7 +94,11 @@ async def main():
             txt = await body_text(pg)
             T(f"{h} renders real content", len(txt) > 220, f"only {len(txt)} chars")
         await goto(pg, "#/reflection")
-        T("1.3 reflection page states the privacy boundary",
+        T("1.3 anonymous reflection page shows the participant-only gate (Q1)",
+          "participant" in (await body_text(pg)).lower())
+        pid = await js(pg, "db.people.find(p=>p.appStatus==='accepted').id")
+        await goto(pg, f"#/reflection/{pid}")
+        T("1.3 personal-link reflection page states the privacy boundary",
           "never stores" in (await body_text(pg)).lower())
         await logout(pg)
         await goto(pg, "#/")
@@ -137,11 +141,15 @@ async def main():
                 T(f"{acct} cannot reach the mentee queue", "review-mentees" not in shown)
             if acct in ("portia", "sapranshu"):
                 T(f"{acct} cannot reach the mentor queue", "review-mentors" not in shown)
-            if acct != "esther":
+            if acct not in ("esther", "weikiat"):
                 await goto(pg, f"#/console/{name.replace(' ', '%20')}/dashboard")
                 T(f"{acct} has no CSV export (Lead-only)",
                   await pg.locator('[data-act="exportReport"]').count() == 0)
-            if acct != "esther":
+            if acct == "weikiat":
+                await goto(pg, f"#/console/{name.replace(' ', '%20')}/dashboard")
+                T("weikiat (Programme Lead) has CSV export",
+                  await pg.locator('[data-act="exportReport"]').count() >= 1)
+            if acct not in ("esther", "weikiat"):
                 T(f"{acct} cannot see the concern inbox", "concerns" not in shown)
 
         print("— Phase 4.1 · the dashboard has to be actionable —")

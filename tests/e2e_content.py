@@ -39,6 +39,8 @@ UNIFORM_OK = {
         "the cohort clock genuinely is one date; the real instant is the separate 'Happened' column",
     ("waitlist", ""):
         "unlabelled column of Promote buttons — an action column, not data",
+    ("certificates", "Approve by exception"):
+        "reason-input + Approve button per row — an action column, not data (F0806-232836)",
     ("matching", "Approved"):
         "the table is sorted newest-first and only the head is shown, so one date at the top is expected",
     ("matching", "Status"):
@@ -89,9 +91,11 @@ async def inspect(pg, where):
     if junk:
         flag(where, f"placeholder/undefined leaking into the page: {sorted(set(junk))[:4]}")
 
-    future = sorted({m.group(0) for m in DATE.finditer(data["text"]) if m.group(0) > TODAY_REAL})
-    if future:
-        flag(where, f"future-dated content on screen (reads as a bug): {future[:4]}")
+    # Future-dated content check DISABLED by Programme Owner decision (F0806-211354):
+    # Esther requires the platform to present the real GRMP 2026 cycle (Oct 2026 – Mar 2027),
+    # future dates included. Kept for reuse if that call is ever reversed.
+    # future = sorted({m.group(0) for m in DATE.finditer(data["text"]) if m.group(0) > TODAY_REAL})
+    # if future: flag(where, f"future-dated content on screen: {future[:4]}")
 
     for ti, t in enumerate(data["tables"]):
         body, head = t["body"], t["head"]

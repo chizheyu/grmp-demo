@@ -13,6 +13,16 @@ try{ SESSION = JSON.parse(localStorage.getItem('grmp_session')||'null'); }catch(
 let db = NET ? null : GRMP.Store.load();
 window.SESSION_TOKEN_FN = ()=> SESSION && SESSION.token;
 
+/* A failed write must stay on screen until a later write succeeds — a 5-second toast
+   is invisible exactly when it matters. The banner also tells the user their action is
+   applied locally and will retry, which is the truth. */
+function syncBanner(on, msg){
+  let el=document.getElementById('sync-fail');
+  if(!on){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='sync-fail'; document.body.appendChild(el);
+    el.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:999;background:#C8102E;color:#fff;font-size:13px;font-weight:650;padding:10px 16px;text-align:center'; }
+  el.textContent='⚠ Your last change could not reach the shared database — it is applied on this screen and will retry on your next action. '+(msg?'('+String(msg).slice(0,80)+')':'');
+}
 function busy(on){
   let el=document.getElementById('rpc-busy');
   if(on){ if(!el){ el=document.createElement('div'); el.id='rpc-busy'; el.className='rpc-busy'; document.body.appendChild(el);} }
@@ -24,7 +34,8 @@ function call(fn, ...args){
     const out = GRMP.D[fn](db, ...args);
     render();
     busy(true);
-    FIRE.persist(db).then(()=>busy(false)).catch(e=>{ busy(false); toast('Sync failed — retrying on next action. '+(e&&e.message||''), false); });
+    FIRE.persist(db).then(()=>{ busy(false); syncBanner(false); })
+      .catch(e=>{ busy(false); syncBanner(true, e&&e.message); });
     return Promise.resolve(out);
   }
   if(!REMOTE){
@@ -76,7 +87,7 @@ function toast(msg, ok=true){
   const root = document.getElementById('overlay-root');
   const el = document.createElement('div');
   el.className='email-pop'; el.style.width='360px';
-  el.innerHTML = `<div class="head" style="background:${ok?'#2E9E6B':'#C8102E'}">${ok?'✓':'!'} ${ok?'DONE':'CHECK'}
+  el.innerHTML = `<div class="head" style="background:${ok?'#27865A':'#C8102E'}">${ok?'✓':'!'} ${ok?'DONE':'CHECK'}
       <button class="x" aria-label="close">×</button></div>
     <div class="body"><div class="txt" style="font-size:13.5px;color:var(--ink)">${esc(msg)}</div></div>`;
   el.querySelector('.x').onclick=()=>el.remove();
@@ -84,10 +95,57 @@ function toast(msg, ok=true){
   setTimeout(()=>el.remove(), 5000);
 }
 
+/* Acknowledgement documents — structure only; SMC supplies final wording (R2-Q4 sibling). */
+const DOC_TEXT = {
+  rules:`<p>What the programme expects of you: attend your rotations, meet your mentor at least twice
+    per rotation, and complete your close-off within the rotation window.</p>
+    <p>Missing a close-off after the final reminder frees your seat for someone on the waitlist.</p>
+    <p>These Rules incorporate, by reference, the <b>SMC Charter</b> (conduct, respect and
+    confidentiality for everyone in the programme) and the <b>Grievance &amp; Misconduct
+    Procedure</b> (how concerns are raised and handled). Acknowledging the Rules acknowledges
+    all three.</p>`,
+  charter:`<p>SMC is a volunteer-run committee. Everyone in GRMP — mentors, mentees and the programme
+    team — is bound by the Committee's charter on conduct, respect and confidentiality.</p>`,
+  governance:`<p>How decisions are made and escalated: the Programme Lead decides matches and outcomes;
+    concerns go to the Escalation Owner privately and are referred to SMC's Grievance &amp; Misconduct process.</p>`,
+  pdpa:`<p>SMC collects your name, contact details and application answers in order to run GRMP:
+    screening, matching, reminders and certificates.</p>
+    <p>Your reflections are <b>not</b> stored — the system records only that you completed a close-off.
+    Your data is held in Singapore, is not sold or shared outside SMC, and you may request deletion
+    at any time by contacting the programme team.</p>`,
+  coi:`<p>Declare any relationship that could affect a pairing — an employer, a relative, a close
+    friend, or a current reporting line. Declared conflicts block that pairing automatically.</p>`,
+};
+
+/* In-page confirm. Native confirm() blocks the whole page and some browsers
+   suppress it outright — the button then looks broken, which is worse than no
+   guard at all. Same reason alert() was removed earlier. */
+function confirmBox(title, body, danger, onYes){
+  const root = document.getElementById('overlay-root');
+  const wrap = document.createElement('div');
+  wrap.className='fb-wrap';
+  wrap.innerHTML = `<div class="fb-bg"></div>
+   <div class="fb-modal">
+     <h3 style="margin:0 0 6px;font-size:16px">${esc(title)}</h3>
+     <div style="font-size:13px;color:var(--ink-2);margin-bottom:14px">${esc(body)}</div>
+     <div style="display:flex;gap:8px;justify-content:flex-end">
+       <button class="btn sm btn-ghost" data-x="no">Cancel</button>
+       <button class="btn sm ${danger?'btn-danger':'btn-primary'}" data-x="yes">${danger?'Yes, reset':'Confirm'}</button>
+     </div></div>`;
+  const close=()=>wrap.remove();
+  wrap.querySelector('[data-x="no"]').onclick=close;
+  wrap.querySelector('.fb-bg').onclick=close;
+  wrap.querySelector('[data-x="yes"]').onclick=()=>{ close(); onYes(); };
+  root.appendChild(wrap);
+}
+
 /* ---------- yellow card helper (in-product decision confirmation) ---------- */
 let decisionCache = null;
 function inferred(qid){
   const it = db.config.openItems[qid]; if(!it) return '';
+  // A settled decision is done arguing: the yellow card and its Confirm UI disappear
+  // from every page. The register keeps the record (who, when, how).
+  if(it.settled) return '';
   const dec = decisionCache && decisionCache[qid];
   const status = dec ? (dec.kind==='confirm'
       ? `<span class="badge b-ok" style="flex:none"><span class="d"></span>Confirmed by ${esc(dec.author)}</span>`
@@ -126,7 +184,7 @@ function renderOpenAs(){
       <div class="sec">Admin console (sign in)</div>
       <button data-goto="#/console">⚙ Console sign-in page</button>
       <div class="sec">Open a mentee's personal link</div>
-      ${preview.map(p=>`<button data-goto="#/me/${p.id}">👤 ${esc(p.name)} <span class="badge b-ai" style="margin-left:auto">fast-forwarded to March</span></button>`).join('')}
+      ${preview.map(p=>`<button data-goto="#/me/${p.id}">👤 ${esc(p.name)} <span class="badge b-ai" style="margin-left:auto">fast-forwarded to cycle end</span></button>`).join('')}
       ${mentees.filter(p=>!p.previewFastForward).map(p=>`<button data-goto="#/me/${p.id}">👤 ${esc(p.name)} <span class="track-chip track-${p.track}" style="margin-left:auto">${esc(GRMP.TRACKS[p.track].label)}</span></button>`).join('')}
       <div class="sec">Open a mentor's personal link</div>
       ${mentors.map(p=>`<button data-goto="#/me/${p.id}">🎓 ${esc(p.name)} <span class="track-chip track-${p.track}" style="margin-left:auto">${esc(GRMP.TRACKS[p.track].label)}</span></button>`).join('')}
@@ -150,7 +208,7 @@ function renderFeedbackBtn(){
   if(!FEEDBACK_URL) return '';
   return `<button class="fb-btn" data-act="openFeedback">💬 Feedback</button>`;
 }
-function openFeedbackModal(){
+function openFeedbackModal(prefill){
   const ctx = feedbackContext();
   const root = document.getElementById('overlay-root');
   const wrap = document.createElement('div');
@@ -160,7 +218,7 @@ function openFeedbackModal(){
      <h3 style="margin:0 0 4px;font-size:16px">Feedback on this screen</h3>
      <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:10px">Attached automatically: <b>${esc(ctx.page)}</b> · viewing as <b>${esc(ctx.role)}</b></div>
      <div class="f-row"><label>Your name (optional)</label><input type="text" id="fb-name" placeholder="so we can follow up"></div>
-     <div class="f-row"><label>What should change? <span class="req">*</span></label><textarea id="fb-text" placeholder="Describe what you expected, what you saw, or what's missing"></textarea></div>
+     <div class="f-row"><label>What should change? <span class="req">*</span></label><textarea id="fb-text" placeholder="Describe what you expected, what you saw, or what's missing">${esc(prefill||'')}</textarea></div>
      <div style="display:flex;gap:8px;justify-content:flex-end">
        <button class="btn sm btn-ghost" id="fb-cancel">Cancel</button>
        <button class="btn sm btn-primary" id="fb-send">Send feedback</button>
@@ -226,19 +284,30 @@ function __decideDefault(d){
 /* ---------- banner ---------- */
 function demoBanner(){
   const rot = GRMP.D.currentRotation(db);
-  const phase = rot ? `Rotation ${rot.n} · ${rot.label}` : (db.today>'2027-03-31'?'after the cycle':'closing weeks');
+  const phase = rot ? `Rotation ${rot.n} · ${rot.label}` : (db.today>db.config.rotations[2].end?'after the cycle':'closing weeks');
   const who = (NET && SESSION && SESSION.identity)
     ? ` · signed in: <b>${esc(SESSION.identity.name||SESSION.identity.label)}</b> · <a href="#" data-act="logout">sign out</a>` : '';
-  return `<div class="demo-banner">Sample data only · simulated today: <b>${db.today}</b> (${phase}) ·
-    yellow boxes are inferred defaults · <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a>${who}</div>`;
+  // The decisions register has to be reachable from every page, including the public
+  // ones. Internal INFERRED cards do not belong in public page content, but hiding the
+  // register with them would leave a visitor reading our assumptions as settled fact.
+  const openN = Object.values(db.config.openItems||{}).filter(i=>!i.settled).length;
+  const open = openN ? ` · <a href="#/decisions"><b>${openN} decision${openN===1?'':'s'} await${openN===1?'s':''} your confirmation</b></a>` : '';
+  return `<div class="demo-banner">Sample data only · simulated today: <b>${db.today}</b> (${phase})${open} ·
+    <a href="#/changelog">changelog</a> · <a href="#/manual">user manual</a>${who}</div>`;
 }
 
+/* SGT display for machine timestamps (feedback/decisions come back as UTC ISO) */
+function fmtSGT(iso){
+  try{ const d=new Date(iso); if(isNaN(d)) return iso;
+    return d.toLocaleString('en-SG',{timeZone:'Asia/Singapore',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})+' SGT';
+  }catch(e){ return iso; }
+}
 /* ---------- router ---------- */
 const routes = [
   {re:/^#\/$/,                view:()=>Views.landing()},
   {re:/^#\/guide\/mentee$/,   view:()=>Views.guideMentee()},
   {re:/^#\/guide\/mentor$/,   view:()=>Views.guideMentor()},
-  {re:/^#\/reflection$/,      view:()=>Views.reflection()},
+  {re:/^#\/reflection(?:\/(.+))?$/, view:m=>Views.reflection(m[1])},
   {re:/^#\/concern$/,         view:()=>Views.concern()},
   {re:/^#\/apply\/(mentee|mentor)$/, view:m=>Views.apply(m[1])},
   {re:/^#\/applied\/(.+)$/,   view:m=>Views.applied(m[1])},
@@ -253,6 +322,16 @@ function render(){
   const h0 = location.hash || '#/';
   const gated = /^#\/(console|me\/)/.test(h0);
   if(NET && !SESSION && (gated || h0==='#/login')){ $app().innerHTML = renderLogin(); bindGlobal(); return; }
+  // The console renders whoever the URL names — so the URL must not be able to name
+  // someone you are not. Participants bounce to their own page; admins to their own
+  // console. (Staging enforces app-side; production replaces this with real Auth.)
+  if(NET && SESSION && /^#\/console/.test(h0)){
+    const who = SESSION.identity, m = h0.match(/^#\/console\/([^/]+)/);
+    if(who && who.kind==='person'){ location.hash = '#/me/'+who.personId; return; }
+    if(who && who.name && (!m || decodeURIComponent(m[1])!==who.name)){
+      location.hash = '#/console/'+encodeURIComponent(who.name); return;
+    }
+  }
   if(NET && !db){ $app().innerHTML = `<div class="login-wrap"><div class="login-card" style="text-align:center"><h1>GRMP Platform</h1><div class="sub">Connecting to the shared database…</div></div></div>`; return; }
   const h = location.hash || '#/';
   let html = null;
@@ -282,11 +361,11 @@ function renderLogin(){
         <b>Participants:</b> mentee.new · mentee.mid · mentee.done · mentor.active · mentor.bench</div>
     </div>
     <div class="sim-note">Fictional sample data · every action is shared with everyone signed in — that's the point.</div>
-    <div style="text-align:center;margin-top:10px"><a href="#/" onclick="location.hash='#/';" style="font-size:12.5px">← Browse the public microsite without signing in</a></div>
+    <div style="text-align:center;margin-top:10px"><a href="#/" onclick="location.hash='#/';" style="font-size:12.5px">← Browse the programme site without signing in</a></div>
   </div></div>`;
 }
 
-/* ---------- progressive AI upgrade: simulated → Gemini, in place ---------- */
+/* ---------- progressive AI upgrade: template → live model, in place ---------- */
 async function upgradeAI(){
   if(!window.AI || !AI.enabled) return;
   document.querySelectorAll('[data-ai-sum]').forEach(async el=>{
@@ -297,34 +376,88 @@ async function upgradeAI(){
     if(txt && el.isConnected){
       const tx=el.querySelector('.ai-txt'), src=el.querySelector('.ai-src');
       if(tx) tx.textContent = txt;
-      if(src) src.textContent = 'Gemini (live)';
+      if(src) src.textContent = 'generated live';
     } else if(el.isConnected){
-      const src=el.querySelector('.ai-src'); if(src) src.textContent='simulated in demo';
+      const src=el.querySelector('.ai-src'); if(src) src.textContent='template (model unavailable)';
     }
   });
+  /* Match rationales are NOT sent to the model. They are already short, precise and
+     derived from the score — a small model rewriting them loses the direction of the
+     claim ("structured thinking is crucial for the mentor" when it is the mentee's
+     need). The division of labour that holds up: the model reads and compresses free
+     text; the system decides and explains its own decision. Flip this on only with a
+     model strong enough to be measured against the deterministic text. */
+  const AI_REWRITES_RATIONALES = false;
+  if(!AI_REWRITES_RATIONALES) return;
   document.querySelectorAll('[data-ai-pair]').forEach(async el=>{
     const id = el.dataset.aiPair, ck = 'pair:'+id;
     const pr = db.pairs.find(x=>x.id===id); if(!pr || pr.status!=='proposed') return;
     const apply = lines=>{
-      pr.rationale = lines; pr.aiLive = true; GRMP.Store.save(db);
+      // The model may only rephrase the reasons. The ranking line is the audit trail
+      // for the R2-Q3 rule and is re-attached from the pair's own numbers, never
+      // from the model — otherwise the proof of ranking vanishes the moment AI is on.
+      const rank = pr.rankedOutOf
+        ? `Ranked 1st of ${pr.rankedOutOf} eligible mentors on development-need fit → industry → diversity (score ${pr.score}); capacity, conflict and no-repeat checks passed`
+        : (pr.rationale || []).slice(-1)[0];
+      const kept = lines.slice(0,3).concat(rank?[rank]:[]);
+      pr.rationale = kept; pr.aiLive = true; GRMP.Store.save(db);
       const ul = el.querySelector('ul.why');
-      if(ul) ul.innerHTML = lines.map(l=>`<li>${esc(l)}</li>`).join('')
-        + `<li style="color:var(--ai-ink);font-weight:650">Generated live by Gemini — the decision above is yours.</li>`;
+      if(ul) ul.innerHTML = kept.map(l=>`<li>${esc(l)}</li>`).join('')
+        + `<li style="color:var(--ai-ink);font-weight:650">Reasons rewritten live by the model; the ranking above is computed by the system, not the model.</li>`;
     };
-    if(AI.cache[ck]){ if(!pr.aiLive) apply(AI.cache[ck].split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,3)); return; }
+    // Only the scored reasons go to the model — the trailing ranking line is ours to keep.
+    const reasons = (pr.rationale||[]).slice(0, Math.max(0,(pr.rationale||[]).length-1));
+    if(!reasons.length) return;
+    const clean = t => t.split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,reasons.length);
+    if(AI.cache[ck]){ if(!pr.aiLive) apply(clean(AI.cache[ck])); return; }
     const m = GRMP.D.person(db, pr.mentorId), e = GRMP.D.person(db, pr.menteeId);
-    const txt = await AI.gen(ck, AI.rationalePrompt(m, e));
-    if(txt && el.isConnected) apply(txt.split('\n').map(s=>s.replace(/^[-*•\d.\s]+/,'').trim()).filter(Boolean).slice(0,3));
+    const txt = await AI.gen(ck, AI.rationalePrompt(m, e, reasons));
+    if(txt && el.isConnected) apply(clean(txt));
+  });
+}
+/* Every form row is `<div class="f-row"><label>…</label><control></div>`, which LOOKS
+   labelled and is not: with no for/id link a screen reader announces the control as
+   nameless, so the public application form was unusable with assistive tech. Linking
+   them here fixes every form at once instead of patching markup in twelve places. */
+let _lblSeq = 0;
+function linkFormLabels(){
+  document.querySelectorAll('.f-row').forEach(row=>{
+    const label = row.querySelector('label');
+    const ctls = [...row.querySelectorAll('input:not([type=checkbox]):not([type=radio]),select,textarea')];
+    if(!label || !ctls.length) return;
+    const base = label.textContent.replace(/\*/g,'').trim();
+    // Rows like "Rotation 1 start / end" hold two controls under one label — the second
+    // one was left nameless. Split the label on its own separator so each gets a name.
+    const parts = base.split(/\s*[\/·]\s*/);
+    ctls.forEach((ctl,i)=>{
+      if(!ctl.id) ctl.id = 'fld-' + (++_lblSeq);
+      if(i===0 && !label.htmlFor) label.htmlFor = ctl.id;
+      if(!ctl.getAttribute('aria-label'))
+        ctl.setAttribute('aria-label', ctls.length>1 && parts.length>1
+          ? `${parts[0]} ${parts[Math.min(i,parts.length-1)]}`.trim() : base);
+    });
+  });
+  // Selects rendered outside .f-row (the re-match picker) still need a name.
+  document.querySelectorAll('select:not([aria-label])').forEach(s=>{
+    const near = s.closest('td,div')?.querySelector('label,b,strong');
+    s.setAttribute('aria-label', (near && near.textContent.trim()) || 'Select an option');
   });
 }
 function bindGlobal(){
+  linkFormLabels();
   const t = document.getElementById('openas-toggle');
   if(t) t.onclick = ()=>{ openasOpen = !openasOpen; render(); };
-  document.querySelectorAll('[data-goto]').forEach(b=>b.onclick = ()=>{ openasOpen=false; location.hash = b.dataset.goto; });
-  document.querySelectorAll('[data-act]').forEach(b=>b.onclick = ()=>{
-    const fn = Actions[b.dataset.act]; if(fn) fn(b.dataset);
-  });
 }
+/* Single document-level delegation instead of per-element onclick at render time:
+   markup injected AFTER render (changelog threads, decision cards, anything async)
+   gets working buttons too. Registered once — per-element rebinding was how the
+   thread Reply buttons shipped dead. */
+document.addEventListener('click', e=>{
+  const g = e.target.closest('[data-goto]');
+  if(g){ openasOpen=false; location.hash = g.dataset.goto; return; }
+  const b = e.target.closest('[data-act]');
+  if(b){ const fn = Actions[b.dataset.act]; if(fn) fn(b.dataset); }
+});
 window.addEventListener('hashchange', render);
 window.addEventListener('DOMContentLoaded', ()=>{
   if(FS){
@@ -365,7 +498,7 @@ const Actions = {
       SESSION={token:'fs-'+Math.random().toString(36).slice(2), identity};
       localStorage.setItem('grmp_session', JSON.stringify(SESSION));
       window.__loginErr=null;
-      db.audit.push({at:db.today,actor:identity.name,action:'signin',entity:acct.u});
+      GRMP.D.logAudit(db, db.today, identity.name, 'signin', acct.u);
       FIRE.persist(db);
       render();
       toast('Signed in as '+identity.label+'. Everything here is shared live with the team.');
@@ -391,24 +524,107 @@ const Actions = {
     SESSION=null; localStorage.removeItem('grmp_session'); location.hash='#/'; render();
   },
   reset(){
-    if(FS){ if(confirm('Reset the SHARED database to the seeded state for everyone?')){
-      busy(true);
-      FIRE.resetAll().then(fresh=>{ db=fresh; lastEmailShown=db.emails.length; busy(false); render(); toast('Shared database reset to seed.'); })
-        .catch(e=>{ busy(false); toast('Reset failed: '+(e&&e.message||''), false); });
-    } return; }
-    if(REMOTE){ if(confirm('Reset the SHARED database to the seeded state for everyone?')) call('adminReset'); return; }
-    if(confirm('Reset all demo data to the seeded state?')){ db = GRMP.Store.reset(); lastEmailShown = db.emails.length; render(); }
+    const shared = FS || REMOTE;
+    confirmBox(
+      shared ? 'Reset the shared database?' : 'Reset the demo data?',
+      shared ? 'Everyone signed in sees this. All applications, matches, close-offs and certificates return to the seeded sample cohort.'
+             : 'Everything in this browser returns to the seeded sample cohort.',
+      true,
+      ()=>{
+        if(FS){ busy(true);
+          FIRE.resetAll().then(fresh=>{ db=fresh; lastEmailShown=db.emails.length; busy(false); render(); toast('Shared database reset to seed.'); })
+            .catch(e=>{ busy(false); toast('Reset failed: '+(e&&e.message||''), false); });
+          return; }
+        if(REMOTE){ call('adminReset'); return; }
+        db = GRMP.Store.reset(); lastEmailShown = db.emails.length; render(); toast('Demo data reset to seed.');
+      });
   },
   ack(d){ call('acknowledge', d.person, d.doc); },
-  ackAll(d){ if(REMOTE){ call('ackAllDocs', d.person); } else { act(x=>{['rules','charter','governance','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); } },
-  orient(d){ call('completeOrientation', d.person, d.mode).then(()=>toast(d.mode==='recorded'?'Recording opened — your completion has been recorded.':'Live attendance marked — orientation complete.')); },
+  /* An acknowledgement that records consent without showing anything to consent to
+     is not an acknowledgement. Placeholder text, real mechanism: open → read → tick → confirm. */
+  openDoc(d){
+    const root = document.getElementById('overlay-root');
+    const wrap = document.createElement('div');
+    wrap.className='fb-wrap';
+    wrap.innerHTML = `<div class="fb-bg"></div>
+     <div class="fb-modal" style="max-width:620px">
+       <h3 style="margin:0 0 2px;font-size:16px">${esc(d.title)}</h3>
+       <div style="font-size:11.5px;color:var(--ink-3);margin-bottom:10px">Version ${esc(d.ver)} · this version is what gets recorded against your name</div>
+       <div class="doc-body">${DOC_TEXT[d.doc]||'<p>Document text to be supplied by the programme team.</p>'}
+         <p class="doc-ph">Placeholder structure — SMC supplies the final wording before go-live.</p></div>
+       <label class="doc-tick"><input type="checkbox" id="doc-tick"> I have read ${esc(d.title)} (${esc(d.ver)}) and I acknowledge it.</label>
+       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+         <button class="btn sm btn-ghost" data-x="no">Cancel</button>
+         <button class="btn sm btn-primary" data-x="yes" disabled>Confirm acknowledgement</button>
+       </div></div>`;
+    const yes = wrap.querySelector('[data-x="yes"]');
+    wrap.querySelector('#doc-tick').onchange = e => { yes.disabled = !e.target.checked; };
+    const close = ()=>wrap.remove();
+    wrap.querySelector('[data-x="no"]').onclick = close;
+    wrap.querySelector('.fb-bg').onclick = close;
+    yes.onclick = ()=>{ close(); call('acknowledge', d.person, d.doc)
+      .then(()=>toast(d.title+' acknowledged — timestamp and version recorded.')); };
+    root.appendChild(wrap);
+  },
+  ackAll(d){ if(REMOTE){ call('ackAllDocs', d.person); } else { act(x=>{['rules','pdpa','coi'].forEach(k=>GRMP.D.acknowledge(x,d.person,k))}); } },
+  saveOrientVideo(d){
+    const mentee=(document.getElementById('ov-url')||{}).value||'';
+    const mentor=(document.getElementById('ov-url-mentor')||{}).value||'';
+    call('setOrientationVideos', mentee, mentor, d.actor)
+      .then(v=>toast((v.mentee||v.mentor)?'Recording links saved — each player opens the right session.':'Links cleared — players show the placeholder again.'));
+  },
+  orient(d){
+    const url = GRMP.D.orientationVideoFor(db, GRMP.D.person(db, d.person));
+    if(d.mode==='recorded' && url){ try{ window.open(url, '_blank', 'noopener'); }catch(e){} }
+    return call('completeOrientation', d.person, d.mode).then(()=>toast(d.mode==='recorded'?'Recording opened — your completion has been recorded.':'Live attendance marked — orientation complete.')); },
   confirmReturn(d){ call('confirmReturn', d.person).then(()=>toast('Welcome back! Please re-acknowledge the programme documents below.')); },
   closeoff(d){
     const met = document.getElementById('co-met').checked;
     const ref = document.getElementById('co-ref').checked;
     if(!met || !ref){ toast('Both confirmations are required to close off the rotation.', false); return; }
+    const extraEl = document.getElementById('co-extra');
+    const extra = extraEl ? extraEl.value.trim() : '';
+    if(extraEl && !extra){
+      toast(d.rot==='2' ? 'Your mid-programme review is part of the Rotation 2 close-off.'
+                        : 'Your end-of-programme evaluation is part of the Rotation 3 close-off.', false);
+      return;
+    }
     const c = document.getElementById('co-comment').value;
-    call('closeoff', d.pair, true, true, c);
+    call('closeoff', d.pair, true, true, c, extra);
+  },
+  endeval(d){
+    const t = document.getElementById('ee-text').value.trim();
+    if(!t){ toast('Please write your end-of-programme evaluation first.', false); return; }
+    call('submitEndEvaluation', d.person, t).then(()=>toast('End-of-programme evaluation submitted — thank you.'));
+  },
+  fbReply(d){
+    const inp=document.getElementById('cl-reply-'+d.fid);
+    const text=(inp&&inp.value.trim())||'';
+    if(!text){ toast('Write the reply first.', false); return; }
+    if(!(typeof NET!=='undefined'&&NET&&FIRE&&FIRE.fs)){ toast('Replies need the shared database (online mode).', false); return; }
+    let who='SMC team';
+    if(SESSION&&SESSION.identity){
+      who = SESSION.identity.name
+         || (SESSION.identity.kind==='person' && (GRMP.D.person(__demo.db, SESSION.identity.personId)||{}).name)
+         || 'SMC team';
+    }
+    const btn=document.querySelector(`button[data-act="fbReply"][data-fid="${d.fid}"]`); if(btn) btn.disabled=true;
+    FIRE.fs.collection('feedback_comments').add({fid:d.fid, by:who, text:text.slice(0,1500), ts:new Date().toISOString()})
+      .then(()=>{ toast('Reply posted — it appears for everyone on this page.'); Views.__clCache=null; render(); })
+      .catch(()=>{ if(btn) btn.disabled=false; toast('Could not post right now — try again in a minute.', false); });
+  },
+  fbDiscuss(d){ openFeedbackModal(`[${d.q}] `); },
+  certException(d){
+    const inp = document.getElementById('exc-reason-'+d.person);
+    const reason = inp ? inp.value.trim() : '';
+    if(!reason){ toast('A reason is required — it is recorded on the certificate and audited.', false); return; }
+    const nm = (GRMP.D.person(__demo.db, d.person)||{}).name || d.person;
+    confirmBox(`Approve ${nm}'s certificate by exception?`,
+      `Reason: “${reason}” — recorded on the certificate and written to the audit log under your name.`, false, ()=>{
+      call('approveByException', d.person, reason, d.actor).then(r=>{
+        toast(r? 'Approved by exception — recorded and audited.' : 'Nothing to approve — already certified or fully eligible.', !!r);
+      });
+    });
   },
   midreview(d){
     const t = document.getElementById('mr-text').value.trim();
@@ -417,7 +633,7 @@ const Actions = {
   },
   builder(d){
     const t = document.getElementById('br-text').value.trim();
-    if(!t){ toast('Please write your Builder Reflection first.', false); return; }
+    if(!t){ toast('Please write your Builder’s Commitment first.', false); return; }
     call('submitBuilderReflection', d.person, t);
   },
   score(d){
@@ -426,11 +642,70 @@ const Actions = {
     call('score', d.person, d.reviewer, Number(s), c);
   },
   decide(d){ call('decide', d.person, d.decision, d.actor); },
-  suggest(d){ call('suggestMatches', Number(d.rotation), d.track).then(n=>{ if(!n||!n.length) toast('No unmatched mentees (or no capacity) in this track right now.', false); }); },
+  /* All proposals for a track are computed in one synchronous pass — each mentee is
+     genuinely scored against every eligible mentor, it is just fast. Rendering six
+     finished cards in the same frame made the real computation indistinguishable from
+     a canned list, so the reveal is paced: the cards exist in the db at once, and are
+     shown one by one as the board re-renders. Real work, made legible — no fake spinner,
+     no fabricated delay on the data itself. Automation (webdriver) gets the instant path. */
+  suggest(d){
+    if(REMOTE){ call('suggestMatches', Number(d.rotation), d.track).then(n=>{ if(!n||!n.length) toast('No unmatched mentees (or no capacity) in this track right now.', false); }); return; }
+    if(window.__suggestBusy) return;
+    const rot=Number(d.rotation), track=d.track;
+    const out = GRMP.D.suggestMatches(db, rot, track);
+    const done = ()=>{
+      if(FS){ busy(true); FIRE.persist(db).then(()=>busy(false)).catch(e=>{ busy(false); toast('Sync failed — retrying on next action. '+(e&&e.message||''), false); }); }
+      else GRMP.Store.save(db);
+    };
+    if(!out || !out.length){ render(); toast('No unmatched mentees (or no capacity) in this track right now.', false); return; }
+    if(navigator.webdriver){ render(); done(); return; }
+    window.__suggestBusy = track;
+    window.__hiddenProposals = new Set(out.map(p=>p.id));
+    render();
+    (async()=>{
+      for(const pr of out){
+        await new Promise(r=>setTimeout(r, 450));
+        window.__hiddenProposals.delete(pr.id);
+        render();
+      }
+      window.__suggestBusy = null; window.__hiddenProposals = null;
+      render();
+      toast(`${out.length} match${out.length>1?'es':''} ranked and proposed — each card shows what it was ranked against.`);
+      done();
+    })();
+  },
   approvePair(d){ call('approvePair', d.pair, d.actor); },
+  reassignPair(d){ call('reassignProposal', d.pair, d.mentor, d.actor)
+    .then(r=>toast(r? 'Mentor swapped — the rationale now reflects your choice.' : 'That mentor is no longer eligible.', !!r)); },
+  discardPair(d){ call('discardProposal', d.pair, d.actor)
+    .then(r=>toast(r? 'Suggestion discarded — the mentee is back in the unmatched pool.' : 'Already actioned.', !!r)); },
   promote(d){ call('promoteWaitlist', d.person, d.actor); },
+  withdrawUnack(d){
+    const n = GRMP.D.pendingWithdrawal(db).length;
+    confirmBox(`Release ${n} seat${n>1?'s':''}?`,
+      `They did not acknowledge after the final reminder. Their places are freed for the waitlist and each is notified. Promoting someone from the waitlist is how you undo this.`,
+      true, ()=>call('withdrawUnacknowledged', d.actor)
+        .then(out=>toast(`${(out||[]).length} seat(s) released and notified.`)));
+  },
   replaceMentor(d){ call('replaceMentor', d.pair, d.bench, d.actor); },
-  issueCerts(d){ call('issueCertificates', d.actor).then(out=>toast((out&&out.length)? out.length+' certificate(s) issued and emailed.' : 'Nobody newly qualifies yet — the rule needs all three rotations completed.', !!(out&&out.length))); },
+  replaceMentorSel(d){
+    const sel = document.getElementById('bench-'+d.pair);
+    if(sel) Actions.replaceMentor({pair:d.pair, bench:sel.value, actor:d.actor});
+  },
+  markDropout(d){
+    // bindGlobal passes only the button's dataset — the two form inputs are read here,
+    // in one place, so the button cannot be wired twice with different argument shapes.
+    const mentorId = (document.getElementById('drop-mentor')||{}).value;
+    const reason = (document.getElementById('drop-reason')||{}).value || '';
+    if(!mentorId) return;
+    const m = GRMP.D.person(db, mentorId);
+    const n = db.pairs.filter(p=>p.mentorId===mentorId&&p.status==='approved').length;
+    confirmBox(`Mark ${m?m.name:'this mentor'} as dropped out?`,
+      `${n} active mentee${n===1?'':'s'} move to the re-match queue, restricted to same-track reserve-bench mentors. The mentor is removed from all future matching.`,
+      true, ()=>call('markDropout', mentorId, reason, d.actor)
+        .then(out=>toast(out? `${out.affected} mentee(s) queued for re-match.` : 'Already marked as dropped.', !!out)));
+  },
+  issueCerts(d){ call('issueCertificates', d.actor).then(out=>toast((out&&out.length)? out.length+' certificate(s) marked ready — presented at the Appreciation Night; participants got a heads-up email.' : 'Nobody newly qualifies yet — check the exception report below for who misses what.', !!(out&&out.length))); },
   remindCloseoff(d){ call('remindCloseoff', d.email).then(()=>toast('Reminder queued.')); },
   checkin(d){ call('toggleAttendance', d.event, d.person); },
   setToday(d){ call('setToday', d.date); },
@@ -443,9 +718,12 @@ const Actions = {
     const today=g('cy-today');
     const carry=(document.getElementById('cy-carry')||{}).checked;
     if(!label||rot.some(r=>!r.start||!r.end)||!today){ toast('Fill in the cycle label, all six rotation dates and the start date.', false); return; }
-    if(!confirm('Start "'+label+'"? The current cycle will be archived; mentors '+(carry?'carry over as invited':'are NOT carried over')+'; mentees, pairs and certificates reset.')) return;
-    call('startNewCycle', {label, rotations:rot, today, actor:(SESSION&&SESSION.identity&&SESSION.identity.name)||'lead', carryOverMentors:carry})
-      .then(id=>{ toast('New cycle '+id+' started — previous cycle archived.'); location.hash='#/console/'+encodeURIComponent((SESSION&&SESSION.identity&&SESSION.identity.name)||'Esther'); });
+    confirmBox('Start "'+label+'"?',
+      'The current cycle is archived. Mentors '+(carry?'carry over as invited and must re-acknowledge':'are NOT carried over')
+      +'. Mentees, pairs and certificates reset for the new cycle.', true, ()=>{
+      call('startNewCycle', {label, rotations:rot, today, actor:(SESSION&&SESSION.identity&&SESSION.identity.name)||'lead', carryOverMentors:carry})
+        .then(id=>{ toast('New cycle '+id+' started — previous cycle archived.'); location.hash='#/console/'+encodeURIComponent((SESSION&&SESSION.identity&&SESSION.identity.name)||'Esther'); });
+    });
   },
   exportReport(){
     const D=GRMP.D;
@@ -470,7 +748,7 @@ const Actions = {
     const consent = (document.getElementById('f-consent')||{}).checked;
     const track = (document.querySelector('.track-opt.sel')||{}).dataset?.track;
     const fields = kind==='mentee'
-      ? {name:get('f-name'),email:get('f-email'),mobile:get('f-mobile'),track,university:'SMU',course:get('f-course'),
+      ? {name:get('f-name'),email:get('f-email'),mobile:get('f-mobile'),track,university:GRMP.D.cohortFacts(db).inst||'',course:get('f-course'),
          year:get('f-year'),goals:get('f-goals'),devNeeds:get('f-dev'),industryInterest:get('f-ind'),
          expectations:get('f-exp'),readiness:get('f-read'),consent}
       : {name:get('f-name'),email:get('f-email'),mobile:get('f-mobile'),track,org:get('f-org'),role:get('f-role'),
