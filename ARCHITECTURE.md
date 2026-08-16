@@ -77,13 +77,27 @@ re-onboarding), clears cycle-scoped entities, swaps `config.cohort/rotations`.
 UI: Console → Configuration → "Start a new cycle" (Lead only). Returning mentor sees a
 welcome-back card → `confirmReturn` → normal gate flow.
 
-## Deploy
+## Deploy (Firestore platform — the CURRENT production path)
 
 ```bash
-# Sandbox (GitHub Pages) — push to main, done
-git push
+# 1. Sync sources into the hosting dir (fsdist/ is a hand-copied mirror, no build step)
+cp data.js app.js views_public.js views_console.js styles.css fire.js ai.js USER_MANUAL.md fsdist/
+# 2. Deploy hosting
+firebase deploy --only hosting
+# 3. ONLY if data.js bumped DB_KEY (schema change): reset the shared seed, or every
+#    client hangs on "Connecting…" against old-shape slices. Run FIRE.resetAll() from a
+#    clean Playwright browser (the owner's local Chrome proxies firestore.googleapis.com
+#    into a black hole — never use it for Firestore work).
+# 4. Sandbox (GitHub Pages) — git push, done
+```
 
-# Platform (Apps Script) — URL never changes
+Firestore write safety: the adapter writes JSON round-trips (`JSON.parse(JSON.stringify(...))`) —
+a single `undefined` field anywhere in a slice makes Firestore reject the WHOLE batch and the
+change silently never lands. Guarded in L1 (`no mutation ever leaves undefined field values`).
+
+## Deploy (Apps Script fallback — superseded, kept for reference)
+
+```bash
 node platform/build_platform.js
 cd platform && clasp push -f && \
   clasp deploy -i AKfycbytCwgGEzhgvaWu5ADK9ml594o6PUTLf4suantAWHMKKEQtinaz6xnJBWdZDusk8zdkkA -d "update"
@@ -100,13 +114,20 @@ never reference `db` at top level in app.js (null until boot in remote mode).
 Apps Script endpoint → Google Sheet ("GRMP Feedback") → `AISMC/feedback_admin.sh new|set`
 → status shown on #/changelog and #/decisions. Credentials/endpoints: `AISMC/凭据与端点_内部.md`.
 
-## Tests
+## Tests (R5 set — run in this order after any change)
 
 ```bash
-node tests/backend_test.js        # 50  — domain
-python tests/e2e_test.py          # 35  — sandbox UI
-python tests/e2e_full_cycle.py    # 43  — lifecycle + branches
-python tests/e2e_platform.py      # 13  — Apps Script platform (fallback)
-python tests/e2e_firestore.py     # 11  — LIVE Firestore platform incl. real-time sync
+node tests/backend_test.js        # 181 — domain + VERBATIM guard (diffs legal text against
+                                  #       ../specs_joanne/*.md; email subjects/signatures/sender)
+node tests/render_smoke.js        # 120 — every role × view + form steps + gate/OTP states
+python tests/e2e_r5_flows.py      # 34  — DESTRUCTIVE full journeys on the live platform
+                                  #       (apply→score→accept→OTP→gate→reserve→reminders);
+                                  #       resets the shared seed at the end — run FIRST
+python tests/e2e_acceptance.py    # 127 — non-destructive live sweep (roles, permissions, R5 phases)
+python tests/e2e_deadends.py      # every page actionable; regenerates ../GRMP_Role_Report.md
+python tests/e2e_content.py       # content smells (stuck columns, leaks, count mismatches)
+python tests/e2e_a11y.py          # axe-core WCAG A/AA
 ```
 All green = safe to deploy. The manual's numbered steps are the test cases.
+(Older suites e2e_test.py / e2e_full_cycle.py / e2e_platform.py / e2e_firestore.py predate the
+R5 model and are superseded by the set above.)
