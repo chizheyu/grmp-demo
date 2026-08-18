@@ -667,6 +667,34 @@ if(fs.existsSync(SPECS_DIR) && fs.existsSync(PDPA_DIR)){
 } else {
   console.log('  (spec .md files not present in this clone — wholesale diff skipped; embedded checks above still ran)');
 }
+/* ---- promise-vs-capability guards -------------------------------------------------
+   Joanne found us offering mentors a Telegram option while the form never collects a
+   Telegram handle: a promise the build could not keep. That is a CLASS, not one bug, so
+   the sweep for its siblings is nailed down here rather than repeated by hand. Two shapes:
+   (1) we ask for something and no one can ever read it back;
+   (2) participant-facing copy claims a narrower audience than the roles actually allow. */
+console.log('— promise vs capability: nothing collected into a hole, no copy narrower than the roles —');
+T('every field the application collects is readable by someone (no data black holes)', (()=>{
+  const root = path.join(__dirname,'..');
+  const pub = fs.readFileSync(path.join(root,'views_public.js'),'utf8');
+  const surfaces = pub + fs.readFileSync(path.join(root,'views_console.js'),'utf8')
+                       + fs.readFileSync(path.join(root,'ai.js'),'utf8');
+  const collected = [...new Set([...pub.matchAll(/id="af-([a-zA-Z0-9]+)"/g)].map(m=>m[1]))];
+  // Collection reads form state (S.d.x / d.x); display reads a stored record (p.x / other.x).
+  const shown = f => new RegExp('\\b(?:p|other|x|person)\\.' + f + '\\b').test(surfaces);
+  // Anything here must carry the reason it is invisible, in words, or it does not belong here.
+  const NOT_SHOWN_ON_PURPOSE = {
+    lastName: 'composed into p.name, which every surface renders',
+    firstName: 'composed into p.name; also greeted by p.firstName on the personal page',
+    pdpa: 'the tick only gates submission — what a human needs to see is p.pdpaAt, on the team card',
+  };
+  const holes = collected.filter(f => !NOT_SHOWN_ON_PURPOSE[f] && !shown(f));
+  if(holes.length) console.log('    collected but shown to nobody: ' + holes.join(', '));
+  return holes.length === 0;
+})());
+/* the matching guard — concern-page copy vs the escalation role — needs a rendered page,
+   so it lives in render_smoke.js next to the other view assertions. */
+
 T('gate checkbox labels are the approved exact strings',
   COPY.rulesTick==='I have read and understood the GRMP Programme Rules and agree to follow them throughout my participation in GRMP. I also acknowledge the principles set out in the SMC Charter.'
   && COPY.coiTick==='I confirm that this declaration is accurate to the best of my knowledge and that I will inform SMC promptly if an actual or potential conflict of interest arises during my participation in GRMP.'

@@ -160,15 +160,20 @@ _review(admin, kind){
   const scored = db.people.filter(p=>p.kind===kind && p.appStatus!=='submitted' && db.reviews.some(v=>v.personId===p.id)).slice(0,4);
   const CRITS = kind==='mentor'?GRMP.MENTOR_CRITERIA:GRMP.MENTEE_CRITERIA;
   const chip = p => `<span class="ind-chip">${esc(kind==='mentor'?(p.industry||''):((p.industryPrefs||[])[0]||''))}</span>`;
+  /* "Other" on its own tells a reviewer nothing. The free text behind it was being collected
+     and shown to no one, which made the Other option Wei Kiat asked for inert at the desk
+     where it matters. Read it back wherever the choice is displayed. */
+  const withOther = (choice, freeText) => choice === GRMP.IND_OTHER && freeText
+    ? `${choice} — ${freeText}` : choice;
   const appBody = p => kind==='mentee'
     ? `<div class="rv-app">
-        <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:6px">${esc(p.faculty||'')} · ${esc(p.degree||'')} · ${esc(p.year||'')} · prefers: ${esc((p.industryPrefs||[]).join(' → '))}</div>
+        <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:6px">${esc(p.faculty||'')} · ${esc(p.degree||'')} · ${esc(p.year||'')} · prefers: ${esc((p.industryPrefs||[]).map(i=>withOther(i, p.industryPrefOther)).join(' → '))}</div>
         <details open><summary style="font-size:12px;font-weight:700">Prompt 1 — growth & ownership <span style="font-weight:400;color:var(--ink-3)">(read for: Readiness to Learn · Values Awareness · Ownership)</span></summary>
           <p style="font-size:13px;margin:6px 0">${esc(p.prompt1||'—')}</p></details>
         <details open><summary style="font-size:12px;font-weight:700">Prompt 2 — curiosity & community <span style="font-weight:400;color:var(--ink-3)">(read for: Global Curiosity · Community Mindset)</span></summary>
           <p style="font-size:13px;margin:6px 0">${esc(p.prompt2||'—')}</p></details>`
     : `<div class="rv-app">
-        <div style="font-size:12.5px;color:var(--ink-2)">${esc(p.designation||'')} @ ${esc(p.org||'')} · ${esc(p.industry||'')}${p.returning?' · <b>returning mentor (screening grandfathered)</b>':''}</div>
+        <div style="font-size:12.5px;color:var(--ink-2)">${esc(p.designation||'')} @ ${esc(p.org||'')} · ${esc(withOther(p.industry||'', p.industryOther))}${p.returning?` · <b>returning mentor (screening grandfathered)</b>${p.lastCycleEmail?` · last cycle as ${esc(p.lastCycleEmail)}`:''}`:''}</div>
         ${p.returning?'':`<div style="font-size:12.5px;color:var(--ink-2);margin-top:4px">Experience: ${esc(p.yearsExp||'—')} · led a team: ${esc(p.ledTeam||'—')} · breadth: ${esc(p.crossIndustry||'—')} · prior mentoring: ${esc(p.priorMentoring||'—')}</div>
         <p style="font-size:13px;margin:6px 0 0">“${esc(p.leadership||'')}”</p>`}
         <div style="font-size:12.5px;color:var(--ink-2);margin-top:4px">Draws: ${esc((p.draws||[]).join('; ')||'—')} · Interests: ${esc(p.interests||'—')}</div>`;

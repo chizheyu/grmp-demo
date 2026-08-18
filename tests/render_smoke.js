@@ -76,9 +76,38 @@ check('apply(mentor)', () => V.apply('mentor'));
 check('manual', () => V.manual());
 check('decisions', () => V.decisions());
 
+/* Sibling of the black-hole guard in backend_test.js. The concern page used to name one
+   person as sole recipient while two accounts held the escalation role — participant-facing
+   copy claiming a narrower audience than the permission model actually grants. The sentence
+   is derived from the roles now, so this pins the derivation, not the wording. */
+{
+  const html = V.concern();
+  const holders = db.config.admins.filter(a => (a.roles || []).includes('escalation'));
+  T('the concern page names every account that can actually open the inbox',
+    holders.length > 0 && holders.every(a => html.includes(a.name)));
+  T('and promises nothing about people who cannot',
+    db.config.admins.filter(a => !(a.roles || []).includes('escalation'))
+      .every(a => !html.includes(a.name))
+    && html.includes('Coordinators, reviewers and IT support cannot see it'));
+}
+
 console.log('— personal pages (every persona state) —');
 for (const acct of (db.config.accounts || []).filter(a => a.kind === 'person'))
   check(`personal ${acct.u}`, () => V.personal(acct.personId));
+
+/* The team-only application record: the surface that stops the form from collecting
+   personal data nobody can read back. Participants must never see it. */
+{
+  const someone = db.people.find(p => p.appStatus === 'accepted' && p.linkedin);
+  const asTeam = vm.runInContext(
+    `SESSION = {identity:{kind:'admin', name:'Wei Kiat'}}; (()=>{const h=Views.personal(${JSON.stringify(someone.id)}); SESSION=null; return h;})()`, ctx);
+  const asThemselves = V.personal(someone.id);
+  T('a team account sees the application record card, with the quiet fields on it',
+    asTeam.includes('Application record') && asTeam.includes('Team view only')
+    && asTeam.includes(someone.linkedin) && asTeam.includes('PDPA consent given'));
+  T('the participant never sees that card on their own page',
+    !asThemselves.includes('Application record') && !asThemselves.includes('Team view only'));
+}
 
 console.log('— console: every admin × every view they can open —');
 const C = G.Console;

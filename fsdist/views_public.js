@@ -416,13 +416,26 @@ reflection(pid){
   </div>` + this.msFooter();
 },
 
+/* Who can actually open the concern inbox, read off the permission model rather than typed
+   into the sentence. The page used to name one person ("the designated Escalation Owner
+   (Esther)") while two accounts held the escalation role — a safeguarding promise the build
+   did not keep, and the kind of drift that only shows up when someone re-reads the roles.
+   Derive it, and the sentence cannot go stale when the roles change. */
+_escalationOwners(){
+  const holders = (__demo.db.config.admins||[]).filter(a=>(a.roles||[]).includes('escalation'));
+  const names = holders.map(a=>`${a.name} (${a.role})`);
+  if(!names.length) return 'the designated Escalation Owner';
+  if(names.length===1) return `the designated Escalation Owner, ${names[0]}`;
+  return `the designated escalation route: ${names.slice(0,-1).join(', ')} and ${names[names.length-1]}`;
+},
+
 /* ---------- 1.4 concern ---------- */
 concern(){
   return this.msNav() + `<div class="doc-page" style="max-width:560px">
     <h1>Raise a concern</h1>
     <p class="lede">If something in your mentoring experience isn't right — for example inappropriate behaviour —
       tell us here, privately.</p>
-    <div class="privacy-note">🔒 <span>Your report goes <b>only</b> to the designated Escalation Owner (Esther).
+    <div class="privacy-note">🔒 <span>Your report goes <b>only</b> to ${esc(this._escalationOwners())}.
       Coordinators, reviewers and IT support cannot see it. The case is handled under SMC's Grievance &amp;
       Misconduct process — this platform records only that a referral was made.</span></div>
     ${inferred('Q6')}
@@ -1007,6 +1020,7 @@ personal(personId){
           <b>${esc(other.name)}</b> ${chip(mentee?other.industry:(other.industryPrefs||[])[0])}
           <div style="font-size:12.5px;color:var(--ink-2)">${mentee?esc((other.designation||'')+' · '+(other.org||'')):esc((other.university||'')+' · '+(other.degree||'')+', '+(other.year||''))}</div>
           <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+(other.background||'')):esc('Growth focus: '+String(other.prompt1||'').slice(0,110)+'…')}</div>
+          ${other.linkedin?`<div style="font-size:12px;margin-top:3px"><a href="${esc(/^https?:/i.test(other.linkedin)?other.linkedin:'https://'+other.linkedin)}" target="_blank" rel="noopener">LinkedIn profile ↗</a></div>`:''}
         </div></div>
       ${x.status==='closed'&&x.closeoff&&x.closeoff.comment&&mentee?`<div style="margin-top:10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Your close-off note</b><br>“${esc(x.closeoff.comment)}”</div>`:''}
       <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection/${personId}">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>
@@ -1029,6 +1043,40 @@ personal(personId){
       <h2>Certificate of Completion</h2><div class="nm">${esc(p.name)}</div>
       <div class="meta">${F().label} · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
 
+  /* --- team-only: what they actually told us on the form ---------------------------
+     Every field the application collects has to be readable by someone, or we are asking
+     people for personal data under a PDPA consent and then dropping it in a hole. Twelve
+     fields were doing exactly that (LinkedIn, phone, preferred contact method, group
+     consent, the "Other" free-text, nationality, referrer, how they heard, the returning
+     mentor's last-cycle email, the PDPA timestamp). This card is where they surface.
+     Team accounts only — deliberately NOT the reviewer's scoring card: nationality and
+     the like must not sit in front of someone assigning a score. */
+  const teamCard = (typeof SESSION!=='undefined' && SESSION && SESSION.identity
+                    && SESSION.identity.kind==='admin') ? (() => {
+    const row = (label, value) => value ? `<div style="display:flex;gap:8px;padding:3px 0;font-size:12.5px">
+      <span style="color:var(--ink-3);min-width:190px">${esc(label)}</span><span>${esc(String(value))}</span></div>` : '';
+    const groupQ = mentee ? 'Mentee Telegram group' : 'Mentor WhatsApp group';
+    const groupA = mentee ? p.telegramConsent : p.whatsappConsent;
+    const otherInd = p.industryOther || p.industryPrefOther;
+    return `<div class="card" style="border-left:3px solid var(--ai-ink)">
+      <h3 style="margin-top:0">Application record <span class="badge b-ai" style="font-size:10px">Team view only</span></h3>
+      <p style="font-size:11.5px;color:var(--ink-3);margin:-4px 0 8px">What ${esc(p.firstName||p.name)} gave us on the form. Participants do not see this card.</p>
+      ${row('Email', p.email)}
+      ${row('Phone', p.phone || p.mobile)}
+      ${row('LinkedIn', p.linkedin)}
+      ${row('Nationality', p.nationality)}
+      ${row(groupQ, groupA)}
+      ${row('Preferred contact method', p.contactPref)}
+      ${row('"Other" industry, in their words', otherInd)}
+      ${row('How they heard about GRMP', p.heard === GRMP.IND_OTHER ? p.heardOther : p.heard)}
+      ${row('Referred by', p.referrer)}
+      ${row('Second faculty / double degree', p.faculty2 && p.faculty2 !== 'Not applicable' ? p.faculty2 : '')}
+      ${p.returning ? row('Email used last cycle', p.lastCycleEmail || '(same as above)') : ''}
+      ${row('PDPA consent given', p.pdpaAt ? String(p.pdpaAt).replace('T',' ').slice(0,16) + ' SGT' : '')}
+      ${row('Anything else they told us', p.anythingElse)}
+    </div>`;
+  })() : '';
+
   return this.ppNav('me', personId) + `<div class="pp-shell">
     <div class="pp-head">
       <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
@@ -1038,7 +1086,7 @@ personal(personId){
     </div>
     <div style="font-size:11.5px;color:var(--ink-3);margin:-8px 0 14px">🔗 You opened this from your personal link — email + one-time code, no password. That's by design.</div>
     <div class="steps">${steps.map((s,i)=>`<div class="step ${s[1]?'done':(i===curIdx?'cur':'')}"><div class="dot">${s[1]?'✓':i+1}</div><span>${s[0]}</span></div>`).join('')}</div>
-    ${nextCard}${vidCard}${certCard}${brCard}${mrCard}${mmrCard}${eeCard}${pairCards}
+    ${nextCard}${vidCard}${certCard}${brCard}${mrCard}${mmrCard}${eeCard}${pairCards}${teamCard}
     ${inferred('Q2')}
   </div>`;
 },
