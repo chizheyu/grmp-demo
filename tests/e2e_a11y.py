@@ -14,7 +14,7 @@ from playwright.async_api import async_playwright
 URL = "https://grmp-platform.web.app"
 PASS = "grmp2026"
 AXE = Path(__file__).resolve().parent.parent / "node_modules" / "axe-core" / "axe.min.js"
-PAGES = ["#/", "#/guide/mentee", "#/guide/mentor", "#/reflection", "#/concern",
+PAGES = ["#/", "#/mentees", "#/mentors", "#/faq", "#/resources", "#/reflection", "#/concern",
          "#/apply/mentee", "#/apply/mentor", "#/changelog", "#/decisions", "#/login"]
 CONSOLE = ["dashboard", "review-mentees", "decisions", "matching", "certificates", "audit", "config"]
 # WCAG A/AA only — the level a public service page is actually held to.

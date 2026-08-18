@@ -74,6 +74,28 @@ r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x5@smu.example.edu', e
 T('the undergraduate eligibility checkbox is a hard gate', r.person===null && r.missing.includes('eligibilityConfirmed'));
 r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x6@smu.example.edu', telegramConsent:'No'});
 T('declining the Telegram group requires a contact preference', r.person===null && r.missing.includes('contactPref'));
+/* "Other" must always carry the free text behind it — Wei Kiat, F0817-235816. */
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x7@smu.example.edu',
+  industryPrefs:[G.IND_OTHER, INDUSTRIES[1], INDUSTRIES[2]]});
+T('choosing Other as an industry preference without the free text is rejected',
+  r.person===null && r.missing.includes('industryPrefOther'));
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x8@smu.example.edu',
+  industryPrefs:[G.IND_OTHER, INDUSTRIES[1], INDUSTRIES[2]], industryPrefOther:'Marine biotech'});
+T('choosing Other WITH the free text goes through and keeps the answer',
+  r.person && r.person.industryPrefOther==='Marine biotech');
+r = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'x9@smu.example.edu', heard:'Other'});
+T('answering Other to "how did you hear" without the free text is rejected',
+  r.person===null && r.missing.includes('heardOther'));
+r = D.submitApplication(db,'mentor',{...MENTOR_OK, email:'m9@example.com', industry:G.IND_OTHER});
+T('a mentor picking Other as their industry must name it',
+  r.person===null && r.missing.includes('industryOther'));
+T('AI is selectable as an industry on both forms', (()=>{
+  const a = D.submitApplication(db,'mentor',{...MENTOR_OK, email:'ai1@example.com', industry:'Artificial Intelligence (AI)'});
+  const b = D.submitApplication(db,'mentee',{...MENTEE_OK, email:'ai2@smu.example.edu',
+    industryPrefs:['Artificial Intelligence (AI)', INDUSTRIES[1], INDUSTRIES[2]]});
+  return a.person && b.person && b.person.industryPrefs[0]==='Artificial Intelligence (AI)'
+      && !/Other/.test(a.person.background);   // the free-text branch must not fire
+})());
 r = D.submitApplication(db,'mentor',MENTOR_OK);
 T('complete mentor application → submitted + receipt', r.person && r.person.appStatus==='submitted'
   && db.emails.some(e=>e.tpl==='mentor_receipt'&&e.to===MENTOR_OK.email));
@@ -104,11 +126,89 @@ T('no mutation ever leaves undefined field values (shared-database write safety)
   return clean(r1.person) && clean(r2.person) && !deepBad;
 })());
 
+console.log('— proposed scores: the reviewer confirms, never keys in (Wei Kiat F0818-004720/004811) —');
+db = fresh();
+const scoredKeys = k => (k==='mentor'?G.MENTOR_CRITERIA:G.MENTEE_CRITERIA).filter(c=>c.scored).map(c=>c.key);
+['mentor','mentee'].forEach(kind=>{
+  const who = db.people.find(p=>p.kind===kind&&p.appStatus==='submitted');
+  const prop = D.proposeScores(db, who);
+  T(`${kind}: every scored criterion arrives proposed, in the console's own order`,
+    prop.items.length===scoredKeys(kind).length
+    && prop.items.every((it,i)=>it.key===scoredKeys(kind)[i]));
+  T(`${kind}: every proposal is a usable 1-5 with a reason the reviewer can check`,
+    prop.items.every(it=>Number.isInteger(it.score) && it.score>=1 && it.score<=5
+                      && typeof it.why==='string' && it.why.length>10));
+  T(`${kind}: the average is the average of the rows`,
+    prop.avg===Math.round(prop.items.reduce((a,b)=>a+b.score,0)/prop.items.length*10)/10);
+});
+T('proposals read the application: a stronger mentor profile does not score below a thinner one', (()=>{
+  const strong = {kind:'mentor', yearsExp:'More than 15 years', ledTeam:'Yes',
+    leadership:'Led a regional team of 40 across four markets for six years.',
+    crossIndustry:'Yes, significantly', priorMentoring:'Yes',
+    draws:G.FORM_OPTS.draws, interests:'Fintech, regional expansion, building first-time managers well.'};
+  const thin = {kind:'mentor', yearsExp:'Under 5 years', ledTeam:'No', leadership:'Some.',
+    crossIndustry:'Not really', priorMentoring:'No', draws:[G.FORM_OPTS.draws[0]], interests:'Tech.'};
+  return D.proposeScores(db, strong).avg > D.proposeScores(db, thin).avg;
+})());
+T('a returning mentor is proposed from the previous cycle, and the row says so', (()=>{
+  const ret = D.proposeScores(db, {kind:'mentor', returning:true});
+  return ret.items.length===scoredKeys('mentor').length
+      && ret.items.every(i=>i.score===4 && /[Rr]eturning mentor/.test(i.why));
+})());
+T('a renamed criterion still gets a row rather than an empty dropdown', (()=>{
+  const saved = G.MENTEE_CRITERIA[0].key;
+  G.MENTEE_CRITERIA[0].key = 'Some New Criterion';
+  const out = D.proposeScores(db, db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted'));
+  G.MENTEE_CRITERIA[0].key = saved;
+  return out.items[0] && out.items[0].key==='Some New Criterion' && out.items[0].score>=1;
+})());
+
+/* ai.js is browser-only (no module.exports), so evaluate it in a bare vm. Worth the trouble:
+   parseScores is the seam where a model's free-form answer becomes numbers a human signs off. */
+function loadAI(){
+  const vm = require('vm');
+  const ctx = vm.createContext({navigator:{}, console});
+  // `const AI = {...}` never lands on the context object; take the script's completion value.
+  return vm.runInContext(fs.readFileSync(path.join(__dirname,'..','ai.js'),'utf8')+'\n;AI;', ctx);
+}
+console.log('— AI score proposals: only a clean, complete answer may replace the rules —');
+T('AI score parsing accepts a good answer, rejects everything doubtful', (()=>{
+  const AI = loadAI(), crits = G.MENTOR_CRITERIA.filter(c=>c.scored);
+  const good = JSON.stringify({scores:crits.map(c=>({key:c.key, score:4, why:'strong evidence'}))});
+  const ok = AI.parseScores(good, crits);
+  const fenced = AI.parseScores('```json\n'+good+'\n```', crits);          // fences are tolerated
+  const partial = AI.parseScores(JSON.stringify({scores:[{key:crits[0].key,score:4,why:'x'}]}), crits);
+  const outOfRange = AI.parseScores(JSON.stringify({scores:crits.map(c=>({key:c.key,score:9,why:'x'}))}), crits);
+  const prose = AI.parseScores('I think this mentor is strong overall.', crits);
+  return ok && ok.length===crits.length && ok.every(r=>r.score===4)
+      && ok.map(r=>r.key).join('|')===crits.map(c=>c.key).join('|')       // order follows the console
+      && fenced && !partial && !outOfRange && !prose
+      && AI.parseScores('', crits)===null && AI.parseScores(null, crits)===null;
+})());
+T('the AI prompt is built from fields the R5 forms actually collect', (()=>{
+  const mentee = D.person(db, db.people.find(p=>p.kind==='mentee'&&p.prompt1).id);
+  const data = loadAI()._appData(mentee);
+  /* The pre-R5 shape (goals / devNeeds / track) was silently feeding the model an empty
+     object, so it filled the blanks itself. Every key must resolve to real data. */
+  return Object.keys(data).length>=8 && data.prompt1_growthAndOwnership===mentee.prompt1
+      && !('track' in data) && !('goals' in data)
+      && Object.values(data).filter(v=>v===undefined).length===0;
+})());
+
 console.log('— criteria scoring + decisions issue the verbatim outcome emails —');
 db = fresh();
 const cand = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted');
-D.score(db, cand.id, 'Portia', 4.2, 'ok', {'Readiness to Learn':4,'Global Curiosity':5,'Values Awareness':4,'Ownership':4,'Community Mindset':4});
+const candProp = D.proposeScores(db, cand);
+D.score(db, cand.id, 'Portia', 4.2, 'ok', {'Readiness to Learn':4,'Global Curiosity':5,'Values Awareness':4,'Ownership':4,'Community Mindset':4}, candProp);
 T('review stores the per-criteria breakdown', db.reviews.some(v=>v.personId===cand.id&&v.criteria&&v.criteria['Global Curiosity']===5));
+T('review also stores what was proposed, so the override rate is measurable',
+  db.reviews.some(v=>v.personId===cand.id && v.proposed && v.proposed.items.length===5 && v.proposedBasis==='rules'));
+T('a score submitted without a proposal still records cleanly (never undefined)', (()=>{
+  const other = db.people.find(p=>p.kind==='mentor'&&p.appStatus==='submitted');
+  D.score(db, other.id, 'Kenzie', 4, '', {'Professional Credibility':4});
+  const v = db.reviews.find(x=>x.personId===other.id);
+  return v.proposed===null && v.proposedBasis===null;
+})());
 D.decide(db, cand.id, 'accepted', 'Esther');
 T('accept → status + mentee acceptance email with personal link', D.person(db,cand.id).appStatus==='accepted'
   && db.emails.some(e=>e.tpl==='mentee_accept'&&e.to===cand.email&&e.vars.link==='#/me/'+cand.id));
@@ -195,11 +295,11 @@ T('an activated-but-unconfirmed reserve gets the activation reminder variant', (
 
 console.log('— release rule: per-person deadline, human-owned —');
 db = fresh();
-db.today = '2026-09-25';
+db.today = '2026-09-19';
 T('before the deadline nobody is releasable', D.pendingWithdrawal(db).length===0 && !D.acceptDeadlinePassed(db));
-db.today = '2026-09-27';
+db.today = '2026-09-21';
 const pending = D.pendingWithdrawal(db);
-T('past 26 Sept the unconfirmed are listed', D.acceptDeadlinePassed(db) && pending.length>0
+T('past the accept-by date the unconfirmed are listed', D.acceptDeadlinePassed(db) && pending.length>0
   && pending.every(p=>!D.placeConfirmed(p)));
 const resAct2 = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
 D.activateReserve(db, resAct2.id, 'Esther');
@@ -333,7 +433,7 @@ T('cohortFacts derives a different cycle end-to-end', (()=>{
   const F2=D.cohortFacts(d2);
   return F1.inst==='SMU' && F2.inst==='NTU' && /2031/.test(F2.spanLong)
     && F2.mentees===0 && F2.label==='GRMP 2031 (NTU pilot)'
-    && F2.acceptBy==='2031-09-26'            // selection timeline shifted with the cycle
+    && F2.acceptBy==='2031-09-20'            // selection timeline shifted with the cycle
     && !D.acceptDeadlinePassed(d2);
 })());
 
@@ -417,7 +517,7 @@ T('mentors carried over as invited, gate state cleared', db.people.length===befo
   db.people.every(p=>p.kind==='mentor'&&p.appStatus==='invited'&&!p.ack&&!p.coi&&!p.kickoff&&!p.placeConfirmedAt));
 T('pairs/reviews/certs cleared', db.pairs.length===0 && db.reviews.length===0 && db.certificates.length===0);
 T('rotations + selection dates shifted into the new cycle', db.config.rotations[0].start==='2027-10-01' && db.today==='2027-09-01'
-  && db.config.selection.acceptBy==='2027-09-26' && db.config.selection.reserveAcceptBy==='2027-09-29');
+  && db.config.selection.acceptBy==='2027-09-20' && db.config.selection.reserveAcceptBy==='2027-09-29');
 const inv = db.people[0];
 T('confirmReturn flips invited→accepted + email', D.confirmReturn(db, inv.id)===true &&
   D.person(db,inv.id).appStatus==='accepted' && db.emails.some(e=>e.subject&&e.subject.includes('Welcome back')));
@@ -475,9 +575,12 @@ T('all 17 participant templates exist (+ otp/onboarding operational)', Object.ke
 Object.entries(SUBJECTS).forEach(([k,subj])=>{
   T(`subject verbatim · ${k}`, rm(k).subject===subj);
 });
+/* Deadline dates inside these fragments come from config, not from the template text: the
+   accept-by moved 26 Sept -> 20 Sept in R6 (later pre-login spec, confirmed; Esther asked for
+   the same in F0816-152143), so the sentence stays verbatim while the date follows the cycle. */
 const BODY_SPOT = {
   mentor_accept:['We are delighted to let you know that your application to mentor with the SMU–SMC Global-Ready Mentoring Programme (GRMP) is successful. Thank you for the care you put into your application, and welcome.',
-    'Please complete this by 26 September 2026.'],
+    'Please complete this by 20 September 2026.'],
   mentee_accept:['and to confirm your attendance at the Kick-Off. This confirms your place.',
     'The GRMP portal is the one place to track your GRMP participation and your wider SMC journey, and you will use it throughout the programme.'],
   mentor_accept_reminder:['If you did not receive the verification code, please check your spam or junk folder, or email us at smu.smc@sa.smu.edu.sg and we will help.',
@@ -485,7 +588,7 @@ const BODY_SPOT = {
   mentee_accept_reminder:['Places in this cycle are limited. If your circumstances have changed and you are no longer able to take part, we would be grateful if you could let us know, so that we may offer your place to another student.'],
   mentor_reserve:['we will give you at least two weeks’ notice, along with the materials you need to begin well.',
     'a place on the Reserve Mentor list is not a guarantee of participation this cycle.',
-    'Please let us know by 26 September 2026 whether you are happy to be placed on the Reserve Mentor list.'],
+    'Please let us know by 20 September 2026 whether you are happy to be placed on the Reserve Mentor list.'],
   mentee_reserve:['a place on the Reserve Mentee list is not a guarantee of participation this cycle.'],
   mentor_reserve_activation:['As this is a later activation, please complete this by 29 September 2026 so that we can prepare you for the Kick-Off on 1 October 2026.'],
   mentee_reserve_activation:['Please complete this by 29 September 2026 so that we can prepare you for the Kick-Off on 1 October 2026.'],
@@ -567,15 +670,32 @@ T('spec error strings are exact', COPY.rulesTickErr==='Please confirm you have r
 T('the two mentee prompts are the spec’s exact questions',
   COPY.menteePrompt1==='Six months from now, what do you hope will have changed in you? Tell us what you would most like to grow, and share a moment when you took real ownership of your own development, at work, in your studies, or in life.'
   && COPY.menteePrompt2==='We are drawn to people who are curious about the world beyond their own field. What pulls your attention, and how would you want to show up for the people around you in this community?');
-T('industry list is the spec’s 17 options in order, shared by both forms',
-  INDUSTRIES.length===17 && INDUSTRIES[0]==='Accounting, Audit & Tax' && INDUSTRIES[4]==='Technology, Media & Telecommunications (TMT)'
-  && INDUSTRIES[15]==='Sustainability & ESG' && INDUSTRIES[16]==='Other');
+/* The spec's 17 options, plus Artificial Intelligence added on Wei Kiat's request
+   (F0818-001327 / F0817-235816). Asserted by value, not by index: the list grows. */
+const SPEC_INDUSTRIES = ['Accounting, Audit & Tax','Consulting & Professional Services',
+  'Banking, Finance & Insurance','Legal','Technology, Media & Telecommunications (TMT)',
+  'Consumer Goods & Retail (incl. FMCG)','Manufacturing & Industrials',
+  'Energy, Utilities & Resources','Real Estate, Construction & Infrastructure',
+  'Transport, Logistics & Supply Chain','Healthcare, Pharmaceuticals & Life Sciences',
+  'Education & Research','Government, Public Sector & Non-Profit',
+  'Media, Arts, Creative & Entertainment','Hospitality, Travel & F&B','Sustainability & ESG','Other'];
+T('industry list keeps all 17 spec options, in the spec’s relative order',
+  SPEC_INDUSTRIES.every(o=>INDUSTRIES.includes(o))
+  && SPEC_INDUSTRIES.map(o=>INDUSTRIES.indexOf(o)).every((v,i,a)=>i===0||v>a[i-1]));
+T('AI is on the list (Wei Kiat) and Other is still last',
+  INDUSTRIES.includes('Artificial Intelligence (AI)')
+  && INDUSTRIES[INDUSTRIES.length-1]==='Other' && INDUSTRIES.length===SPEC_INDUSTRIES.length+1);
+T('nothing reads the industry list by hard-coded index (the list grows)', (()=>{
+  const root=path.join(__dirname,'..');
+  return ['data.js','views_public.js','views_console.js','app.js']
+    .every(f=>!/INDUSTRIES\s*\[\s*\d+\s*\]/.test(fs.readFileSync(path.join(root,f),'utf8')));
+})());
 T('faculty list is the 7 verified schools, no Other', FACULTIES.length===7
   && FACULTIES.includes('Yong Pung How School of Law') && FACULTIES.includes('College of Integrative Studies')
   && !FACULTIES.includes('Other'));
 T('selection timeline constants match the standards note',
   db.config.registration.closes==='2026-09-10' && db.config.selection.approvalsBy==='2026-09-16'
-  && db.config.selection.outcomeBy==='2026-09-18' && db.config.selection.acceptBy==='2026-09-26'
+  && db.config.selection.outcomeBy==='2026-09-18' && db.config.selection.acceptBy==='2026-09-20'
   && db.config.selection.reserveAcceptBy==='2026-09-29'
   && db.events.kickoff.date==='2026-10-01' && db.events.kickoff.venue==='SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902');
 

@@ -22,7 +22,8 @@ data.js            ← THE DOMAIN LAYER. Pure JS, runs in browser, Node and Apps
 app.js             ← Shell: router, render loop, session, Actions registry (thin — every
                      mutation funnels through call() → GRMP.D.* locally or via RPC),
                      login page, feedback + decision modals, email popups.
-views_public.js    ← Microsite + participant personal pages (manual ch.1–3).
+views_public.js    ← Public site (Home / Mentees / Mentors / FAQ, built to Joanne's Pre-Login
+                     Site spec) + the gated Resources library + participant personal pages.
 views_console.js   ← Role-scoped admin console (manual ch.4–8) incl. Start-new-cycle.
 ai.js              ← Gemini layer: progressive upgrade, cache, graceful fallback.
                      Sandbox: client key (accepted risk). Platform: server-side key via aiGen.
@@ -82,6 +83,9 @@ welcome-back card → `confirmReturn` → normal gate flow.
 ```bash
 # 1. Sync sources into the hosting dir (fsdist/ is a hand-copied mirror, no build step)
 cp data.js app.js views_public.js views_console.js styles.css fire.js ai.js USER_MANUAL.md fsdist/
+#    Hosted documents: the public Charter + the five gated Resources files. The Resources
+#    files are gitignored (public repo, SMC material) — they live locally and on Hosting only.
+mkdir -p fsdist/docs/resources && cp docs/*.pdf fsdist/docs/ && cp docs/resources/* fsdist/docs/resources/
 # 2. Deploy hosting
 firebase deploy --only hosting
 # 3. ONLY if data.js bumped DB_KEY (schema change): reset the shared seed, or every
@@ -117,9 +121,10 @@ Apps Script endpoint → Google Sheet ("GRMP Feedback") → `AISMC/feedback_admi
 ## Tests (R5 set — run in this order after any change)
 
 ```bash
-node tests/backend_test.js        # 181 — domain + VERBATIM guard (diffs legal text against
+node tests/backend_test.js        # 201 — domain + VERBATIM guard (diffs legal text against
                                   #       ../specs_joanne/*.md; email subjects/signatures/sender)
-node tests/render_smoke.js        # 120 — every role × view + form steps + gate/OTP states
+node tests/render_smoke.js        # 146 — every role × view + form steps + gate/OTP states,
+                                  #       plus the pre-login spec asserted against rendered markup
 python tests/e2e_r5_flows.py      # 34  — DESTRUCTIVE full journeys on the live platform
                                   #       (apply→score→accept→OTP→gate→reserve→reminders);
                                   #       resets the shared seed at the end — run FIRST

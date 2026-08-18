@@ -27,6 +27,21 @@ function meAuthed(pid){
   }
   try{ const m=JSON.parse(localStorage.getItem('grmp_link_auth')||'{}'); return !!m[pid]; }catch(e){ return false; }
 }
+/* The Resources library is one shared page, not a per-person page, so it cannot ask "is this
+   YOUR link". It asks the weaker, correct question: has this browser proved it belongs to
+   someone in the programme (a team account, or a personal link verified by one-time code).
+   Sandbox has no sign-in at all — the Open-as switcher is the identity — so it is open there. */
+function anyLinkAuthed(){
+  if(!NET) return true;
+  if(SESSION && SESSION.identity) return true;
+  return !!lastLinkAuthed();
+}
+function lastLinkAuthed(){
+  try{ const m=JSON.parse(localStorage.getItem('grmp_link_auth')||'{}');
+    const ids=Object.keys(m); if(!ids.length) return null;
+    return ids.sort((a,b)=>String(m[b]).localeCompare(String(m[a])))[0];
+  }catch(e){ return null; }
+}
 function grantMeAuth(pid){
   try{ const m=JSON.parse(localStorage.getItem('grmp_link_auth')||'{}');
     m[pid]=new Date().toISOString(); localStorage.setItem('grmp_link_auth', JSON.stringify(m)); }catch(e){}
@@ -297,10 +312,16 @@ function fmtSGT(iso){
   }catch(e){ return iso; }
 }
 /* ---------- router ---------- */
+/* The two written guide pages were placeholders standing in for Marylyn's material
+   (Esther, F0806-210058). That material has now arrived and is hosted in Resources
+   (F0816-155832), so the old paths forward there rather than 404 for anyone holding a link. */
+const REDIRECTS = {'#/guide/mentee':'#/resources', '#/guide/mentor':'#/resources'};
 const routes = [
   {re:/^#\/$/,                view:()=>Views.landing()},
-  {re:/^#\/guide\/mentee$/,   view:()=>Views.guideMentee()},
-  {re:/^#\/guide\/mentor$/,   view:()=>Views.guideMentor()},
+  {re:/^#\/mentees$/,         view:()=>Views.pageMentees()},
+  {re:/^#\/mentors$/,         view:()=>Views.pageMentors()},
+  {re:/^#\/faq$/,             view:()=>Views.pageFaq()},
+  {re:/^#\/resources$/,       view:()=>Views.resources()},
   {re:/^#\/reflection(?:\/(.+))?$/, view:m=>Views.reflection(m[1])},
   {re:/^#\/concern$/,         view:()=>Views.concern()},
   {re:/^#\/apply\/(mentee|mentor)$/, view:m=>Views.apply(m[1])},
@@ -314,6 +335,7 @@ const routes = [
 ];
 function render(){
   const h0 = location.hash || '#/';
+  if(REDIRECTS[h0]){ location.hash = REDIRECTS[h0]; return; }
   /* Console needs a team session. Personal pages do NOT force the account login any
      more: they carry their own email + one-time-code flow (spec §2), handled in the view. */
   const gated = /^#\/console/.test(h0);
@@ -379,8 +401,34 @@ async function upgradeAI(){
       const src=el.querySelector('.ai-src'); if(src) src.textContent='template (model unavailable)';
     }
   });
-  const AI_REWRITES_RATIONALES = false;
-  if(!AI_REWRITES_RATIONALES) return;
+  /* Score proposals: the rule-based rows are already on screen and already selected in the
+     dropdowns, so this only ever replaces them with a better reading. A failed or malformed
+     answer changes nothing — the reviewer is never left with an empty form to key in. */
+  document.querySelectorAll('[data-ai-score]').forEach(async el=>{
+    const id = el.dataset.aiScore, ck = 'score:'+id;
+    const p = GRMP.D.person(db, id); if(!p) return;
+    const crits = (p.kind==='mentor'?GRMP.MENTOR_CRITERIA:GRMP.MENTEE_CRITERIA).filter(c=>c.scored);
+    const txt = await AI.gen(ck, AI.scorePrompt(p, crits));
+    const rows = txt && AI.parseScores(txt, crits);
+    if(!rows){
+      if(el.isConnected){ const src=el.querySelector('.ai-src');
+        if(src) src.textContent='read from the application · rule-based first cut'; }
+      return;
+    }
+    window.__PROPOSED = window.__PROPOSED||{};
+    window.__PROPOSED[id] = {items:rows, basis:'ai',
+      avg: Math.round(rows.reduce((a,b)=>a+b.score,0)/rows.length*10)/10};
+    if(!el.isConnected) return;
+    rows.forEach((r,i)=>{
+      const sel=document.getElementById(`sc-${id}-${i}`);
+      if(sel && !sel.dataset.touched){ sel.value=String(r.score); sel.dataset.proposed=String(r.score); }
+      const lab=sel && sel.closest('.crit-row').querySelector('.crit-hint + .crit-hint');
+      if(lab) lab.textContent = `Proposed ${r.score}/5 · ${r.why}`;
+    });
+    const src=el.querySelector('.ai-src'); if(src) src.textContent='AI reading of this application';
+    const tx=el.querySelector('.ai-txt');
+    if(tx) tx.textContent = `Average ${window.__PROPOSED[id].avg}/5 across the ${rows.length} scored criteria. These are a starting point, not a decision: change any of them below.`;
+  });
 }
 /* Every form row is `<div class="f-row"><label>…</label><control></div>` — link labels
    programmatically so assistive tech announces every control. */
@@ -424,9 +472,13 @@ document.addEventListener('click', e=>{
    - gate radios reveal their conditional detail fields without a full re-render */
 document.addEventListener('change', e=>{
   const id = e.target && e.target.id;
-  if(['af-heard','af-industry','af-telegramConsent','af-whatsappConsent'].includes(id)){
+  /* af-ind1..3 are here because picking "Other" in any of the three preference slots has to
+     reveal the free-text row (Wei Kiat, F0817-235816). */
+  if(['af-heard','af-industry','af-ind1','af-ind2','af-ind3','af-telegramConsent','af-whatsappConsent'].includes(id)){
     Actions._applyCollect(); render(); return;
   }
+  /* A reviewer's own edit wins over a late AI answer arriving behind it. */
+  if(id && /^sc-/.test(id)) e.target.dataset.touched = '1';
   if(e.target && e.target.name==='g-coi'){
     const d=document.getElementById('g-coi-details');
     if(d) d.style.display = e.target.value==='some' ? '' : 'none';
@@ -458,8 +510,18 @@ window.addEventListener('hashchange', ()=>{
   /* Navigating away from the form drops its in-memory state (that is the no-save
      model); returning starts fresh at step 1. */
   if(window.__APPLY && !/^#\/apply\//.test(location.hash||'')) window.__APPLY = null;
+  window.__NAVOPEN = false;                 // the mobile menu never survives a navigation
   render();
 });
+/* Single-open accordions (FAQ spec). Modern browsers do this natively via <details name>;
+   this keeps the behaviour identical on the ones that do not. */
+document.addEventListener('toggle', e=>{
+  const el = e.target;
+  if(!el || el.tagName!=='DETAILS' || !el.open || !el.getAttribute('name')) return;
+  document.querySelectorAll(`details[name="${el.getAttribute('name')}"]`).forEach(d=>{
+    if(d!==el) d.open = false;
+  });
+}, true);                                    // capture: toggle does not bubble
 window.addEventListener('DOMContentLoaded', ()=>{
   if(FS){
     render();
@@ -499,6 +561,7 @@ const APPLY_VAL = {
       if(!APPLY_VAL._linkedin(d.linkedin)) e.linkedin='Please enter a valid LinkedIn URL.';
       if(!d.heard) e.heard='Please select an option.';
       if(/referred/.test(d.heard||'') && !String(d.referrer||'').trim()) e.referrer='Please tell us who referred you.';
+      if(d.heard===GRMP.IND_OTHER && !String(d.heardOther||'').trim()) e.heardOther='Please tell us how you heard about GRMP.';
       return e;
     },
     2:d=>{
@@ -518,6 +581,8 @@ const APPLY_VAL = {
       else if(d.ind2===d.ind1) e.ind2='Please select a different industry from your first choice.';
       if(!d.ind3) e.ind3='Please select an industry.';
       else if(d.ind3===d.ind1||d.ind3===d.ind2) e.ind3='Please select a different industry from your earlier choices.';
+      if([d.ind1,d.ind2,d.ind3].includes(GRMP.IND_OTHER) && !String(d.industryPrefOther||'').trim())
+        e.industryPrefOther='Please tell us which industry you have in mind.';
       return e;
     },
     4:d=>{
@@ -547,7 +612,7 @@ const APPLY_VAL = {
       if(!String(d.org||'').trim()) e.org='Please enter your organisation.';
       if(!String(d.designation||'').trim()) e.designation='Please enter your designation.';
       if(!d.industry) e.industry='Please select your industry.';
-      if(d.industry===GRMP.INDUSTRIES[16] && !String(d.industryOther||'').trim()) e.industryOther='Please tell us your industry.';
+      if(d.industry===GRMP.IND_OTHER && !String(d.industryOther||'').trim()) e.industryOther='Please tell us your industry.';
       if(!String(d.linkedin||'').trim()) e.linkedin='Please enter your LinkedIn profile URL.';
       else if(!APPLY_VAL._linkedin(d.linkedin)) e.linkedin='Please enter a valid LinkedIn URL.';
       if(!returning){
@@ -633,6 +698,11 @@ const Actions = {
       });
   },
 
+  /* --- pre-login site chrome --- */
+  navToggle(){ window.__NAVOPEN = !window.__NAVOPEN; render(); },
+  faqTab(d){ window.__FAQTAB = d.tab; render();
+    setTimeout(()=>{ const t=document.getElementById('faqtab-'+d.tab); if(t) t.focus(); },20); },
+
   /* --- R5 staged application form --- */
   _applyCollect(){
     const S=window.__APPLY; if(!S) return;
@@ -674,9 +744,11 @@ const Actions = {
     const x=S.d;
     const payload = S.kind==='mentee'
       ? {email:x.email, firstName:x.firstName, lastName:x.lastName, phone:x.phone, nationality:x.nationality,
-         linkedin:x.linkedin, heard:x.heard, referrer:x.referrer, year:x.year, faculty:x.faculty,
+         linkedin:x.linkedin, heard:x.heard, referrer:x.referrer, heardOther:x.heardOther,
+         year:x.year, faculty:x.faculty,
          faculty2:x.faculty2||'Not applicable', degree:x.degree, eligibilityConfirmed:!!x.eligibilityConfirmed,
          prompt1:x.prompt1, prompt2:x.prompt2, industryPrefs:[x.ind1,x.ind2,x.ind3],
+         industryPrefOther:x.industryPrefOther,
          commit:x.commit, telegramConsent:x.telegramConsent, contactPref:x.contactPref, pdpa:true}
       : {email:x.email, firstName:x.firstName, lastName:x.lastName, phone:x.phone, nationality:x.nationality,
          heard:x.heard, referrer:x.referrer, lastCycleEmail:x.lastCycleEmail,
@@ -828,16 +900,22 @@ const Actions = {
   },
   score(d){
     const crits = (d.kind==='mentor'?GRMP.MENTOR_CRITERIA:GRMP.MENTEE_CRITERIA).filter(c=>c.scored);
-    const criteria={}; let sum=0, n=0, missing=false;
+    const criteria={}; let sum=0, n=0, missing=false, changed=0;
     crits.forEach((c,i)=>{
       const el=document.getElementById(`sc-${d.person}-${i}`);
       if(!el || !el.value){ missing=true; return; }
       criteria[c.key]=Number(el.value); sum+=Number(el.value); n++;
+      if(el.dataset.proposed && Number(el.dataset.proposed)!==Number(el.value)) changed++;
     });
     if(missing || !n){ toast('Please score every criterion (1–5) before submitting.', false); return; }
     const avg = Math.round(sum/n*10)/10;
     const c = (document.getElementById('cm-'+d.person)||{}).value||'';
-    call('score', d.person, d.reviewer, avg, c, criteria);
+    const proposed = (window.__PROPOSED||{})[d.person] || null;
+    call('score', d.person, d.reviewer, avg, c, criteria, proposed)
+      .then(()=>toast(changed
+        ? `Scores recorded: ${changed} of ${n} adjusted from the proposal.`
+        : `Scores recorded: proposal confirmed as it stood.`))
+      .catch(()=>{});                      // call() already surfaces the failure
   },
   decide(d){ call('decide', d.person, d.decision, d.actor); },
   reserveReply(d){ call('recordReserveReply', d.person, d.reply==='in', d.actor)

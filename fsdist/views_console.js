@@ -173,7 +173,7 @@ _review(admin, kind){
         <p style="font-size:13px;margin:6px 0 0">“${esc(p.leadership||'')}”</p>`}
         <div style="font-size:12.5px;color:var(--ink-2);margin-top:4px">Draws: ${esc((p.draws||[]).join('; ')||'—')} · Interests: ${esc(p.interests||'—')}</div>`;
   return `<h1 class="co-title">Review ${kind}s</h1>
-  <p class="co-sub">Score each criterion 1–5 — the committee reads the application against the ${CRITS.filter(c=>c.scored).length} scored ${kind} criteria; Commitment is a confirmation captured on the form, not a score. You recommend — the Programme Lead decides. The AI summary speeds reading; it never recommends an outcome.</p>
+  <p class="co-sub">Every criterion arrives with a <b>proposed score</b> already filled in, read from the application itself, so nobody keys ${db.config.selection.menteeCap} applications in by hand. Read, adjust anything that does not look right, then submit. Commitment is a confirmation captured on the form, not a score. You recommend; the Programme Lead decides the outcome.</p>
   ${queue.length? queue.map(p=>`
     <div class="qcard" id="q-${p.id}">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -183,17 +183,25 @@ _review(admin, kind){
       </div>
       <div class="ai-block" data-ai-sum="${p.id}"><div class="t">✦ AI summary — <span class="ai-src">${(window.AI&&AI.cache['sum:'+p.id])?'generated live':'template · generating…'}</span></div><div class="ai-txt">${(window.AI&&AI.cache['sum:'+p.id])||D.aiSummary(p)}</div></div>
       ${appBody(p)}</div>
+      ${(()=>{ const prop = GRMP.D.proposeScores(db, p);
+               if(typeof window!=='undefined'){ window.__PROPOSED = window.__PROPOSED||{}; window.__PROPOSED[p.id] = prop; }
+               const live = window.AI && AI.cache['score:'+p.id];
+        return `<div class="ai-block" data-ai-score="${p.id}" style="margin-top:10px">
+        <div class="t">✦ Proposed scores — <span class="ai-src">${live?'AI reading of this application':'read from the application · rule-based first cut'}</span></div>
+        <div class="ai-txt">Average ${prop.avg}/5 across the ${prop.items.length} scored criteria. These are a starting point, not a decision: change any of them below.${live?'':' Where an application gives little to go on, the proposal stays at 3 and the line under each criterion says what was found.'}</div></div>
       <div class="crit-grid" style="margin-top:10px">
-        ${CRITS.filter(c=>c.scored).map((c,i)=>`<div class="crit-row">
-          <div class="crit-lab"><b>${esc(c.key)}</b><div class="crit-hint">${esc(c.hint)}</div></div>
-          <select id="sc-${p.id}-${i}" aria-label="Score for ${esc(c.key)}"><option value=""></option>
-            <option value="5">5 — outstanding</option><option value="4">4 — strong</option>
-            <option value="3">3 — adequate</option><option value="2">2 — weak</option><option value="1">1 — not ready</option></select>
-        </div>`).join('')}
-      </div>
+        ${CRITS.filter(c=>c.scored).map((c,i)=>{ const pr = prop.items[i]||{score:'',why:''};
+          return `<div class="crit-row">
+          <div class="crit-lab"><b>${esc(c.key)}</b><div class="crit-hint">${esc(c.hint)}</div>
+            <div class="crit-hint" style="color:var(--ai-ink)">Proposed ${pr.score}/5 · ${esc(pr.why)}</div></div>
+          <select id="sc-${p.id}-${i}" data-proposed="${pr.score}" aria-label="Score for ${esc(c.key)} (proposed ${pr.score} of 5, change if needed)"><option value=""></option>
+            <option value="5"${pr.score===5?' selected':''}>5 — outstanding</option><option value="4"${pr.score===4?' selected':''}>4 — strong</option>
+            <option value="3"${pr.score===3?' selected':''}>3 — adequate</option><option value="2"${pr.score===2?' selected':''}>2 — weak</option><option value="1"${pr.score===1?' selected':''}>1 — not ready</option></select>
+        </div>`; }).join('')}
+      </div>`; })()}
       <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
         <input id="cm-${p.id}" type="text" placeholder="Comment (optional)" style="flex:1;min-width:180px;border:1px solid var(--line);border-radius:8px;padding:7px 10px">
-        <button class="btn sm btn-primary" data-act="score" data-person="${p.id}" data-kind="${kind}" data-reviewer="${admin.name}">Submit score</button>
+        <button class="btn sm btn-primary" data-act="score" data-person="${p.id}" data-kind="${kind}" data-reviewer="${admin.name}">Confirm scores</button>
       </div>
       ${db.reviews.filter(v=>v.personId===p.id).map(v=>`<div style="font-size:12px;color:var(--ink-3);margin-top:6px">✓ ${v.reviewer}: ${v.score}/5 ${v.comment?('— '+v.comment):''}</div>`).join('')}
     </div>`).join('')

@@ -13,21 +13,29 @@
 | Mentors & mentees | **No accounts, no passwords — ever.** The acceptance email carries a personal link; opening it asks for the email they applied with, sends a **one-time verification code** to that email, and the code signs them in. (A forwarded link alone cannot confirm a place — that is the point.) |
 | The programme team (~6 people) | Sign in to the console with their accounts (Google sign-in in production; passcode accounts in staging). |
 
-**The selection timeline (spec-confirmed constants, shown in Configuration):** applications 1–10 Sept · approvals completed by 16 Sept · outcome by 18 Sept · acceptance reminder (once) 23 Sept · acceptance deadline **26 Sept** · reserve-activation deadline **29 Sept** · Kick-Off **1 Oct, 7.30–9.00 pm, SMU ALCove**.
+**The selection timeline (spec-confirmed constants, shown in Configuration):** applications 1–10 Sept · approvals completed by 16 Sept · outcome by 18 Sept · acceptance reminder (once) 17 Sept · acceptance deadline **20 Sept** · reserve-activation deadline **29 Sept** · Kick-Off **1 Oct, 7.30–9.00 pm, SMU ALCove**.
 
 ---
 
 ## 1 · Visitor — the microsite & the application forms
 
-**1.1 Landing page.** What GRMP is, the Oct–Mar cycle, how the six months run, and two buttons: **Apply as a Mentee** · **Apply as a Mentor** (both use "apply" — house style). *(Home-page copy updates from the UX owner land separately.)*
+**1.1 The public site — four pages** (built to the UX owner's Pre-Login Site Build Spec; copy is that spec's, verbatim):
+- **Home** (`#/`) — hero, the two ways in, the six-step timeline (Apply · Accept · Kick-Off · 3 rotations · Close each rotation · Complete), closing band. No FAQ answers and no rotation detail: those live on the pages below.
+- **Mentees** (`#/mentees`) — the gain-led case: what you gain, what it asks of you, the three-rotation arc, the reflection-sheet bar.
+- **Mentors** (`#/mentors`) — the contribute-led case, in the navy lane so the two audiences read apart at a glance.
+- **FAQ** (`#/faq`) — three tabs (About GRMP · For mentees · For mentors), sub-category headings, single-open accordions, all collapsed on load, keyboard-operable.
 
-**1.2 Programme documents.** **For Mentees** / **For Mentors** hold the briefing structure *(final text comes from Marylyn, GRMP's content creator)*. The **Reflection Sheet** stays participant-only: it opens from a personal link, never from the public menu.
+Shared header on every page: **Mentees · Mentors · FAQ** plus a secondary **Sign in** (cue: "Already accepted? Sign in"). **Apply is never in the nav** — it is the primary red action in the page body. On narrow screens the three links collapse into a menu; Sign in stays pinned.
+
+Shared footer on every page: **About SMC** · **SMC Charter** (hosted PDF, opens in a new tab) · **Programme Enquiries** · **Raise a concern (private)**.
+
+**1.2 Programme documents.** The written briefing material now lives in the gated **Resources** library (chapter 2.9), not on the public site — that is the UX owner's confirmed boundary. The old `#/guide/mentee` and `#/guide/mentor` paths forward there. The **Reflection Sheet** stays participant-only.
 
 **1.3 Apply as a Mentee — a 4-step staged form** (About you · Your studies · Your growth · Commitment & consent):
 - Persistent progress stepper; **Next** validates only the current step; **Back never loses data**.
 - SMU email asked with a **soft warning** if it does not look like a student address (the binding gate is the eligibility checkbox, not the domain).
 - **Step 2 — the hard gate:** "I confirm I am a current SMU undergraduate" (all years eligible, incl. final-year; 7-school faculty list).
-- **Step 3 — the scored core:** the two written prompts (verbatim from the spec), each with a live word count and a **hard cap of 200 words** (no minimum — tight answers are a good signal); three **distinct** industry preferences from the same 17-option list mentors classify themselves on.
+- **Step 3 — the scored core:** the two written prompts (verbatim from the spec), each with a live word count and a **hard cap of 200 words** (no minimum — tight answers are a good signal); three **distinct** industry preferences from the same list mentors classify themselves on (the spec's 17 options plus **Artificial Intelligence**, added on the Programme Lead's request). Choosing **Other** anywhere on the form opens a free-text box; the answer is required, so "Other" never arrives blank.
 - **Step 4:** commitment confirmation, Telegram-group consent (the mentee channel), and the approved **PDPA consent rendered verbatim** — timestamped on submission. PDPA is collected once, here; it is *not* repeated at the acceptance gate.
 - **No save-and-resume (confirmed):** the form is completed in one sitting — there is no applicant login to attach a partial record to. A browser leave-page warning guards accidental loss. *(This replaces the earlier draft-saving behaviour — see the decisions register, Q10.)*
 - Submit → verbatim confirmation screen + the acknowledgement-receipt email.
@@ -42,7 +50,7 @@
 
 ## 2 · Accepted participant — link, code, gate, page
 
-**2.1 The acceptance email** (verbatim, dual-signed by Esther Koh and Wei Kiat Koh) carries the personal link and the 26 Sept deadline.
+**2.1 The acceptance email** (verbatim, dual-signed by Esther Koh and Wei Kiat Koh) carries the personal link and the 20 Sept deadline.
 
 **2.2 Sign-in.** The link opens a check: *enter the email you applied with* → a one-time code is emailed → entering it signs you in. Wrong email or wrong code: a clear message, no data shown.
 
@@ -63,21 +71,25 @@ Completing all three **confirms the place**: the onboarding email fires *(copy i
 
 **2.8 Reserve list members** see an honest status page: opted in / awaiting your reply / declined — and what activation would mean.
 
+**2.9 Resources** (`#/resources`, in the participant nav, to the right). One library, five documents, supplied by the programme and hosted on the platform: mentee preparation note, mentee briefing deck, personal reflection sheet, mentor rotation briefing & conversation guide, mentor briefing deck. **Everyone signed in sees everything** — the two headings label who each document is mainly for, they do not filter. Documents open in a new tab. Revisions are overridden in place, so a link never changes. *(Staging caveat: the page is gated, the file URLs are not — production moves these to authenticated storage. See Appendix B.)*
+
 ---
 
 ## 3 · Reviewer — screening console
 
 **3.1 My queue.** Mentor reviewers see mentors; mentee reviewers see mentees. Each card shows the full application (for mentees: both prompts in full, with the criteria each prompt is read for — the committee scoring guide is built into the page) and a labelled AI summary that never recommends an outcome.
 
-**3.2 Score against the criteria.** Mentee: five scored criteria (Readiness to Learn · Global Curiosity · Values Awareness · Ownership · Community Mindset) — **Commitment is a confirmation captured on the form**, shown as a badge, not scored. Mentor: four scored criteria (Professional Credibility · Breadth of Perspective · Values Alignment · Mentoring Mindset) + the same Commitment confirmation. Each criterion is 1–5; the stored score is the average, with the per-criterion breakdown kept.
+**3.2 Scores arrive proposed; you confirm them.** Every scored criterion is pre-filled with a proposed 1–5 and a one-line reason for it, read from the application itself — nobody keys 120 applications in by hand (Wei Kiat, 18 Aug). Where the live model is reachable it does the reading and the block says so; where it is not, a rule-based first cut stands in and says *that*. Change anything that does not look right, then **Confirm scores**. What was proposed is stored next to what you submitted, so how often the proposal gets overridden is a number we can look at rather than guess.
+
+**3.3 The criteria themselves.** Mentee: five scored criteria (Readiness to Learn · Global Curiosity · Values Awareness · Ownership · Community Mindset) — **Commitment is a confirmation captured on the form**, shown as a badge, not scored. Mentor: four scored criteria (Professional Credibility · Breadth of Perspective · Values Alignment · Mentoring Mindset) + the same Commitment confirmation. Each criterion is 1–5; the stored score is the average, with the per-criterion breakdown kept.
 
 ---
 
 ## 4 · Programme Lead — decisions, matching, certificates
 
 **4.1 Decisions. Approving is the send:** every decision issues its verbatim outcome email automatically (spec flow stage 0 — approval and invitation are one action; running as the default, Q9 card to confirm). The buttons per applicant:
-- **Accept** → acceptance email with personal link + 26 Sept deadline
-- **Reserve list** → the Reserve email (opt-in requested by 26 Sept)
+- **Accept** → acceptance email with personal link + 20 Sept deadline
+- **Reserve list** → the Reserve email (opt-in requested by 20 Sept)
 - Mentor: **Decline** · Mentee: **Decline (not selected)** / **Decline (ineligible)** — two honest variants: "more applications than places" is true for one and misleading for the other.
 
 **4.2 Matching (per rotation).** One pool — hard constraints: ≤2 mentees per mentor · no repeat mentor · **only confirmed places enter matching**. **Suggest matches** scores every eligible mentor on the mentee's three ranked industry preferences (first +10 · second +6 · third +3), significant cross-industry breadth (+2), organisation diversity across rotations (+3) and load spread; the top match is proposed with its actual scoring reasons quoted. Declared conflicts of interest from the gate are listed above the board for the Lead to check against. Alternatives, swap and discard work per proposal; nothing is matched until the Lead approves.
@@ -88,9 +100,9 @@ Completing all three **confirms the place**: the onboarding email fires *(copy i
 
 ## 5 · Coordinator — operations
 
-**5.1 Dashboard.** The worklist ("what needs you"), then the standing state: **Place confirmed X/Y (gate done, by 26 Sept)** with the per-person not-yet-confirmed list (which of the three items each is missing, and whether they have been reminded), Kick-Off confirmations, open exceptions, Reserve-list counts, submissions, certificates. Tiles link to the page where the work happens. CSV export is restricted to the Lead.
+**5.1 Dashboard.** The worklist ("what needs you"), then the standing state: **Place confirmed X/Y (gate done, by 20 Sept)** with the per-person not-yet-confirmed list (which of the three items each is missing, and whether they have been reminded), Kick-Off confirmations, open exceptions, Reserve-list counts, submissions, certificates. Tiles link to the page where the work happens. CSV export is restricted to the Lead.
 
-**5.2 Reminders.** The confirmed rule, mechanised: acceptance reminders are sent **once** per person, only to accepted-but-unconfirmed, a few days before 26 Sept (activated reserves: the compressed variant before 29 Sept; no same-day nudge). Staging has a "send now" control; production runs it on schedule. After the deadline passes, the **seat release** list appears — releasing is an explicit human action; freed seats go to the Reserve list.
+**5.2 Reminders.** The confirmed rule, mechanised: acceptance reminders are sent **once** per person, only to accepted-but-unconfirmed, a few days before 20 Sept (activated reserves: the compressed variant before 29 Sept; no same-day nudge). Staging has a "send now" control; production runs it on schedule. After the deadline passes, the **seat release** list appears — releasing is an explicit human action; freed seats go to the Reserve list.
 
 **5.3 Reserve lists.** Both lists ranked by committee score, with the reply state (opted in / awaiting / declined — replies arrive by email and are recorded here) and **Activate**: sends the activation acceptance email with the 29 Sept deadline and puts the person into the normal gate flow. Places opening too late for email: contact the person directly (confirmed — no email fallback deadline).
 
@@ -124,4 +136,11 @@ No pair/meeting tracking during rotations · no availability collection · no re
 
 ## Appendix B — open items owed by the programme side (from the specs)
 
-SMC brand guidelines & assets (styling waits for them — Q12) · portal onboarding email copy · the SMC Charter link referenced in the Programme Rules · form fill-time estimate to measure on a real fill-through · confirmation of Q9 (auto-issue on approval).
+SMC brand guidelines & assets (styling waits for them — Q12) · portal onboarding email copy · form fill-time estimate to measure on a real fill-through · confirmation of Q9 (auto-issue on approval).
+
+Opened by the pre-login and Resources build specs:
+- **Outcome-by date, 14 or 18 Sept.** The Programme Owner asked for 14 Sept (F0816-152143); the later Pre-Login Site spec lists 18 Sept as confirmed. Running on **18 Sept** until the two are reconciled. (The accept-by date is settled: both sources say **20 Sept**, and that is what the system now uses.)
+- **Two FAQ answers** ("Do I need an account or a password to apply?", "How much time does it really take?") are not in the approved FAQ document. They are drafted from what the build actually does, never invented, and are marked *awaiting owner confirmation* on the page.
+- **FAQ mentee eligibility.** The spec flags that the source answer omits the SMU-undergraduate gate. The page states it, for consistency with the Mentees page and the application's own hard gate; flagged for confirmation.
+- **Concern link in the footer.** Not in the pre-login footer spec, but the Programme Owner required it on every public page (Q6). Kept, and raised with the UX owner rather than dropped.
+- **Gated documents are page-gated, not file-gated.** Static hosting serves the Resources files to anyone holding the URL. Production must move them behind authenticated storage; on the go-live list with Auth and the real mail channel.

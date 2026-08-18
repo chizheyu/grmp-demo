@@ -19,102 +19,107 @@ function copyHTML(lines){
 window.__APPLY = window.__APPLY || null;
 window.__OTP = window.__OTP || null;
 
+/* Documents supplied by the programme and hosted here, never hot-linked to Drive
+   (Resources Area spec, "Document hosting"). Relative paths so the same build works on
+   Firebase Hosting and on the sandbox. The Charter is the one public document. */
+const CHARTER_URL = 'docs/SMC_Charter_V1.0.pdf';
+
 const Views = {
 
-/* ---------- shared microsite chrome ---------- */
-msNav(){
+/* ---------- shared chrome (pre-login spec §B and §C) ----------
+   Nav is exactly Mentees / Mentors / FAQ, in that order. Apply is deliberately NOT in the
+   nav: it is the primary red action and lives only in page bodies. Sign in is secondary and
+   is never hidden, including inside the mobile menu. */
+msNav(active){
+  const signedIn = (typeof NET!=='undefined'&&NET) && SESSION && SESSION.identity;
+  const meHref = signedIn
+    ? (SESSION.identity.kind==='person' ? '#/me/'+SESSION.identity.personId
+                                        : '#/console/'+encodeURIComponent(SESSION.identity.name||''))
+    : '#/login';
+  const open = (typeof window!=='undefined' && window.__NAVOPEN);
+  const item = (key,href,label)=>`<a href="${href}" class="ms-navlink${active===key?' is-active':''}"${active===key?' aria-current="page"':''}>${label}</a>`;
+  const links = item('mentees','#/mentees','Mentees') + item('mentors','#/mentors','Mentors') + item('faq','#/faq','FAQ');
   return `<nav class="ms-nav"><div class="wrap row">
-    <a href="#/" class="ms-logo" style="text-decoration:none">SMC · GRMP<small>GLOBAL READY MENTORSHIP</small></a>
+    <a href="#/" class="ms-logo" style="text-decoration:none">${esc(F().pairName)} · GRMP<small>${esc(F().progName)}</small></a>
     <span class="spacer"></span>
-    <a href="#/guide/mentee">For Mentees</a>
-    <a href="#/guide/mentor">For Mentors</a>
-    <a href="#/apply/mentee" class="btn sm" style="background:#fff;color:var(--red);border-radius:8px">Apply</a>
-    ${(typeof NET!=='undefined'&&NET)?(SESSION?`<a href="${SESSION.identity&&SESSION.identity.kind==='person'?'#/me/'+SESSION.identity.personId:'#/console/'+encodeURIComponent((SESSION.identity&&SESSION.identity.name)||'')}" style="font-size:12px;opacity:.95">👤 ${esc((SESSION.identity&&SESSION.identity.name)||'me')}</a>`:`<a href="#/login" style="font-size:12.5px;font-weight:700">Sign in</a>`):''}
-  </div></nav>`;
+    <div class="ms-links">${links}</div>
+    ${signedIn
+      ? `<a href="${meHref}" class="ms-signin">👤 ${esc(SESSION.identity.name||'me')}</a>`
+      : `<span class="ms-signcue">Already accepted?</span><a href="${meHref}" class="ms-signin" title="For participants who have already been accepted">Sign in</a>`}
+    <button class="ms-burger" data-act="navToggle" aria-expanded="${open?'true':'false'}" aria-label="${open?'Close menu':'Open menu'}">${open?'✕':'☰'} Menu</button>
+  </div>${open?`<div class="ms-drawer wrap">${links}</div>`:''}</nav>`;
 },
+/* Footer: the spec's three elements, plus the private concern route. That fourth link is
+   not in the pre-login spec, but the Programme Owner required it on every public page
+   (Q6 / F0806-174654), so it stays and is flagged back to Joanne rather than dropped. */
 msFooter(){
-  return `<footer class="ms-footer"><div class="wrap" style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
-    <span>Singapore Mentorship Committee · ${F().label}</span>
-    <span class="spacer" style="flex:1"></span>
-    <a href="#/concern">Raise a concern (private)</a>
+  return `<footer class="ms-footer"><div class="wrap">
+    <div style="font-weight:700;color:#fff;margin-bottom:6px">${esc(F().progFull)}</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <a href="https://www.smcmentorship.org/" target="_blank" rel="noopener">About SMC<span class="ext" aria-label="opens in a new tab"> ↗</span></a>
+      <span aria-hidden="true">|</span>
+      <a href="${CHARTER_URL}" target="_blank" rel="noopener">SMC Charter<span class="ext" aria-label="opens in a new tab"> ↗</span></a>
+      <span aria-hidden="true">|</span>
+      <span>Programme Enquiries: <a href="mailto:${esc(F().enquiries)}">${esc(F().enquiries)}</a></span>
+      <span aria-hidden="true">|</span>
+      <a href="#/concern">Raise a concern (private)</a>
+    </div>
   </div></footer>`;
 },
 
-/* ---------- 1.1 landing ---------- */
+/* ---------- PAGE 1 — Home (pre-login spec §D) ----------
+   Orientation and routing only. No rotation detail, no philosophy strip beyond the hero
+   sub-line, and no FAQ block: those live on the dedicated pages. */
 landing(){
-  return this.msNav() + `
+  const CF = F();
+  return this.msNav('home') + `
   <header class="ms-hero"><div class="wrap">
-    <div class="eyebrow">Singapore Mentorship Committee · Global Ready for SG100</div>
-    <h1>Six months. Three mentors. A global-ready you.</h1>
-    <p>The Global Ready Mentorship Programme pairs ${F().inst?F().inst+' ':''}students with senior leaders across three rotations — ${F().spanLong}. One hour with the right mentor
-       can reframe a career.</p>
+    <div class="eyebrow">Singapore Mentorship Committee · ${esc(CF.pairName)}</div>
+    <h1>Six months. A mentoring journey that works both ways.</h1>
+    <p>GRMP pairs ${esc(CF.inst)} undergraduates with experienced mentors from the SMC community
+       across three rotations, from understanding yourself, to the world, to your way forward.
+       ${esc(CF.spanLong)}.</p>
     <div class="cta">
       <a class="btn btn-light" href="#/apply/mentee" style="text-decoration:none">Apply as a Mentee</a>
       <a class="btn btn-line" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
     </div>
   </div></header>
-  <div class="ms-strip">${F().short}${F().inst?` is piloted with ${F().inst}`:``} · ${F().mentors} mentors · ${F().mentees} mentees · applications reviewed by the programme team</div>
 
   <section class="ms-section"><div class="wrap">
-    <h2>Is this for you?</h2>
-    <div class="cards3" style="margin-top:14px">
-      <div class="tcard"><h3 style="margin-top:0">Who can apply</h3>
-        <p>Current ${F().inst?F().inst+' ':''}undergraduates from every school and every year — ready to be mentored,
-        and to do the reflecting that makes mentorship work. Places are capped at ${F().menteeCap}, and every application is read with care.</p></div>
-      <div class="tcard"><h3 style="margin-top:0">What it asks of you</h3>
-        <p>Meet your mentor <b>at least twice</b> in each two-month rotation, at times you both choose.
-        Write a private reflection after each rotation. One minute to close each rotation off. That is all.</p></div>
-      <div class="tcard"><h3 style="margin-top:0">What you leave with</h3>
-        <p>Three mentors across three rotations, matched to your industry preferences, a habit of reflecting on your own direction, and a
-        completion certificate presented jointly by ${F().inst||'the university'} and the Singapore Mentorship Committee.</p></div>
+    <h2>Two ways in</h2>
+    <div class="cards2" style="margin-top:14px">
+      <div class="tcard lane-mentee">
+        <h3 style="margin-top:0">Mentees</h3>
+        <p>Current ${esc(CF.inst)} undergraduate, any school, any year.</p>
+        <p style="margin-top:8px">Gain three mentors, real-world perspective, and a clearer next step.</p>
+        <p style="margin-top:14px"><a href="#/mentees" style="font-weight:700">Discover the mentee journey →</a></p>
+      </div>
+      <div class="tcard lane-mentor">
+        <h3 style="margin-top:0">Mentors</h3>
+        <p>Experienced professional, 5+ years, with demonstrated experience working across different
+           industries, cultures, markets or communities.</p>
+        <p style="margin-top:8px">Contribute two hours a rotation; gain fresh perspective and a global network.</p>
+        <p style="margin-top:14px"><a href="#/mentors" style="font-weight:700">Explore the mentor journey →</a></p>
+      </div>
     </div>
   </div></section>
 
   <section class="ms-section" style="padding-top:0"><div class="wrap">
     <h2>How the six months run</h2>
-    <p class="lede">Every step below is handled on this platform — no forms lost in inboxes, no chasing.</p>
     <div class="timeline">
-      <div class="tl-node"><div class="dot">1</div><h4>Apply · ${F().regWindow||F().applyShort}</h4><p>One staged form, reviewed by the programme team · outcome by ${F().outcomeByLong}</p></div>
-      <div class="tl-node"><div class="dot">2</div><h4>Accept your place</h4><p>Your personal link opens the portal gate — Programme Rules, a conflict declaration and Kick-Off attendance, by ${F().acceptByLong}</p></div>
-      <div class="tl-node"><div class="dot">3</div><h4>Kick-Off · ${F().kickoffShort}</h4><p>${F().kickoffLong}, ${F().kickoffTime} — a binding programme requirement</p></div>
-      <div class="tl-node"><div class="dot">4</div><h4>3 rotations · ${F().r1Short}–${F().endShort}</h4><p>Know Yourself · Know Your World · Know Your Path</p></div>
-      <div class="tl-node"><div class="dot">5</div><h4>Close-off each rotation</h4><p>Two meetings + your private reflection</p></div>
-      <div class="tl-node"><div class="dot">6</div><h4>Certificate · ${F().endShort}</h4><p>Complete all three rotations</p></div>
+      ${[['Apply · by '+CF.closesDayShort,'Complete a short application'],
+         ['Accept · by '+CF.acceptByDayShort,'Accept the charter &amp; commitments'],
+         ['Kick-Off · '+CF.kickoffDayShort,'Meet your cohort &amp; mentors'],
+         ['3 rotations · '+CF.rotSpanShort,'Engage, inspire, learn'],
+         ['Close each rotation','Reflect &amp; capture learning'],
+         ['Complete · '+CF.endMon3,'Complete and take forward']]
+        .map(([h,p],i)=>`<div class="tl-node"><div class="dot">${i+1}</div><h4>${esc(h).replace('&amp;amp;','&amp;')}</h4><p>${p}</p></div>`).join('')}
     </div>
+    <p style="margin-top:18px;font-size:13.5px"><a href="#/faq">Questions people ask before applying →</a></p>
   </div></section>
 
-  <section class="ms-section" style="background:var(--surface);border-top:1px solid var(--line)"><div class="wrap" style="display:flex;gap:26px;align-items:center;flex-wrap:wrap">
-    <div style="flex:1;min-width:260px">
-      <h2 style="margin-bottom:8px">Mentors: two hours a month that change a trajectory</h2>
-      <p class="lede" style="margin:0">Meet your mentee at least twice per two-month rotation, at times you both choose.
-      No admin burden — the platform handles everything except the conversation.</p>
-    </div>
-    <a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
-  </div></section>
-
-  <section class="ms-section"><div class="wrap">
-    <h2>Questions people ask before applying</h2>
-    <div class="faq">
-      ${[
-        ['Do I need an account or a password?',
-         'No password, ever. Your acceptance email carries your own personal link; opening it sends a one-time code to your email, and that signs you in. Only the programme team holds accounts.'],
-        ['How much time does it really take?',
-         'Two conversations per rotation, arranged directly between you and your mentor, plus a one-minute close-off at the end of each. Six conversations over six months.'],
-        ['Do I have to hand in my reflections?',
-         'No. Your reflection is yours. The platform records only that you completed the rotation — never what you wrote.'],
-        ['What if my mentor drops out?',
-         'You are re-matched within seven days from our Reserve Mentor list and briefed on the hand-over.'],
-        ['Can I get the same mentor twice?',
-         'No — you meet a different mentor in each rotation. That is the point of three rotations.'],
-        ['What if something goes wrong?',
-         'Every page carries a private "Raise a concern" link. It reaches the Escalation Owner alone — no other role, including IT support, can see it, and it is referred into SMC’s Grievance &amp; Misconduct process.'],
-      ].map(([q,a])=>`<details class="faq-item"><summary>${q}</summary><p>${a}</p></details>`).join('')}
-    </div>
-  </div></section>
-
-  <section class="ms-section" style="background:var(--ai-wash);border-top:1px solid var(--line)"><div class="wrap" style="text-align:center">
-    <h2 style="margin-bottom:6px">Applications are open</h2>
-    <p class="lede" style="margin:0 auto 18px">Reviewed by the programme team, with an outcome by ${F().outcomeByLong}. One staged form, no account.</p>
+  <section class="ms-section ms-closing"><div class="wrap" style="text-align:center">
+    <h2 style="margin-bottom:14px">Applications are open.</h2>
     <div class="cta" style="justify-content:center">
       <a class="btn btn-primary" href="#/apply/mentee" style="text-decoration:none">Apply as a Mentee</a>
       <a class="btn btn-ghost" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
@@ -122,38 +127,262 @@ landing(){
   </div></section>` + this.msFooter();
 },
 
-/* ---------- 1.2 guides ---------- */
-guideMentee(){
-  return this.msNav() + `<div class="doc-page">
-    <h1>Mentee Guide</h1>
-    <p class="lede">What's expected of you, and what you can expect from GRMP.</p>
-    <div class="doc-card"><h3>Your role</h3><ul>
-      <li>You own the relationship: reach out first, propose times, come prepared.</li>
-      <li>Meet your mentor at least twice per rotation.</li>
-      <li>Write your private reflection after each rotation, then close off on your personal page.</li></ul></div>
-    <div class="doc-card"><h3>Preparation expectations</h3><ul>
-      <li>Before each meeting: one topic you want to explore, one question you can't answer alone.</li>
-      <li>After: capture what shifted in your Reflection Sheet.</li></ul></div>
-    <div class="doc-card"><h3>Conduct</h3><ul>
-      <li>Respect your mentor's time and confidentiality. Mentorship is guidance, not job placement.</li>
-      <li>Concerns can be raised privately via the link in the footer.</li></ul></div>
-    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — the final Mentee Guide comes from Marylyn, GRMP’s content creator.</p>
+/* The three-rotation arc, shared by the Mentees and Mentors pages. Same rotations, framed
+   from each side: the mentee explores, the mentor contributes (spec §E and §F). */
+_rotationArc(rows){
+  return `
+    <h2>The three-rotation arc</h2>
+    <p class="arc-strip"><i>修身齐家治国平天下</i> | <b>AI-WT Mindset: Adaptive, Innovative, With the Times.</b>
+       AI-WT underpins GRMP, with each rotation progressively building one core capacity.</p>
+    <div class="cards3" style="margin-top:14px">
+      ${rows.map(r=>`<div class="tcard rot-card">
+        <div class="rot-label">${r[0]}</div>
+        <h3 style="margin:6px 0 4px">${esc(r[1])}</h3>
+        <p style="font-style:italic;margin-bottom:6px">${esc(r[2])}</p>
+        <p>${esc(r[3])}</p>
+      </div>`).join('')}
+    </div>`;
+},
+
+/* ---------- PAGE 2 — Mentees (pre-login spec §E) · gain-led, red lane ---------- */
+pageMentees(){
+  const CF = F();
+  return this.msNav('mentees') + `
+  <header class="ms-hero"><div class="wrap">
+    <div class="eyebrow">For mentees · ${esc(CF.inst)} undergraduates</div>
+    <h1>Three mentors. Six months. A clearer sense of where you are going.</h1>
+    <p>You do not need a plan yet. You need good questions, and people who have walked further ahead.
+       GRMP gives you both.</p>
+    <div class="cta"><a class="btn btn-light" href="#/apply/mentee" style="text-decoration:none">Apply as a Mentee</a></div>
+  </div></header>
+
+  <section class="ms-section"><div class="wrap">
+    <h2>What you gain</h2>
+    <div class="cards3" style="margin-top:14px">
+      <div class="tcard"><h3 style="margin-top:0">Three mentors</h3><p>A new mentor each rotation, drawn from SMC's global community.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">Real-world perspective</h3><p>How industries, workplaces and cultures actually work, beyond the classroom.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">A clearer next step</h3><p>Direction, one practical step, and a certificate from ${esc(CF.inst)} and SMC.</p></div>
+    </div>
+  </div></section>
+
+  <section class="ms-section" style="padding-top:0"><div class="wrap">
+    <h2>What it asks of you</h2>
+    <ul class="ms-list">
+      <li>Attend the Kick-Off on ${esc(CF.kickoffLong)}. A binding programme requirement.</li>
+      <li>Meet your mentor at least twice each rotation, virtually or in person.</li>
+      <li>Prepare, reflect after each conversation, and take ownership of your own growth.</li>
+      <li>Close with a Builder's Commitment: one simple way to give back to SMC.</li>
+    </ul>
+  </div></section>
+
+  <section class="ms-section" style="padding-top:0"><div class="wrap">
+    ${this._rotationArc([
+      ['ROTATION 1 · 修身 | Adaptive','Understand yourself','Who am I as a global citizen?','Surface your values, identity and strengths.'],
+      ['ROTATION 2 · 治国 | Innovative','Understand the real world','How do I navigate the world beyond my classroom?','Gain industry and cross-cultural perspective.'],
+      ['ROTATION 3 · 平天下 | With the Times','Plan your next step','How do I step forward and bring others with me?','Shape your direction, action and contribution.'],
+    ])}
+    <div class="reflect-bar">
+      <b>Your reflection sheet</b>
+      <span>One continuous thread across all three rotations. It belongs to you: you decide what to share
+        with each mentor, and it never needs to be submitted.</span>
+    </div>
+  </div></section>
+
+  <section class="ms-section ms-closing"><div class="wrap" style="text-align:center">
+    <h2 style="margin-bottom:6px">Ready to grow?</h2>
+    <p class="lede" style="margin:0 auto 18px">Applications close ${esc(CF.applyClosesLong)}. Outcome by ${esc(CF.outcomeByNoYear)}.</p>
+    <div class="cta" style="justify-content:center">
+      <a class="btn btn-primary" href="#/apply/mentee" style="text-decoration:none">Apply as a Mentee</a>
+    </div>
+  </div></section>` + this.msFooter();
+},
+
+/* ---------- PAGE 3 — Mentors (pre-login spec §F) · contribute-led, navy lane ---------- */
+pageMentors(){
+  const CF = F();
+  return this.msNav('mentors') + `
+  <header class="ms-hero hero-navy"><div class="wrap">
+    <div class="eyebrow">For mentors · Experienced professionals</div>
+    <h1>Two hours a rotation. A perspective a student will carry for years.</h1>
+    <p>You do not need all the answers. What matters is your willingness to listen, share honestly,
+       and help a young person think more clearly.</p>
+    <div class="cta"><a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a></div>
+  </div></header>
+
+  <section class="ms-section"><div class="wrap">
+    <h2>What you contribute</h2>
+    <ul class="ms-list">
+      <li>Mentor across three rotations, a new mentee in each, ${esc(CF.spanLong)}.</li>
+      <li>Meet your mentee at least twice per rotation, virtually or in person.</li>
+      <li>Attend the Kick-Off on ${esc(CF.kickoffLong)}. A binding programme requirement.</li>
+      <li>Share not just your successes, but the setbacks and choices that shaped you.</li>
+    </ul>
+  </div></section>
+
+  <section class="ms-section" style="padding-top:0"><div class="wrap">
+    <h2>What you gain</h2>
+    <div class="cards2" style="margin-top:14px">
+      <div class="tcard"><h3 style="margin-top:0">Sharper coaching and leadership</h3><p>Mentoring across a cohort strengthens how you guide and develop people.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">Fresh perspective</h3><p>See how the next generation thinks about work, values and change.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">A global network</h3><p>Join 5,000+ SMC members across 35 countries.</p></div>
+      <div class="tcard"><h3 style="margin-top:0">Recognition</h3><p>A Certificate of Appreciation jointly presented by ${esc(CF.inst)} and SMC.</p></div>
+    </div>
+    <div class="role-block">
+      <b>Your role: guide, challenge, inspire</b>
+      <p>Ask the questions that open new thinking, share the experience that widens their view, and
+         encourage them to act. You are not here to give answers or offer jobs, you are here to help
+         them find their own next step. The rotation conversation guides give you a starting point.</p>
+    </div>
+  </div></section>
+
+  <section class="ms-section" style="padding-top:0"><div class="wrap">
+    ${this._rotationArc([
+      ['ROTATION 1 · 修身 | Adaptive','Understand yourself','Who am I as a global citizen?','Help surface values, identity and strengths.'],
+      ['ROTATION 2 · 治国 | Innovative','Understand the real world','How do I navigate the world beyond my classroom?','Bring industry and cross-cultural perspective.'],
+      ['ROTATION 3 · 平天下 | With the Times','Plan the next step','How do I step forward and bring others with me?','Support direction, action and contribution.'],
+    ])}
+  </div></section>
+
+  <section class="ms-section ms-closing"><div class="wrap" style="text-align:center">
+    <h2 style="margin-bottom:6px">Shape a global-ready leader.</h2>
+    <p class="lede" style="margin:0 auto 18px">Applications close ${esc(CF.applyClosesLong)}. Outcome by ${esc(CF.outcomeByNoYear)}.</p>
+    <div class="cta" style="justify-content:center">
+      <a class="btn btn-primary" href="#/apply/mentor" style="text-decoration:none">Apply as a Mentor</a>
+    </div>
+  </div></section>` + this.msFooter();
+},
+
+/* ---------- PAGE 4 — FAQ (pre-login spec §G) ----------
+   Three tabs, sub-category headings, single-open accordions, all collapsed on load. Answers
+   are the approved FAQ document's, with the two alignment notes the spec records. */
+_faqContent(){
+  const CF = F();
+  return {
+    about:{label:'About GRMP', groups:[
+      ['The basics',[
+        ['What is GRMP?',
+         'GRMP is a six-month, one-to-one mentorship programme that connects university students with experienced professionals. Through mentor conversations, students reflect on themselves, learn about the real world, and think about their next steps.'],
+        ['Is GRMP a job placement programme?',
+         'No. GRMP does not guarantee internships, jobs or business opportunities. The programme is about learning, reflection, guidance and growth.'],
+        ['What does "global-ready" mean?',
+         'It means being able to navigate diverse cultures with confidence, solve the right problems with clarity, and turn uncertainty into opportunities to learn and grow, so that every generation can empower the next.'],
+        ['How does GRMP work?',
+         'GRMP has three mentoring rotations. Rotation 1, Understand Yourself: interests, strengths, values and goals. Rotation 2, Understand the Real World: work, industry, culture and real-world choices. Rotation 3, Plan Your Next Step: direction, action and giving back. The three-rotation journey is inspired by the founder’s philosophy 修身齐家治国平天下 and the AI-WT Mindset: Rotation 1 reflects 修身 and Adaptive, Rotation 2 reflects 治国 and Innovative, and Rotation 3 reflects 平天下 and With the Times.'],
+      ]],
+      ['Practical',[
+        ['Do I need an account or a password to apply?',
+         'No. Applications need no account and no password: you apply directly from the mentee or mentor page on this site. Accounts exist only for the programme team. If you are offered a place, your acceptance email carries your own personal link, and opening it sends a one-time code to your email address.', true],
+        ['How much time does it really take?',
+         'At least two conversations with your mentor in each rotation, arranged directly between the two of you, plus a short close-off at the end of each rotation. Six conversations across the six months, and the Kick-Off evening.', true],
+        ['What support and materials will I get?',
+         'Once you join, you will have access to preparation notes, conversation guides and briefing materials for every rotation, all in one place on the platform.'],
+        ['What if I have concerns during the programme?',
+         `If you feel uncomfortable, unclear or unable to continue, please contact the programme team at ${CF.enquiries}. The team will provide support and guidance.`],
+        ['How do I apply?',
+         'Applications are made through this site. On the mentee or mentor page, choose Apply, and complete the short application before the closing date. No account is needed to apply.'],
+      ]],
+    ]},
+    mentees:{label:'For mentees', groups:[
+      ['Joining as a mentee',[
+        ['Who can join as a mentee?',
+         `Current ${CF.inst} undergraduates of all nationalities who are highly motivated and who value mentorship, and who are open to learning, asking questions and reflecting on their growth, can join as mentees. You do not need to have a clear career plan before joining.`, true],
+        ['What can mentees gain?',
+         'A better understanding of themselves; practical insights from real-world professionals; more confidence in asking questions; a wider view of work and society; meaningful connections with mentors and peers; and clearer next steps after the programme.'],
+        ['What is expected of mentees?',
+         'Attend mentor meetings responsibly; prepare questions before each session; be respectful of mentors’ time; reflect on what they learn; take small actions after each conversation; and think about how they can give back to SMC.'],
+        ['What is the reflection sheet?',
+         'The reflection sheet is a simple tool for mentees to record their goals, key learning, new insights, next steps and what they want to carry forward. It belongs to the mentee, and mentees decide what to share with each mentor.'],
+      ]],
+      ['Taking part',[
+        ['What is a give-back action?',
+         'A Builder’s Commitment, or give-back action, is one simple way a mentee can contribute back to the SMC community: sharing learning with peers, supporting future mentees, volunteering in an SMC activity, helping with a student initiative, or staying connected with the SMC community.'],
+        ['How can mentees contribute?',
+         'Share useful feedback; support future GRMP participants; share learning with peers; participate in SMC activities where appropriate; and commit to one practical way of giving back to the SMC community.'],
+      ]],
+    ]},
+    mentors:{label:'For mentors', groups:[
+      ['Becoming a mentor',[
+        ['Who can become a mentor?',
+         'Mentors are working professionals with at least five years of professional experience who are passionate about sharing their experience and supporting the development of young people. Mentors do not need to have all the answers. What matters most is their willingness to listen, guide and encourage.'],
+        ['What is the mentor’s role?',
+         'Mentors help mentees think more clearly, broaden their perspectives and take greater ownership of their development. They establish what the mentee hopes to achieve, share relevant real-world experience, ask thoughtful questions, offer industry and workplace insights, and help identify development areas, skills or knowledge gaps and practical next steps. Mentors are also expected to stay committed throughout the programme, maintain regular contact and respect the confidentiality of information shared by the mentee. Mentors are not expected to provide jobs or internships, or to have all the answers.'],
+        ['How many meetings are expected?',
+         'Each mentor-mentee pair should aim to have at least two meaningful conversations per rotation. Meetings can be in person or online.'],
+      ]],
+      ['Taking part',[
+        ['How can mentors contribute?',
+         'Join SMC community activities; share relevant expertise or perspectives with the wider community; encourage other suitable professionals to mentor; and support future SMC initiatives where appropriate.'],
+      ]],
+    ]},
+  };
+},
+pageFaq(){
+  const content = this._faqContent();
+  const keys = ['about','mentees','mentors'];
+  const tab = (typeof window!=='undefined' && window.__FAQTAB && content[window.__FAQTAB]) ? window.__FAQTAB : 'about';
+  const panel = content[tab];
+  let n = 0;
+  return this.msNav('faq') + `
+  <div class="doc-page" style="max-width:860px">
+    <h1>Questions people ask before applying</h1>
+    <p class="lede">Pick your view. Shared questions apply to everyone.</p>
+    <div class="faq-tabs" role="tablist" aria-label="Question sets">
+      ${keys.map(k=>`<button role="tab" id="faqtab-${k}" aria-controls="faqpanel" aria-selected="${k===tab?'true':'false'}"
+        class="faq-tab${k===tab?' is-active':''}" data-act="faqTab" data-tab="${k}">${esc(content[k].label)}</button>`).join('')}
+    </div>
+    <div id="faqpanel" role="tabpanel" aria-labelledby="faqtab-${tab}">
+      ${panel.groups.map(([heading, rows])=>`
+        <h2 class="faq-group">${esc(heading)}</h2>
+        <div class="faq">
+          ${rows.map(([q,a,flagged])=>{ n++; return `<details class="faq-item" name="faq-${tab}">
+            <summary>${esc(q)}</summary>
+            <p>${esc(a)}${flagged?` <span class="faq-flag" title="Drafted for the programme owner to confirm before publishing">awaiting owner confirmation</span>`:''}</p>
+          </details>`; }).join('')}
+        </div>`).join('')}
+    </div>
   </div>` + this.msFooter();
 },
-guideMentor(){
-  return this.msNav() + `<div class="doc-page">
-    <h1>Mentor Brief</h1>
-    <p class="lede">Thank you for volunteering. Here's the shape of the commitment.</p>
-    <div class="doc-card"><h3>Role expectations</h3><ul>
-      <li>Up to two mentees per rotation; at least two meetings with each per rotation.</li>
-      <li>Share honestly — your career's real turns are the curriculum.</li></ul></div>
-    <div class="doc-card"><h3>Boundaries & confidentiality</h3><ul>
-      <li>What your mentee shares stays between you, except safety concerns (use the private concern link).</li>
-      <li>Mentorship is not recruitment; avoid conflicts of interest.</li></ul></div>
-    <div class="doc-card"><h3>Your one checkpoint</h3><ul>
-      <li>A single short mid-programme review in ${F().midMonth} — two minutes, on your personal page.</li></ul></div>
-    <p style="font-size:12px;color:var(--ink-3)">Placeholder structure — the final Mentor Brief comes from Marylyn, GRMP’s content creator.</p>
+
+/* ---------- Resources (post-login) — Resources Area spec ----------
+   Every signed-in participant sees every document; the two headings are labels, not filters.
+   Nothing else on the page: no links out to the public site, no application links. */
+resources(){
+  if(typeof anyLinkAuthed==='function' && !anyLinkAuthed()){
+    return this.msNav() + `<div class="doc-page" style="max-width:560px">
+      <h1>Resources</h1>
+      <p class="lede">These materials are for GRMP participants. Please open your personal link, or sign in, to reach them.</p>
+      <a class="btn btn-primary" href="#/login" style="text-decoration:none">Sign in</a>
+    </div>` + this.msFooter();
+  }
+  const secs = GRMP.RESOURCES;
+  return this.ppNav('resources') + `<div class="doc-page" style="max-width:860px">
+    <h1>Resources</h1>
+    <p class="lede">Everything you need to prepare well, in one place. These materials are for GRMP participants.</p>
+    ${['mentees','mentors'].map(key=>{
+      const rows = secs.filter(d=>d.section===key);
+      if(!rows.length) return '';
+      return `<h2 class="res-head">${key==='mentees'?'For mentees':'For mentors'}</h2>
+      ${rows.map(d=>`<div class="res-row">
+        <div><b>${esc(d.title)}</b><div class="res-desc">${esc(d.desc)}</div></div>
+        <a class="btn sm btn-ghost" href="docs/resources/${encodeURIComponent(d.file)}" target="_blank" rel="noopener"
+           style="text-decoration:none;white-space:nowrap">Open ${esc(d.title)}<span class="ext" aria-label="opens in a new tab"> ↗</span></a>
+      </div>`).join('')}`;
+    }).join('')}
   </div>` + this.msFooter();
+},
+
+/* Authenticated participant chrome. Resources sits to the right, as the spec places it. */
+ppNav(active, personId){
+  const pid = personId
+    || ((typeof SESSION!=='undefined' && SESSION && SESSION.identity && SESSION.identity.kind==='person')
+        ? SESSION.identity.personId
+        : (typeof lastLinkAuthed==='function' ? lastLinkAuthed() : null));
+  return `<nav class="ms-nav pp-nav"><div class="wrap row">
+    <a href="#/" class="ms-logo" style="text-decoration:none">${esc(F().pairName)} · GRMP<small>Participant portal</small></a>
+    <span class="spacer"></span>
+    ${pid?`<a href="#/me/${esc(pid)}" class="ms-navlink${active==='me'?' is-active':''}">My programme</a>`:''}
+    <a href="#/resources" class="ms-navlink${active==='resources'?' is-active':''}"${active==='resources'?' aria-current="page"':''}>Resources</a>
+  </div></nav>`;
 },
 
 /* ---------- 1.3 reflection sheet ---------- */
@@ -281,7 +510,9 @@ _menteeStep1(S, CF){
   <div class="f-row"><label>How did you hear about GRMP? <span class="req">*</span></label>
     <select id="af-heard"><option value=""></option>${GRMP.FORM_OPTS.heardMentee.map(o=>`<option${this._sel(S,'heard',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'heard')}</div>
   ${/referred/.test(S.d.heard||'')?`<div class="f-row"><label>Who referred you? <span class="req">*</span></label>
-    <input type="text" id="af-referrer" value="${this._v(S,'referrer')}" placeholder="Name of the person who referred you.">${this._err(S,'referrer')}</div>`:''}`;
+    <input type="text" id="af-referrer" value="${this._v(S,'referrer')}" placeholder="Name of the person who referred you.">${this._err(S,'referrer')}</div>`:''}
+  ${S.d.heard===GRMP.IND_OTHER?`<div class="f-row"><label>Please tell us how <span class="req">*</span></label>
+    <input type="text" id="af-heardOther" value="${this._v(S,'heardOther')}" placeholder="Where you heard about GRMP.">${this._err(S,'heardOther')}</div>`:''}`;
 },
 _menteeStep2(S, CF){
   return `
@@ -316,6 +547,9 @@ _menteeStep3(S, CF){
   ${indSel('ind1','Most preferred industry')}
   ${indSel('ind2','Second preferred industry')}
   ${indSel('ind3','Third preferred industry')}
+  ${[S.d.ind1,S.d.ind2,S.d.ind3].includes(GRMP.IND_OTHER)?`<div class="f-row"><label>You chose Other — which industry is it? <span class="req">*</span></label>
+    <input type="text" id="af-industryPrefOther" value="${this._v(S,'industryPrefOther')}" placeholder="The industry you have in mind.">
+    <div class="f-micro">So we can match you even though it is not on the list.</div>${this._err(S,'industryPrefOther')}</div>`:''}
   <p class="f-secnote">Your three preferences must be three different industries — they map directly to how mentors describe themselves, so we can match on the same keys.</p>`;
 },
 _menteeStep4(S, CF){
@@ -363,12 +597,12 @@ _mentorStep2(S, CF){
   return `
   ${returning?`<p class="f-secnote">Welcome back — as a returning mentor we only need your current professional details.</p>`:''}
   <div class="f-grid2">
-    <div class="f-row"><label>Organisation <span class="req">*</span></label><input type="text" id="af-org" value="${this._v(S,'org')}"><div class="f-micro">May have changed since last cycle.</div>${this._err(S,'org')}</div>
+    <div class="f-row"><label>Organisation <span class="req">*</span></label><input type="text" id="af-org" value="${this._v(S,'org')}">${this._err(S,'org')}</div>
     <div class="f-row"><label>Designation <span class="req">*</span></label><input type="text" id="af-designation" value="${this._v(S,'designation')}">${this._err(S,'designation')}</div>
   </div>
   <div class="f-row"><label>Current industry <span class="req">*</span></label>
     <select id="af-industry"><option value=""></option>${GRMP.INDUSTRIES.map(o=>`<option${this._sel(S,'industry',o)}>${esc(o)}</option>`).join('')}</select>${this._err(S,'industry')}</div>
-  ${S.d.industry===GRMP.INDUSTRIES[16]?`<div class="f-row"><label>Your industry (free text) <span class="req">*</span></label>
+  ${S.d.industry===GRMP.IND_OTHER?`<div class="f-row"><label>Your industry (free text) <span class="req">*</span></label>
     <input type="text" id="af-industryOther" value="${this._v(S,'industryOther')}">${this._err(S,'industryOther')}</div>`:''}
   <div class="f-row"><label>LinkedIn profile URL <span class="req">*</span></label>
     <input type="text" id="af-linkedin" value="${this._v(S,'linkedin')}" placeholder="linkedin.com/in/yourname">
@@ -433,8 +667,15 @@ applied(personId){
     ${copyHTML(txt)}
     <div class="card" style="text-align:left"><h3>What happens behind the scenes</h3>
       <p style="font-size:13px;color:var(--ink-2);margin:0">Your application is now in the master tracker with status
-      <b>${esc(p.appStatus)}</b>, and your acknowledgement email is in the outbox — visible to reviewers in the admin console. Open the console from the
-      <b>Open as…</b> switcher (bottom-left) to see the other side of this staging build.</p></div>
+      <b>${esc(p.appStatus)}</b>, and your acknowledgement email is in the outbox.</p>
+      ${/* Wei Kiat (F0818 group message): applicants must not see the staging pointer, and Esther
+            asked the same question in F0816-160640. It stays for a signed-in team account, which
+            is who it was written for, labelled so nobody mistakes it for applicant-facing copy. */
+        (typeof SESSION!=='undefined' && SESSION && SESSION.identity && SESSION.identity.kind==='admin')
+        ? `<p style="font-size:12px;color:var(--ink-3);margin:8px 0 0;border-top:1px dashed var(--line);padding-top:8px">
+            <b>Team view only</b> (applicants do not see this line): the record is visible to reviewers in the admin console.
+            Open the console from the <b>Open as…</b> switcher (bottom-left) to see the other side of this staging build.</p>`
+        : ''}</div>
     <a class="btn btn-ghost" href="#/" style="text-decoration:none">Back to the programme site</a>
   </div>` + this.msFooter();
 },
@@ -790,7 +1031,7 @@ personal(personId){
       <h2>Certificate of Completion</h2><div class="nm">${esc(p.name)}</div>
       <div class="meta">${F().label} · all three rotations completed · issued ${esc(db.certificates.find(c=>c.personId===p.id).at)}</div></div>` : '';
 
-  return `<div class="pp-shell">
+  return this.ppNav('me', personId) + `<div class="pp-shell">
     <div class="pp-head">
       <div class="avatar ${mentee?'av-mentee':'av-mentor'}">${esc(p.name.split(' ').map(w=>w[0]).slice(0,2).join(''))}</div>
       <div><h1>Hi ${esc(p.firstName||p.name.split(' ')[0])}</h1>

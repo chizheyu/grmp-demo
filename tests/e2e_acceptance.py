@@ -75,7 +75,7 @@ ADMINS = {
 DISPLAY = {"esther": "Esther", "weikiat": "Wei Kiat", "kenzie": "Kenzie",
            "yutong": "Yu Tong", "portia": "Portia", "sapranshu": "Sapranshu"}
 PERSONAS = ["mentee.new", "mentee.mid", "mentee.done", "mentor.active", "mentor.bench"]
-PUBLIC = ["#/", "#/guide/mentee", "#/guide/mentor", "#/reflection", "#/concern",
+PUBLIC = ["#/", "#/mentees", "#/mentors", "#/faq", "#/resources", "#/reflection", "#/concern",
           "#/apply/mentee", "#/apply/mentor", "#/manual", "#/changelog", "#/decisions"]
 
 

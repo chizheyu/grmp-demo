@@ -75,18 +75,65 @@ const AI = {
     return null;
   },
 
+  /* Field names must track the application specs. They were left on the pre-R5 shape
+     (role / track / goals / devNeeds) after the forms were rebuilt, so the model was being
+     handed a near-empty object and filling the gaps itself. Read from what the form collects. */
+  _appData(p){
+    return p.kind==='mentor'
+      ? {designation:p.designation, organisation:p.org, industry:p.industry,
+         yearsOfExperience:p.yearsExp, hasLedATeam:p.ledTeam, leadershipExperience:p.leadership,
+         crossIndustryExposure:p.crossIndustry, priorMentoring:p.priorMentoring,
+         whatDrawsThemToMentoring:p.draws, interestsTheyOffer:p.interests,
+         anythingElse:p.anythingElse, returningMentor:!!p.returning}
+      : {university:p.university, faculty:p.faculty, secondFaculty:p.faculty2,
+         degreeOrMajor:p.degree, yearOfStudy:p.year, industryPreferences:p.industryPrefs,
+         prompt1_growthAndOwnership:p.prompt1, prompt2_curiosityAndCommunity:p.prompt2,
+         commitmentAnswer:p.commit};
+  },
+
   summaryPrompt(p){
-    const data = p.kind==='mentor'
-      ? {role:p.role, organisation:p.org, industry:p.industry, background:p.background,
-         leadership:p.leadership, crossCultural:p.xcultural, languages:p.languages,
-         motivation:p.motivation, track:p.track}
-      : {university:p.university, course:p.course, year:p.year, goals:p.goals,
-         developmentNeeds:p.devNeeds, industryInterest:p.industryInterest,
-         expectations:p.expectations, readinessToReflect:p.readiness, track:p.track};
     return `You are assisting volunteer reviewers of GRMP, a Singapore mentorship programme.
 Summarise this ${p.kind} application in 3 short factual sentences a busy reviewer can scan.
-Do NOT recommend accepting or rejecting. No greetings, no markdown, plain text only.
-Application data: ${JSON.stringify(data)}`;
+Use only what is in the data. Do NOT recommend accepting or rejecting.
+No greetings, no markdown, plain text only.
+Application data: ${JSON.stringify(this._appData(p))}`;
+  },
+
+  /* Per-criterion score proposal (Wei Kiat, F0818-004720 / F0818-004811). The reviewer keys
+     nothing in; they check and adjust. Strict JSON so a malformed answer is discarded rather
+     than half-parsed — on any doubt the rule-based proposal already on screen stands. */
+  scorePrompt(p, criteria){
+    return `You are assisting volunteer reviewers of GRMP, a Singapore mentorship programme.
+Propose a score from 1 to 5 for each selection criterion below, reading ONLY the application data.
+5 = outstanding, 4 = strong, 3 = adequate, 2 = weak, 1 = not ready.
+
+Rules you must follow:
+- Score every criterion listed, using its exact name as the key.
+- Judge only on evidence present in the data. Absent evidence is a 3, not a guess.
+- Give a "why" of at most 15 words per criterion, quoting or naming what you read.
+- Do NOT recommend accepting, reserving or rejecting. The score is a proposal a human confirms.
+- Output STRICT JSON only, no markdown fence, no preamble, in exactly this shape:
+{"scores":[{"key":"<criterion name>","score":<1-5>,"why":"<short reason>"}]}
+
+Criteria: ${JSON.stringify(criteria.map(c=>({key:c.key, reads:c.hint})))}
+Application data: ${JSON.stringify(this._appData(p))}`;
+  },
+
+  /* Returns [{key, score, why}] or null. Never throws — the caller keeps its rule-based rows. */
+  parseScores(txt, criteria){
+    try{
+      const m = String(txt||'').match(/\{[\s\S]*\}/);          // tolerate a stray fence or prose
+      const j = JSON.parse(m ? m[0] : txt);
+      const rows = j && j.scores;
+      if(!Array.isArray(rows) || !rows.length) return null;
+      const out = criteria.map(c=>{
+        const r = rows.find(x=>x && String(x.key).trim().toLowerCase()===c.key.toLowerCase());
+        const n = r && Math.round(Number(r.score));
+        if(!(n>=1 && n<=5)) return null;                        // one bad row voids the set:
+        return {key:c.key, score:n, why:String(r.why||'').slice(0,140)};
+      });
+      return out.every(Boolean) ? out : null;                   // partial fills are worse than none
+    }catch(e){ return null; }
   },
 
   /* The system decides the pairing and computes why. The model's only job is to make

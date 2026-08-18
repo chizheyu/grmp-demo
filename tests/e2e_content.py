@@ -18,7 +18,7 @@ URL = "https://grmp-platform.web.app"
 PASS = "grmp2026"
 ADMINS = {"esther": "Esther", "weikiat": "Wei Kiat", "kenzie": "Kenzie",
           "yutong": "Yu Tong", "portia": "Portia", "sapranshu": "Sapranshu"}
-PUBLIC = ["#/", "#/guide/mentee", "#/guide/mentor", "#/reflection", "#/concern",
+PUBLIC = ["#/", "#/mentees", "#/mentors", "#/faq", "#/resources", "#/reflection", "#/concern",
           "#/apply/mentee", "#/apply/mentor", "#/manual", "#/changelog", "#/decisions"]
 JUNK = re.compile(r"\bundefined\b|\bNaN\b|\[object Object\]|\bnull\b|Lorem ipsum|TODO|FIXME|XXX|\$\{")
 DATE = re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b")

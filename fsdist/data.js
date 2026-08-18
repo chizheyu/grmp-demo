@@ -41,6 +41,11 @@ const INDUSTRIES = [
   'Banking, Finance & Insurance',
   'Legal',
   'Technology, Media & Telecommunications (TMT)',
+  'Artificial Intelligence (AI)',                 // added on Wei Kiat's request (F0818-001327 /
+                                                  // F0817-235816) — the spec list had no AI entry.
+                                                  // Added to BOTH sides at once: the specs require
+                                                  // mentor self-classification and mentee preference
+                                                  // to stay one identical list.
   'Consumer Goods & Retail (incl. FMCG)',
   'Manufacturing & Industrials',
   'Energy, Utilities & Resources',
@@ -54,6 +59,10 @@ const INDUSTRIES = [
   'Sustainability & ESG',
   'Other',
 ];
+/* Referenced by value, never by position — the list grows (AI was added mid-cycle) and a
+   hard-coded offset into it silently starts meaning a different industry the day it does.
+   Guarded in L1: no file may index this array with a number literal. */
+const IND_OTHER = 'Other';
 /* Seven SMU undergraduate schools, verified by Wei Kiat Koh for AY2026/27. No "Other". */
 const FACULTIES = [
   'Lee Kong Chian School of Business',
@@ -63,6 +72,27 @@ const FACULTIES = [
   'School of Social Sciences',
   'Yong Pung How School of Law',
   'College of Integrative Studies',
+];
+/* Post-login Resources library (Resources Area spec §A). Everyone signed in sees everything;
+   the two sections are labels, not filters, and the order here is the order on the page.
+   Filenames are deliberately version-free: the spec's versioning rule is "override in place",
+   so a revised deck replaces the file at the same path and every existing link still works. */
+const RESOURCES = [
+  {section:'mentees', file:'mentee-preparation-note.docx',
+   title:'Mentee Preparation Note (Rotations 1–3)',
+   desc:'How to prepare for each rotation, with questions to ask.'},
+  {section:'mentees', file:'mentee-briefing-deck.pptx',
+   title:'Mentee Briefing Deck',
+   desc:'The full guide to the mentee role across the arc.'},
+  {section:'mentees', file:'personal-reflection-sheet.docx',
+   title:'Personal Reflection Sheet (template)',
+   desc:'The blank reflection template. It belongs to you and is never submitted.'},
+  {section:'mentors', file:'mentor-rotation-briefing-and-conversation-guide.docx',
+   title:'Mentor Rotation Briefing & Conversation Guide',
+   desc:'The mentor’s role and conversation prompts for each rotation.'},
+  {section:'mentors', file:'mentor-briefing-deck.pptx',
+   title:'Mentor Briefing Deck',
+   desc:'The full guide to mentoring across the arc.'},
 ];
 /* Selection criteria. `scored:false` = a confirmation captured on the form, not a 1–5 read. */
 const MENTEE_CRITERIA = [
@@ -516,7 +546,7 @@ function buildSeed(){
           leadership:pick(LEADERSHIP_POOL), crossIndustry:pick(FORM_OPTS.crossIndustry),
           priorMentoring: rnd()<0.6?'Yes':'No'});
       }
-      p.background = `${p.yearsExp||'previous-cycle mentor'}${p.yearsExp?' of experience':''} in ${p.industry===INDUSTRIES[16]?'their field':p.industry}`;
+      p.background = `${p.yearsExp||'previous-cycle mentor'}${p.yearsExp?' of experience':''} in ${p.industry===IND_OTHER?'their field':p.industry}`;
     }else{
       const fac = pick(FACULTIES);
       Object.assign(p,{university:'SMU', faculty:fac, faculty2:'Not applicable',
@@ -525,7 +555,7 @@ function buildSeed(){
         heard:pick(FORM_OPTS.heardMentee),
         prompt1:`Six months from now I hope to have grown ${pick(P1_GROW)}. ${pick(P1_MOMENT)}, and I want to keep building that muscle with a mentor who will hold me to it.`,
         prompt2:`I keep getting pulled toward ${pick(P2_PULL)}. Beyond my own field I read widely and ask a lot of questions. In this community I would want to show up by ${pick(P2_SHOW)}.`,
-        industryPrefs: pickN(INDUSTRIES.slice(0,16), 3),
+        industryPrefs: pickN(INDUSTRIES.filter(i=>i!==IND_OTHER), 3),
         commit:'yes', telegramConsent: rnd()<0.92?'Yes':'No'});
       if(p.heard===FORM_OPTS.heardMentee[0]) p.referrer = uname(used).full;
       if(p.telegramConsent==='No') p.contactPref = pick(['Email','Phone']);
@@ -720,9 +750,16 @@ function buildSeed(){
       // confirmation lives in the acceptance gate per the post-selection specs).
       orientationVideo:'', orientationVideoMentor:'',
       registration:{opens:'2026-09-01', closes:'2026-09-10'},
-      /* R5 selection timeline — spec-confirmed constants (Standards note §1) */
-      selection:{approvalsBy:'2026-09-16', outcomeBy:'2026-09-18', acceptBy:'2026-09-26',
-                 reserveAcceptBy:'2026-09-29', reminderOn:'2026-09-23', menteeCap:60},
+      /* Selection timeline — spec-confirmed constants (Standards note §1).
+         R6: accept-by moved 26 Sept → 20 Sept. Both sources now say 20: the Pre-Login Site
+         spec carries it as confirmed-do-not-reopen, and Esther asked for the same shift in
+         F0816-152143. The single-shot acceptance reminder moves with it (three days before
+         the deadline, as before). Reserve activation stays 29 Sept: no spec changed it, and
+         it still sits clear of the Kick-Off.
+         OPEN: Esther also asked for outcome-by 14 Sept; the later spec says 18 Sept and lists
+         it as confirmed. Left at 18 pending the team's answer — see GRMP_R6_Spec_Delta §4. */
+      selection:{approvalsBy:'2026-09-16', outcomeBy:'2026-09-18', acceptBy:'2026-09-20',
+                 reserveAcceptBy:'2026-09-29', reminderOn:'2026-09-17', menteeCap:60},
       mail:{from:'SMC GRMP Team', replyTo:'smu.smc@sa.smu.edu.sg'},
       signatories:[
         {name:'Esther Koh', titles:['Chief, SMC HR & Transformation']},
@@ -733,7 +770,7 @@ function buildSeed(){
       rotations:[{n:1,label:'Know Yourself',start:'2026-10-01',end:'2026-11-30'},
                  {n:2,label:'Know Your World',start:'2026-12-01',end:'2027-01-31'},
                  {n:3,label:'Know Your Path',start:'2027-02-01',end:'2027-03-31'}],
-      ackLadder:[{date:'2026-09-23',what:'Acceptance reminder — sent once, no same-day nudge (confirmed)',who:'accepted, place not yet confirmed'},
+      ackLadder:[{date:'2026-09-17',what:'Acceptance reminder — sent once, no same-day nudge (confirmed)',who:'accepted, place not yet confirmed'},
                  {date:'2026-09-27',what:'Reserve-activation reminder — one to two days before the activation deadline',who:'activated reserves, place not yet confirmed'}],
       admins:[{name:'Esther', role:'Programme Owner', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
               {name:'Wei Kiat', role:'Programme Lead', roles:['lead','coordinator','mentor_reviewer','mentee_reviewer','escalation']},
@@ -755,6 +792,8 @@ function buildSeed(){
         Q10:{title:'Draft-saving on the application forms is removed: the specs confirm no save-and-resume (no applicant login, so no identity to attach a partial record to). This supersedes the earlier draft behaviour built from feedback F0806-205424; a browser leave-site warning guards accidental loss instead.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Portal Capability & Technical Assumptions §1 [CONFIRMED]'}},
         Q11:{title:'Orientation videos are an optional briefing resource, not a gate: the binding step is the acceptance gate (Rules + COI + Kick-Off attendance), per the post-selection specs. Kick-Off exceptions route to Esther Koh and Wei Kiat Koh.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Post-Selection Specs §2.1 — gate defines confirmation'}},
         Q12:{title:'Visual styling deliberately stays as the current neutral theme: the specs say do not invent a brand theme, and SMC brand guidelines/assets are an outstanding input (owner: SMC comms lead). Restyle lands when the assets do.', inferred:true},
+        Q13:{title:'Selection dates, as they now run. Acceptance deadline: 20 September (moved from 26) — the Pre-Login Site spec and Esther’s 16 August note both ask for this, and it flows through the acceptance emails, the Reserve emails and the reminder automatically. Outcome by: 18 September — the Pre-Login Site spec carries it as a confirmed date, and that spec is the later document and already adopted the acceptance change from the same note, so we have followed it rather than treat the pair as unsettled. Esther’s note had suggested 14 September for this one: if that is still what you want, say so here and it is a one-line change.', inferred:true},
+        Q14:{title:'For Joanne (UX owner) — three things the Pre-Login Site spec left to you, which we filled in rather than invented, all reversible: (a) the two [CONTENT] FAQ answers are drafted from what the build actually does (no account or password to apply; two conversations per rotation plus a short close-off) and are labelled "awaiting owner confirmation" on the page itself; (b) the FAQ mentee-eligibility answer now says "current SMU undergraduate", the inconsistency your own spec flagged, so it matches the Mentees page and the application gate; (c) the private "Raise a concern" link stays as a fourth footer item — it is not in your footer spec, but Esther required a private concern route on every public page in August, and we would rather show you the clash than quietly drop a safeguarding channel.', inferred:true},
       },
     },
     people, reviews, pairs, events, concerns, emails,
@@ -794,6 +833,11 @@ const D = {
   shiftDate:(iso,days)=>{const d=new Date(iso+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10)},
   monthName:iso=>['January','February','March','April','May','June','July','August','September','October','November','December'][Number(iso.slice(5,7))-1],
   monthShort:iso=>D.monthName(iso).slice(0,4)==='Sept'?'Sept':D.monthName(iso).slice(0,3),
+  /* Strict three-letter month. The pre-login spec pins the Home timeline to "Sep" and body
+     prose to "September", and says in as many words not to normalise one into the other. */
+  mon3:iso=>D.monthName(iso).slice(0,3),
+  fmtDayMon3:iso=>`${Number(iso.slice(8,10))} ${D.mon3(iso)}`,
+  fmtLongNoYear:iso=>`${Number(iso.slice(8,10))} ${D.monthName(iso)}`,
   fmtDMY:iso=>`${Number(iso.slice(8,10))} ${D.monthShort(iso)} ${iso.slice(0,4)}`,
   fmtLong:iso=>`${Number(iso.slice(8,10))} ${D.monthName(iso)} ${iso.slice(0,4)}`,
   registrationOpen(db){
@@ -830,7 +874,15 @@ const D = {
       applyClosesLong: c.registration ? D.fmtLong(c.registration.closes) : '',
       approvalsByLong: sel.approvalsBy ? D.fmtLong(sel.approvalsBy) : '',
       outcomeByLong: sel.outcomeBy ? D.fmtLong(sel.outcomeBy) : '',
+      outcomeByNoYear: sel.outcomeBy ? D.fmtLongNoYear(sel.outcomeBy) : '',
       acceptBy: sel.acceptBy||'', acceptByLong: sel.acceptBy ? D.fmtLong(sel.acceptBy) : '',
+      /* Pre-login site: programme name in full, and the Home timeline's short dates. */
+      progName: 'Global-Ready Mentoring Programme',
+      closesDayShort: c.registration ? D.fmtDayMon3(c.registration.closes) : '',
+      acceptByDayShort: sel.acceptBy ? D.fmtDayMon3(sel.acceptBy) : '',
+      kickoffDayShort: D.fmtDayMon3(kickoff),
+      rotSpanShort: `${D.mon3(r[0].start)}–${D.mon3(r[2].end)}`,
+      endMon3: D.mon3(r[2].end),
       reserveAcceptBy: sel.reserveAcceptBy||'', reserveAcceptByLong: sel.reserveAcceptBy ? D.fmtLong(sel.reserveAcceptBy) : '',
       kickoffShort:D.monthShort(kickoff), kickoffLong:D.fmtLong(kickoff),
       kickoffTime:(db.events&&db.events.kickoff&&db.events.kickoff.time)||'',
@@ -872,6 +924,82 @@ const D = {
       subject:`Your ${db.config.cohort.label.replace(/\s*\(.*\)\s*/,'')} certificate (approved by exception), ${p.name}`});
     D.logAudit(db, db.today, actor, 'certificate_by_exception:'+missing.join('+'), personId);
     return db.certificates[db.certificates.length-1];
+  },
+  /* ---- proposed criterion scores (Wei Kiat, F0818-004720 / F0818-004811) ----------------
+     "AI should propose a score and not require for us to manually do this" — keying 5 or 6
+     numbers per applicant × 120 applicants was the objection. So the platform proposes every
+     scored criterion and the reviewer checks, adjusts and submits.
+
+     This function is the rule-based first cut: deterministic, offline, auditable, and it always
+     answers. Where the live model is reachable the console upgrades these numbers in place and
+     relabels the block as an AI proposal (ai.js `scoreProposal`); when it is not, this stands.
+     Either way the score is a PROPOSAL: the reviewer owns the submitted number and the
+     Programme Lead still owns the accept / reserve / decline outcome.
+
+     `why` is rendered next to each row, so a reviewer can see what was read, not just a digit. */
+  proposeScores(db, p){
+    const clamp = n => Math.max(1, Math.min(5, n));
+    const wc = t => D.wordCount(t||'');
+    const hits = (t, words) => { const s=String(t||'').toLowerCase();
+      return words.filter(w=>s.includes(w)).length; };
+    const items = [];
+    if(p.kind==='mentor'){
+      const add=(key,score,why)=>items.push({key, score:clamp(score), why});
+      if(p.returning){
+        /* Returning mentors skip the screening block by design (the form branches), so there
+           is nothing new to read. Carry the prior cycle forward and say so. */
+        MENTOR_CRITERIA.filter(c=>c.scored)
+          .forEach(c=>add(c.key, 4, 'Returning mentor: the screening block is not asked again, so this carries the previous cycle forward. Adjust if you know otherwise.'));
+      } else {
+        const yrs = {'Under 5 years':2,'5–10 years':3,'11–15 years':4,'More than 15 years':5}[p.yearsExp];
+        let cred = yrs || 3;
+        if(p.ledTeam==='Yes') cred += 1;
+        if(String(p.leadership||'').trim().length < 40) cred -= 1;
+        add('Professional Credibility', cred,
+          `${p.yearsExp||'experience not stated'}; led a team: ${p.ledTeam||'not stated'}; ${String(p.leadership||'').trim().length} characters of leadership detail.`);
+        const br = {'Yes, significantly':5,'Somewhat':3,'Not really':2}[p.crossIndustry] || 3;
+        add('Breadth of Perspective', br,
+          `Cross industry / market / culture exposure: ${p.crossIndustry||'not stated'}.`);
+        const nd = (p.draws||[]).length;
+        add('Values Alignment', 2 + nd,
+          `${nd} of ${FORM_OPTS.draws.length} motivations selected${String(p.anythingElse||'').trim()?', plus an added note':''}.`);
+        let mind = p.priorMentoring==='Yes' ? 4 : 3;
+        if(String(p.interests||'').trim().length >= 60) mind += 1;
+        add('Mentoring Mindset', mind,
+          `Prior mentoring: ${p.priorMentoring||'not stated'}; ${String(p.interests||'').trim().length} characters on what they offer.`);
+      }
+    } else {
+      /* Mentee criteria are read out of the two 200-word prompts. Signal words are a first cut,
+         disclosed in the UI as such — the live model reads the prose properly when available. */
+      const SIG = {
+        'Readiness to Learn': ['prompt1', ['learn','grow','improve','develop','better','feedback','challenge','stretch']],
+        'Values Awareness':   ['prompt1', ['value','honest','weak','struggl','mistake','believ','matter','fail']],
+        'Ownership':          ['prompt1', ['i led','i started','i took','i built','i organis','i decided','initiativ','responsib','ownership']],
+        'Global Curiosity':   ['prompt2', ['world','global','culture','different','industry','abroad','perspectiv','curious','outside']],
+        'Community Mindset':  ['prompt2', ['other','peer','communit','help','give back','support','team','share','together']],
+      };
+      /* Walk the criteria list itself, so a criterion can never silently go unproposed. */
+      MENTEE_CRITERIA.filter(c=>c.scored).forEach(c=>{
+        const rule = SIG[c.key];
+        if(!rule){ items.push({key:c.key, score:3, why:'No reading rule for this criterion yet — please score it yourself.'}); return; }
+        const [field, words] = rule;
+        const n = hits(p[field], words), w = wc(p[field]);
+        let s = 3;
+        if(n >= 2) s += 1;
+        if(w >= 80) s += 1;
+        if(w < 30) s -= 1;
+        items.push({key:c.key, score:clamp(s),
+          why:`Prompt ${field==='prompt1'?'1':'2'}: ${w} words, ${n} signal${n===1?'':'s'} for this criterion.`});
+      });
+    }
+    /* Safety net: a renamed or newly added criterion must still arrive with a row, or the
+       console would render an empty select and the reviewer would be back to keying it in. */
+    const crits = (p.kind==='mentor'?MENTOR_CRITERIA:MENTEE_CRITERIA).filter(c=>c.scored);
+    crits.forEach(c=>{ if(!items.some(i=>i.key===c.key))
+      items.push({key:c.key, score:3, why:'No reading rule for this criterion yet — please score it yourself.'}); });
+    const ordered = crits.map(c=>items.find(i=>i.key===c.key));
+    const avg = ordered.length ? Math.round(ordered.reduce((a,b)=>a+b.score,0)/ordered.length*10)/10 : null;
+    return {items:ordered, avg, basis:'rules'};
   },
   aiSummary:p=>{                                   // simulated AI output, clearly labelled in UI
     if(p.kind==='mentor')
@@ -927,6 +1055,8 @@ const D = {
     need('nationality', f.nationality);
     need('heard', f.heard);
     if(f.heard && /referred/.test(f.heard)) need('referrer', f.referrer);
+    /* "Other" must always come with the free text behind it (Wei Kiat, F0817-235816). */
+    if(f.heard===IND_OTHER) need('heardOther', f.heardOther);
     need('pdpa', !!f.pdpa);
     need('commit', f.commit);
     if(kind==='mentee'){
@@ -939,12 +1069,14 @@ const D = {
       need('prompt2', f.prompt2 && D.wordCount(f.prompt2)<=200);
       const prefs=(f.industryPrefs||[]).filter(Boolean);
       need('industryPrefs', prefs.length===3 && new Set(prefs).size===3);
+      if(prefs.includes(IND_OTHER)) need('industryPrefOther', f.industryPrefOther);
       need('telegramConsent', f.telegramConsent);
       if(f.telegramConsent==='No') need('contactPref', f.contactPref);
     } else {
       need('org', f.org);
       need('designation', f.designation);
       need('industry', f.industry);
+      if(f.industry===IND_OTHER) need('industryOther', f.industryOther);
       need('linkedin', f.linkedin);
       const returning = f.heard===FORM_OPTS.heardMentor[0];
       if(!returning){
@@ -969,7 +1101,7 @@ const D = {
     Object.keys(p).forEach(k=>{ if(p[k]===undefined) delete p[k]; });
     if(kind==='mentor'){
       p.returning = f.heard===FORM_OPTS.heardMentor[0];
-      p.background = `${p.yearsExp||'previous-cycle mentor'}${p.yearsExp?' of experience':''} in ${p.industry===INDUSTRIES[16]?(p.industryOther||'their field'):p.industry}`;
+      p.background = `${p.yearsExp||'previous-cycle mentor'}${p.yearsExp?' of experience':''} in ${p.industry===IND_OTHER?(p.industryOther||'their field'):p.industry}`;
     } else { p.university = D.cohortFacts(db).inst||'SMU'; }
     // A3: a second application on a known email flags BOTH records for a human —
     // never silently merged and never rejected.
@@ -986,8 +1118,12 @@ const D = {
     D.logAudit(db, db.today, 'system', 'application_submitted', id);
     return {person:p,missing:[]};
   },
-  score(db, personId, reviewer, score, comment, criteria){
-    db.reviews.push({personId,reviewer,score,comment,criteria:criteria||null});
+  /* `proposed` = what the platform put in front of the reviewer. Kept alongside the submitted
+     numbers so the override rate is measurable: if reviewers rewrite most proposals, the rubric
+     is wrong and we should know that from the data, not from a hunch. */
+  score(db, personId, reviewer, score, comment, criteria, proposed){
+    db.reviews.push({personId,reviewer,score,comment,criteria:criteria||null,
+                     proposed:proposed||null, proposedBasis:(proposed&&proposed.basis)||null});
     D.logAudit(db, db.today, reviewer, 'scored', personId);
   },
   /* R5 decisions: approval auto-issues the outcome email (approval and invitation are a
@@ -1384,7 +1520,7 @@ const D = {
       from:CF.mailFrom, replyTo:CF.enquiries};
   },
 };
-const GRMP_EXPORT = {Store, D, DB_KEY, buildSeed, INDUSTRIES, FACULTIES,
-  MENTEE_CRITERIA, MENTOR_CRITERIA, FORM_OPTS, COPY, MAILS};
+const GRMP_EXPORT = {Store, D, DB_KEY, buildSeed, INDUSTRIES, IND_OTHER, FACULTIES,
+  MENTEE_CRITERIA, MENTOR_CRITERIA, FORM_OPTS, COPY, MAILS, RESOURCES};
 if (typeof window !== 'undefined') window.GRMP = GRMP_EXPORT;
 if (typeof module !== 'undefined' && module.exports) module.exports = GRMP_EXPORT;

@@ -1,2 +1,7 @@
 tests/videos/*.webm
 node_modules
+# Programme materials supplied by SMC for the gated Resources area. This repo is public;
+# these documents are not. They are deployed straight to Firebase Hosting, never committed.
+# The SMC Charter is the deliberate exception: the spec makes it a public footer PDF.
+docs/resources/
+fsdist/docs/resources/
