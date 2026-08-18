@@ -1172,6 +1172,27 @@ const D = {
   reminderTargets(db){
     return db.people.filter(p=>p.appStatus==='accepted' && !D.ackComplete(p) && !p.acceptReminderAt);
   },
+  /* Who is inside the programme group channel and who is not — mentors use WhatsApp,
+     mentees use Telegram. Asking someone how they would rather be reached and then making
+     the team open twenty individual pages to find out is only half an answer: the question
+     is asked once per person but used once per cohort, so it has to be readable as a list.
+     Each person outside the group carries the detail their own preference points at, so
+     nobody has to go looking it up separately. */
+  channelRoster(db){
+    const side = (kind, consentKey, channel) => {
+      const acc = db.people.filter(p=>p.kind===kind && p.appStatus==='accepted');
+      const out = acc.filter(p=>p[consentKey]==='No').map(p=>{
+        const pref = p.contactPref || '';
+        const detail = /phone|call/i.test(pref) ? (p.phone || p.mobile || '') : (p.email || '');
+        return {id:p.id, name:p.name, pref: pref || 'not stated', detail};
+      });
+      return {channel, total:acc.length, joined:acc.length-out.length, out};
+    };
+    return {
+      mentors: side('mentor','whatsappConsent','WhatsApp'),
+      mentees: side('mentee','telegramConsent','Telegram'),
+    };
+  },
   sendAcceptanceReminders(db, actor){
     const out=[];
     D.reminderTargets(db).forEach(p=>{

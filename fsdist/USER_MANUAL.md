@@ -104,6 +104,8 @@ Completing all three **confirms the place**: the onboarding email fires *(copy i
 
 **5.2 Reminders.** The confirmed rule, mechanised: acceptance reminders are sent **once** per person, only to accepted-but-unconfirmed, a few days before 20 Sept (activated reserves: the compressed variant before 29 Sept; no same-day nudge). Staging has a "send now" control; production runs it on schedule. After the deadline passes, the **seat release** list appears — releasing is an explicit human action; freed seats go to the Reserve list.
 
+Also on this page: **Programme channels**, the roster for the two group chats (mentors on WhatsApp, mentees on Telegram), built straight from the consent question on the application. It shows how many of the accepted consented, and names everyone who did not alongside how they asked to be reached — with the email address or phone number their own answer points at, so there is nothing to look up separately. This is where you build the groups and where you find the handful who are contacted individually.
+
 **5.3 Reserve lists.** Both lists ranked by committee score, with the reply state (opted in / awaiting / declined — replies arrive by email and are recorded here) and **Activate**: sends the activation acceptance email with the 29 Sept deadline and puts the person into the normal gate flow. Places opening too late for email: contact the person directly (confirmed — no email fallback deadline).
 
 **5.4 Exceptions.** Kick-Off exception requests (decide: approve / ask to attend — participant notified either way), overdue close-offs (remind), and mentor dropouts (mentees re-matched from the opted-in Reserve Mentor list within 7 days).

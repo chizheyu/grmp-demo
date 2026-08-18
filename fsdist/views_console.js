@@ -387,6 +387,28 @@ v_reminders(admin){
     <span style="font-size:11px;color:var(--ink-3);margin-left:8px">in production this fires on the scheduled date; staging sends on demand</span>`:''}
   </div>
   ${(()=>{
+    /* The other half of Joanne's Telegram catch. Asking a mentor how they want to be reached
+       is worthless if answering it puts the answer somewhere nobody looks. The question is
+       asked once per person and used once per cohort — so it belongs here as a list, on the
+       page where the team does its chasing, not only on twenty individual pages. */
+    const R = D.channelRoster(db);
+    const block = s => `<div style="padding:8px 0;border-top:1px solid var(--line-2)">
+      <b style="font-size:13px">${s.channel} group — ${s.joined} of ${s.total} consented</b>
+      ${s.out.length? `<p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 4px">${s.out.length} opted out, so they are contacted individually:</p>
+        ${s.out.map(o=>`<div style="display:flex;gap:10px;align-items:center;padding:4px 0;font-size:13px;flex-wrap:wrap">
+          <b>${esc(o.name)}</b>
+          <span class="badge b-neut" style="font-size:10.5px"><span class="d"></span>${esc(o.pref)}</span>
+          <span style="color:var(--ink-2)">${esc(o.detail||'—')}</span>
+          <a style="margin-left:auto;font-size:12px" href="#/me/${o.id}">page →</a></div>`).join('')}`
+        : `<p style="font-size:12.5px;color:var(--ink-3);margin:6px 0 0">Everyone accepted is in the group — nobody to contact separately.</p>`}
+    </div>`;
+    return `<div class="qcard" style="margin-top:12px">
+      <b style="font-size:13.5px">Programme channels — who is outside the group, and how they asked to be reached</b>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 0">Built from the consent question on the application. Each person below carries the detail their own preference points at, so there is nothing else to look up.</p>
+      ${block(R.mentors)}${block(R.mentees)}
+    </div>`;
+  })()}
+  ${(()=>{
     const pend = D.pendingWithdrawal(db);
     if(!D.acceptDeadlinePassed(db))
       return `<div class="qcard" style="margin-top:12px"><b style="font-size:13.5px">Seat release</b>

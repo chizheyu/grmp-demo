@@ -674,6 +674,34 @@ if(fs.existsSync(SPECS_DIR) && fs.existsSync(PDPA_DIR)){
    (1) we ask for something and no one can ever read it back;
    (2) participant-facing copy claims a narrower audience than the roles actually allow. */
 console.log('— promise vs capability: nothing collected into a hole, no copy narrower than the roles —');
+/* Half-fixing is its own failure mode: the Telegram option was corrected while the answer
+   people gave it still went nowhere useful. A preferred contact method is asked once per
+   person and used once per cohort, so "readable" has to mean a list, with the matching
+   detail already on it — not twenty individual pages the team has to open one at a time. */
+T('the channel roster lists everyone outside the group, with the detail their own preference points at', (()=>{
+  const R = D.channelRoster(db);
+  const accM = db.people.filter(p=>p.kind==='mentor' && p.appStatus==='accepted');
+  const accE = db.people.filter(p=>p.kind==='mentee' && p.appStatus==='accepted');
+  const shapeOK = R.mentors.channel==='WhatsApp' && R.mentees.channel==='Telegram'
+    && R.mentors.total===accM.length && R.mentees.total===accE.length
+    && R.mentors.joined + R.mentors.out.length === R.mentors.total
+    && R.mentees.joined + R.mentees.out.length === R.mentees.total;
+  const optedOut = [...R.mentors.out, ...R.mentees.out];
+  // exactly the people who said No, nobody else
+  const rightPeople = optedOut.length === db.people.filter(p=>p.appStatus==='accepted'
+      && (p.whatsappConsent==='No' || p.telegramConsent==='No')).length;
+  // a phone preference must hand over a phone number, anything else an email
+  const detailMatchesPref = optedOut.every(o=>{
+    const p = D.person(db, o.id);
+    return /phone|call/i.test(o.pref) ? o.detail === (p.phone||p.mobile) : o.detail === p.email;
+  });
+  return shapeOK && rightPeople && detailMatchesPref && optedOut.every(o=>!!o.detail);
+})());
+T('nobody is offered a channel the form never collects a handle for', (()=>{
+  // The original bug, pinned: every stored contact preference must be one we can actually act on.
+  const REACHABLE = ['Email','Phone','Phone call'];
+  return db.people.filter(p=>p.contactPref).every(p=>REACHABLE.includes(p.contactPref));
+})());
 T('every field the application collects is readable by someone (no data black holes)', (()=>{
   const root = path.join(__dirname,'..');
   const pub = fs.readFileSync(path.join(root,'views_public.js'),'utf8');

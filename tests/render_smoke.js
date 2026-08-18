@@ -91,6 +91,18 @@ check('decisions', () => V.decisions());
     && html.includes('Coordinators, reviewers and IT support cannot see it'));
 }
 
+/* The other half of the Telegram fix: the preferred contact method has to be readable as a
+   cohort list where the team does its chasing, not only one page at a time. */
+{
+  const html = G.Console.shell('Wei Kiat','reminders');
+  const R = G.GRMP.D.channelRoster(db);
+  const someone = [...R.mentors.out, ...R.mentees.out][0];
+  T('the reminders page carries the channel roster for both groups',
+    html.includes('Programme channels') && html.includes('WhatsApp group') && html.includes('Telegram group'));
+  T('and each person outside a group arrives with their preference and the detail it points at',
+    !!someone && html.includes(someone.name) && html.includes(someone.pref) && html.includes(someone.detail));
+}
+
 console.log('— personal pages (every persona state) —');
 for (const acct of (db.config.accounts || []).filter(a => a.kind === 'person'))
   check(`personal ${acct.u}`, () => V.personal(acct.personId));
