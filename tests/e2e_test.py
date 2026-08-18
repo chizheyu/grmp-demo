@@ -1,5 +1,10 @@
+# ⚠️ RETIRED — DOES NOT RUN. Same story as e2e_full_cycle.py: written 2 Aug against the pre-R5
+# product (single-page form, three tracks, five-tick acknowledgement, orientation as a gate), all of
+# which the 15 Aug R5 rebuild replaced. Fails on its first assertion. Kept as the record of the
+# in-programme journeys it used to walk; not part of the seven-suite verification set.
+#
 # L2 end-to-end tests — real page clicks + state assertions via window.__demo.
-# Run: python tests/e2e_test.py   (serves the folder on :8777, headless Chromium)
+# Run: python tests/e2e_test.py   ← broken since 2026-08-15, see above
 import asyncio, subprocess, sys, os, time
 from playwright.async_api import async_playwright
 

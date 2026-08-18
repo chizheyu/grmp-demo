@@ -281,8 +281,26 @@ async def main():
         T("R5 form: empty Next shows the spec's exact error strings", all(s in txt for s in
           ["Please enter a valid email address.", "Please enter your first name.",
            "Please enter a valid phone number.", "Please tell us your nationality."]))
-        T("R5 form: no-save is stated (no drafts by design)",
-          "no save function" in txt)
+        # Joanne had the written no-save paragraph removed on 18 Aug (F0818-145038) because the
+        # browser's own leave-page warning already says it. So the promise is no longer a sentence
+        # on the page — test the guard that now carries it, not the words that used to.
+        T("R5 form: the removed no-save paragraph is gone from the page",
+          "no save function" not in txt)
+        guard_armed = await pg.evaluate("""() => {
+          window.__APPLY = {kind:'mentee', step:1, d:{firstName:'Half typed'}, errors:{}};
+          const e = new Event('beforeunload', {cancelable:true});
+          window.dispatchEvent(e);
+          return e.defaultPrevented;
+        }""")
+        guard_quiet = await pg.evaluate("""() => {
+          window.__APPLY = {kind:'mentee', step:1, d:{}, errors:{}};
+          const e = new Event('beforeunload', {cancelable:true});
+          window.dispatchEvent(e);
+          return e.defaultPrevented;
+        }""")
+        T("R5 form: the browser leave-page warning arms on a part-filled form, and only then",
+          guard_armed and not guard_quiet)
+        await pg.evaluate("window.__APPLY = null")
         await pg.evaluate("window.__APPLY={kind:'mentee',step:3,d:{},errors:{}}; render()")
         await pg.wait_for_timeout(300)
         await pg.fill("#af-prompt1", " ".join(["word"] * 230))
@@ -299,6 +317,20 @@ async def main():
         T("R5 form: step 4 renders the approved PDPA verbatim (title + consent line)",
           "GRMP PDPA Consent and Acknowledgement" in txt
           and "I have read and understood the above. I consent to SMC collecting and using my personal data" in txt)
+        # Joanne's 18 Aug revision, to be live on BOTH forms (specs_joanne_r7).
+        revised = ["SMC may use technology service providers, including AI assisted tools",
+                   "SMC will not otherwise share your personal data with third parties"]
+        T("R7 form: the revised PDPA is live on the mentee form",
+          all(s in txt for s in revised))
+        await goto(pg, "#/apply/mentor")
+        await pg.evaluate("window.__APPLY={kind:'mentor',step:4,d:{whatsappConsent:'No'},errors:{}}; render()")
+        await pg.wait_for_timeout(300)
+        txt = await body_text(pg)
+        T("R7 form: the revised PDPA is live on the mentor form too",
+          all(s in txt for s in revised))
+        opts = await pg.eval_on_selector_all("#af-contactPref option", "els => els.map(e => e.textContent.trim())")
+        T("R7 form: a mentor declining the group is offered Phone call, not Telegram",
+          "Phone call" in opts and "Email" in opts and "Telegram" not in opts, str(opts))
         await pg.evaluate("window.__APPLY=null")
 
         print("— Phase R5·D · console: reserve lists, exception queue, reminders, templates —")

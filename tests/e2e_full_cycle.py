@@ -1,6 +1,21 @@
+# ⚠️ RETIRED — DOES NOT RUN. Written 2 Aug against the pre-R5 product; the 15 Aug R5 rebuild
+# replaced the single-page application form with the staged 4-step one (#f-* → #af-*), dropped the
+# three tracks for industry preferences, and replaced reserve_bench/waitlist with the Reserve lists.
+# It has failed on its first form fill ever since. Left in the tree, not deleted, because it is the
+# only written record of the in-programme half of the lifecycle at UI level.
+#
+# NOT part of the seven-suite verification set (backend_test · render_smoke · e2e_acceptance ·
+# e2e_r5_flows · e2e_deadends · e2e_content · e2e_a11y). Do not run it expecting truth.
+#
+# What lost UI-level cover when it broke — rotations and close-offs, mid-programme and end
+# evaluations, Builder's Commitment, certificate issue, mentor dropout → replacement, promotion
+# from the bench, the demo clock advancing R2→R3. The domain rules underneath are still covered at
+# L1 (backend_test) and every console view still renders (render_smoke); it is the click-through of
+# those journeys that is unverified. Rebuilding it against the R5 model is the open piece of work.
+#
 # L2 full-lifecycle cohort test: multiple mentors & mentees, real comments, branch flows
 # (mentor dropout→replacement, reserve bench, waitlist promotion), R2→R3 via demo clock, certificates.
-# Run: python tests/e2e_full_cycle.py
+# Run: python tests/e2e_full_cycle.py   ← broken since 2026-08-15, see above
 import asyncio, subprocess, sys, os, time
 from playwright.async_api import async_playwright
 

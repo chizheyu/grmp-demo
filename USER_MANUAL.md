@@ -36,11 +36,11 @@ Shared footer on every page: **About SMC** · **SMC Charter** (hosted PDF, opens
 - SMU email asked with a **soft warning** if it does not look like a student address (the binding gate is the eligibility checkbox, not the domain).
 - **Step 2 — the hard gate:** "I confirm I am a current SMU undergraduate" (all years eligible, incl. final-year; 7-school faculty list).
 - **Step 3 — the scored core:** the two written prompts (verbatim from the spec), each with a live word count and a **hard cap of 200 words** (no minimum — tight answers are a good signal); three **distinct** industry preferences from the same list mentors classify themselves on (the spec's 17 options plus **Artificial Intelligence**, added on the Programme Lead's request). Choosing **Other** anywhere on the form opens a free-text box; the answer is required, so "Other" never arrives blank.
-- **Step 4:** commitment confirmation, Telegram-group consent (the mentee channel), and the approved **PDPA consent rendered verbatim** — timestamped on submission. PDPA is collected once, here; it is *not* repeated at the acceptance gate.
-- **No save-and-resume (confirmed):** the form is completed in one sitting — there is no applicant login to attach a partial record to. A browser leave-page warning guards accidental loss. *(This replaces the earlier draft-saving behaviour — see the decisions register, Q10.)*
+- **Step 4:** commitment confirmation, Telegram-group consent (the mentee channel; declining asks for a preferred contact method, Email or Phone), and the approved **PDPA consent rendered verbatim** — timestamped on submission. PDPA is collected once, here; it is *not* repeated at the acceptance gate. The wording is Joanne's revised text of 18 Aug 2026 (`specs_joanne_r7/`), which adds the technology-provider / AI-assisted-tools paragraph and the "will not **otherwise** share" carve-out.
+- **No save-and-resume (confirmed):** the form is completed in one sitting — there is no applicant login to attach a partial record to. A browser leave-page warning guards accidental loss. *(This replaces the earlier draft-saving behaviour — see the decisions register, Q10.)* The form no longer prints a written notice saying so: the browser's own warning carries it (Joanne, 18 Aug).
 - Submit → verbatim confirmation screen + the acknowledgement-receipt email.
 
-**1.4 Apply as a Mentor — the same staged pattern** (About you · Your experience · Your mentoring contributions · Commitment & consent), with the **returning-mentor branch**: "I was a mentor in last year's programme" hides the screening fields (years of experience, led-a-team, leadership text, cross-industry) — returners are matched against last cycle's roster by the team before acceptance. WhatsApp is the mentor channel. Same verbatim PDPA, same no-save rule.
+**1.4 Apply as a Mentor — the same staged pattern** (About you · Your experience · Your mentoring contributions · Commitment & consent), with the **returning-mentor branch**: "I was a mentor in last year's programme" hides the screening fields (years of experience, led-a-team, leadership text, cross-industry) — returners are matched against last cycle's roster by the team before acceptance. WhatsApp is the mentor channel; declining the group asks for a preferred contact method, **Phone call or Email** (Telegram was offered until 18 Aug, when Joanne pointed out the form never collects a mentor's Telegram handle). Same verbatim PDPA, same no-save rule.
 
 **1.5 Duplicate protection.** A second application on a known email flags **both** records for a human to review — never silently merged, never auto-rejected.
 
@@ -136,11 +136,12 @@ No pair/meeting tracking during rotations · no availability collection · no re
 
 ## Appendix B — open items owed by the programme side (from the specs)
 
-SMC brand guidelines & assets (styling waits for them — Q12) · portal onboarding email copy · form fill-time estimate to measure on a real fill-through · confirmation of Q9 (auto-issue on approval).
+SMC brand guidelines & assets (styling waits for them — Q12) · portal onboarding email copy · form fill-time estimate to measure on a real fill-through.
 
 Opened by the pre-login and Resources build specs:
-- **Outcome-by date, 14 or 18 Sept.** The Programme Owner asked for 14 Sept (F0816-152143); the later Pre-Login Site spec lists 18 Sept as confirmed. Running on **18 Sept** until the two are reconciled. (The accept-by date is settled: both sources say **20 Sept**, and that is what the system now uses.)
-- **Two FAQ answers** ("Do I need an account or a password to apply?", "How much time does it really take?") are not in the approved FAQ document. They are drafted from what the build actually does, never invented, and are marked *awaiting owner confirmation* on the page.
-- **FAQ mentee eligibility.** The spec flags that the source answer omits the SMU-undergraduate gate. The page states it, for consistency with the Mentees page and the application's own hard gate; flagged for confirmation.
-- **Concern link in the footer.** Not in the pre-login footer spec, but the Programme Owner required it on every public page (Q6). Kept, and raised with the UX owner rather than dropped.
+- **Outcome-by date, 14 or 18 Sept — still open (Q13).** The Programme Owner asked for 14 Sept (F0816-152143); the later Pre-Login Site spec lists 18 Sept as confirmed. Running on **18 Sept**. On 18 Aug the UX owner took the whole date set back to reconcile the interconnected dates and will return with them. (Accept-by is settled at **20 Sept** — both sources agree.)
+- ~~Two FAQ answers awaiting owner confirmation~~ — **closed 18 Aug.** Both answers confirmed by the UX owner (F0818-131510); the line "Accounts exist only for the programme team" was removed on her instruction, and the on-page badges are gone.
+- ~~FAQ mentee eligibility~~ — **closed 18 Aug.** The SMU-undergraduate wording is confirmed (F0818-131600).
+- ~~Concern link in the footer~~ — **closed 18 Aug.** Confirmed to stay as the fourth footer item (F0818-131630).
+- **Q9, auto-issue on approval — closed 18 Aug.** Confirmed by both the Programme Owner (F0817-145316) and the UX owner (F0818-131700).
 - **Gated documents are page-gated, not file-gated.** Static hosting serves the Resources files to anyone holding the URL. Production must move them behind authenticated storage; on the go-live list with Auth and the real mail channel.

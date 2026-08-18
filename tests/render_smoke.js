@@ -99,7 +99,9 @@ console.log('— settled decisions carry no card; open ones still do —');
   const html_apply = V.apply('mentee');
   T('Q4/Q10 settled by the specs → no card on the application form', !/INFERRED · (Q4|Q10)/.test(html_apply));
   const html_dec = C.shell('Esther','decisions');
-  T('Q9 (auto-issue on approval) still open → its card stays on Decisions', /INFERRED · Q9/.test(html_dec));
+  /* Q9 was confirmed twice on 18 Aug (Esther F0817-145316, Joanne F0818-131700), so its card retires
+     from Decisions and lives on in the register with a Settled badge. */
+  T('Q9 settled by Esther and Joanne → no card left on Decisions', !/INFERRED · Q9/.test(html_dec));
   const html_cfg = C.shell('Esther','config');
   T('Q8 settled → no card on Configuration', !/INFERRED · Q8/.test(html_cfg));
   T('Q12 (brand assets outstanding) still open → its card stays on Configuration', /INFERRED · Q12/.test(html_cfg));
@@ -118,6 +120,31 @@ console.log('— R5: the gate, OTP card and staged form render in every state �
     vm.runInContext(`window.__APPLY = {kind:'mentor', step:${s}, d:${s>1?`{heard:GRMP.FORM_OPTS.heardMentor[0]}`:'{}'}, errors:{}}`, ctx);
     check(`apply mentor step ${s}${s>1?' (returning branch)':''}`, () => V.apply('mentor'));
   }
+
+  /* 18 Aug (Joanne): the written no-save notice is gone from both forms — the browser's own
+     leave-page warning says it — and the revised PDPA must reach BOTH forms, not just the one
+     she happened to file the feedback from. */
+  vm.runInContext(`window.__APPLY = {kind:'mentee', step:4, d:{}, errors:{}}`, ctx);
+  const step4Mentee = V.apply('mentee');
+  vm.runInContext(`window.__APPLY = {kind:'mentor', step:4, d:{}, errors:{}}`, ctx);
+  const step4Mentor = V.apply('mentor');
+  T('the written no-save notice is off both application forms',
+    [step4Mentee, step4Mentor].every(h => !h.includes('there is no save function')));
+  T('the revised PDPA (AI/service-provider paragraph) renders on both forms',
+    [step4Mentee, step4Mentor].every(h =>
+      h.includes('technology service providers, including AI assisted tools')
+      && h.includes('SMC will not otherwise share your personal data')));
+
+  /* A mentor who declines the WhatsApp group is offered Phone call, not Telegram: the form never
+     collects a mentor's Telegram handle, so the old option promised a channel we cannot use. */
+  vm.runInContext(`window.__APPLY = {kind:'mentor', step:4, d:{whatsappConsent:'No'}, errors:{}}`, ctx);
+  const mentorDeclined = V.apply('mentor');
+  T('declining the mentor group offers Phone call / Email, with Telegram gone',
+    mentorDeclined.includes('>Phone call<') && mentorDeclined.includes('>Email<')
+    && !/>Telegram</.test(mentorDeclined));
+  vm.runInContext(`window.__APPLY = {kind:'mentee', step:4, d:{telegramConsent:'No'}, errors:{}}`, ctx);
+  T('the mentee side still offers Email / Phone per its own spec',
+    /<option[^>]*>Email</.test(V.apply('mentee')));
   vm.runInContext('window.__APPLY = null', ctx);
 }
 
@@ -213,10 +240,17 @@ console.log('— pre-login site: the build spec, rendered —');
   T('every FAQ row is collapsed on load and single-open within its tab',
     !/<details[^>]* open/.test(faq)
     && (faq.match(/<details class="faq-item" name="faq-about"/g) || []).length === 9);
-  T('the two answers the spec left open are flagged, not silently invented',
-    (faq.match(/faq-flag/g) || []).length === 2
+  /* The two [CONTENT] answers carried an "awaiting owner confirmation" badge until Joanne
+     confirmed both on 18 Aug (F0818-131510). Nothing is flagged now; the badge mechanism
+     stays for the next answer we have to draft ahead of the owner. */
+  T('the two answers the spec left open are confirmed, no flags left on the page',
+    (faq.match(/faq-flag/g) || []).length === 0
     && faq.includes('Do I need an account or a password to apply?')
     && faq.includes('How much time does it really take?'));
+  T('the account answer drops the programme-team line Joanne asked us to remove',
+    !faq.includes('Accounts exist only for the programme team'));
+  T('the FAQ sub-line Joanne asked us to remove is gone',
+    !faq.includes('Pick your view'));
   T('FAQ never links the gated Resources area', !faq.includes('#/resources'));
 }
 

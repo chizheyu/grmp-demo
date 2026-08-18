@@ -271,9 +271,9 @@ _faqContent(){
       ]],
       ['Practical',[
         ['Do I need an account or a password to apply?',
-         'No. Applications need no account and no password: you apply directly from the mentee or mentor page on this site. Accounts exist only for the programme team. If you are offered a place, your acceptance email carries your own personal link, and opening it sends a one-time code to your email address.', true],
+         'No. Applications need no account and no password: you apply directly from the mentee or mentor page on this site. If you are offered a place, your acceptance email carries your own personal link, and opening it sends a one-time code to your email address.'],
         ['How much time does it really take?',
-         'At least two conversations with your mentor in each rotation, arranged directly between the two of you, plus a short close-off at the end of each rotation. Six conversations across the six months, and the Kick-Off evening.', true],
+         'At least two conversations with your mentor in each rotation, arranged directly between the two of you, plus a short close-off at the end of each rotation. Six conversations across the six months, and the Kick-Off evening.'],
         ['What support and materials will I get?',
          'Once you join, you will have access to preparation notes, conversation guides and briefing materials for every rotation, all in one place on the platform.'],
         ['What if I have concerns during the programme?',
@@ -285,7 +285,7 @@ _faqContent(){
     mentees:{label:'For mentees', groups:[
       ['Joining as a mentee',[
         ['Who can join as a mentee?',
-         `Current ${CF.inst} undergraduates of all nationalities who are highly motivated and who value mentorship, and who are open to learning, asking questions and reflecting on their growth, can join as mentees. You do not need to have a clear career plan before joining.`, true],
+         `Current ${CF.inst} undergraduates of all nationalities who are highly motivated and who value mentorship, and who are open to learning, asking questions and reflecting on their growth, can join as mentees. You do not need to have a clear career plan before joining.`],
         ['What can mentees gain?',
          'A better understanding of themselves; practical insights from real-world professionals; more confidence in asking questions; a wider view of work and society; meaningful connections with mentors and peers; and clearer next steps after the programme.'],
         ['What is expected of mentees?',
@@ -325,7 +325,6 @@ pageFaq(){
   return this.msNav('faq') + `
   <div class="doc-page" style="max-width:860px">
     <h1>Questions people ask before applying</h1>
-    <p class="lede">Pick your view. Shared questions apply to everyone.</p>
     <div class="faq-tabs" role="tablist" aria-label="Question sets">
       ${keys.map(k=>`<button role="tab" id="faqtab-${k}" aria-controls="faqpanel" aria-selected="${k===tab?'true':'false'}"
         class="faq-tab${k===tab?' is-active':''}" data-act="faqTab" data-tab="${k}">${esc(content[k].label)}</button>`).join('')}
@@ -474,10 +473,9 @@ apply(kind){
     ${S.step===1?`<div class="doc-card" style="background:var(--surface-2)">${copyHTML(intro)}</div>`:''}
     ${this._stepper(kind, S.step)}
     <div class="form" id="apply-form" data-kind="${kind}">`;
-  const foot = `</div>
-    <p style="font-size:11.5px;color:var(--ink-3);margin:10px 0 0">This application is completed in one sitting — there is no save function
-    (confirmed by the programme team; there is no applicant sign-in to attach a partial record to). If you try to leave the page, your browser will warn you first.</p>
-  </div>`;
+  /* The written no-save notice was removed on Joanne's request (F0818-145038): the browser's own
+     leave-page warning already carries it, and the paragraph repeated what the warning says. */
+  const foot = `</div></div>`;
   const nav = `<div style="display:flex;gap:8px;margin-top:16px">
     ${S.step>1?`<button class="btn btn-ghost" data-act="applyBack" data-kind="${kind}">← Back</button>`:''}
     <span style="flex:1"></span>
@@ -650,7 +648,7 @@ _mentorStep4(S, CF){
   <div class="f-row"><label>Consent to join the Mentor WhatsApp group for programme updates? <span class="req">*</span></label>
     <select id="af-whatsappConsent"><option value=""></option><option${this._sel(S,'whatsappConsent','Yes')}>Yes</option><option${this._sel(S,'whatsappConsent','No')}>No</option></select>${this._err(S,'whatsappConsent')}</div>
   ${S.d.whatsappConsent==='No'?`<div class="f-row"><label>Preferred contact method <span class="req">*</span></label>
-    <select id="af-contactPref"><option value=""></option><option${this._sel(S,'contactPref','Telegram')}>Telegram</option><option${this._sel(S,'contactPref','Email')}>Email</option></select>${this._err(S,'contactPref')}</div>`:''}
+    <select id="af-contactPref"><option value=""></option><option${this._sel(S,'contactPref','Phone call')}>Phone call</option><option${this._sel(S,'contactPref','Email')}>Email</option></select>${this._err(S,'contactPref')}</div>`:''}
   <div class="doc-card" style="max-height:300px;overflow-y:auto"><h3 style="margin-top:0">${esc(GRMP.COPY.pdpaTitle)}</h3>${copyHTML(GRMP.COPY.pdpaBody)}</div>
   <label class="f-row f-check" style="display:flex"><input type="checkbox" id="af-pdpa" ${S.d.pdpa?'checked':''}>
     <span>${esc(GRMP.COPY.pdpaTick)} <span class="req">*</span></span></label>${this._err(S,'pdpa')}`;

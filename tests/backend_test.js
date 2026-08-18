@@ -631,16 +631,27 @@ T('no template leaks ${ / undefined / NaN', Object.keys(MAILS).every(k=>{
 
 console.log('— verbatim guard: legal blocks diffed against the spec files (when present) —');
 const SPECS_DIR = path.join(__dirname, '..', '..', 'specs_joanne', 'Mentor & Mentee Application Workflow Content');
-if(fs.existsSync(SPECS_DIR)){
+/* PDPA moved to its own R7 file on 18 Aug: Joanne revised the text (AI/service-provider paragraph
+   + "will not otherwise share") in a separate doc, so the block inside the R5 application specs is
+   superseded and must NOT be the thing we diff against. */
+const PDPA_DIR = path.join(__dirname, '..', '..', 'specs_joanne_r7');
+if(fs.existsSync(SPECS_DIR) && fs.existsSync(PDPA_DIR)){
   const norm = s => String(s).replace(/\*\*/g,'').replace(/[’‘]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
-  const specBlock = (file, startMarker, endMarker) => {
-    const txt = fs.readFileSync(path.join(SPECS_DIR,file),'utf8');
+  const blockFrom = (dir, file, startMarker, endMarker) => {
+    const txt = fs.readFileSync(path.join(dir,file),'utf8');
     const i = txt.indexOf(startMarker); const j = txt.indexOf(endMarker, i);
     return norm(txt.slice(i,j).split('\n').map(l=>l.replace(/^>\s?/,'')).filter(l=>l.trim()).join(' '));
   };
-  T('PDPA wording matches the application spec verbatim',
-    specBlock('GRMP_Mentor_Application_Spec.md','> **GRMP PDPA Consent and Acknowledgement**','> ☐')
+  const specBlock = (file, startMarker, endMarker) => blockFrom(SPECS_DIR, file, startMarker, endMarker);
+  T('PDPA wording matches Joanne’s 18 Aug revised text verbatim',
+    blockFrom(PDPA_DIR,'GRMP_PDPA_Consent_Revised.md','> **GRMP PDPA Consent and Acknowledgement**','> ☐')
     === norm([COPY.pdpaTitle,...COPY.pdpaBody].join(' ')));
+  T('the superseded R5 PDPA block is no longer what we ship (the revision really landed)',
+    specBlock('GRMP_Mentor_Application_Spec.md','> **GRMP PDPA Consent and Acknowledgement**','> ☐')
+    !== norm([COPY.pdpaTitle,...COPY.pdpaBody].join(' ')));
+  T('both revised sentences are live: AI/service-provider paragraph and the "otherwise" carve-out',
+    COPY.pdpaBody.some(l=>l.includes('technology service providers, including AI assisted tools'))
+    && COPY.pdpaBody.some(l=>l.startsWith('SMC will not otherwise share your personal data')));
   T('mentor Programme Rules match the post-selection spec verbatim',
     specBlock('GRMP_Mentor_PostSelection_Spec.md','> **GRMP Programme Rules Acknowledgement**','- Acknowledgement:')
     === norm([COPY.rulesTitleMentor,...COPY.rulesMentor].join(' ')));
