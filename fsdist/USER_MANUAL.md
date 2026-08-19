@@ -67,7 +67,7 @@ Completing all three **confirms the place**: the onboarding email fires *(copy i
 
 **2.6 Rotations & close-offs (unchanged from the owner's decisions):** meet at least twice per rotation; one-minute close-off; the R2 close-off carries the mentee's mid-programme review, the R3 close-off the end-of-programme evaluation; then the Builder's Commitment. Reflection content is never stored.
 
-**2.7 Certificates (owner's rule):** mentee = 3 close-offs + mid-prog review + end-prog evaluation + Builder's Commitment; mentor = mid-prog feedback + end-prog evaluation. Printed and presented at the Appreciation Night (26 Mar).
+**2.7 Certificates (owner's rule):** mentee = 3 close-offs + mid-prog review + end-prog evaluation + Builder's Commitment; mentor = mid-prog feedback + end-prog evaluation. Printed and presented at the Appreciation Night (2 Apr 2027 — moved off 26 Mar, which is Good Friday).
 
 **2.8 Reserve list members** see an honest status page: opted in / awaiting your reply / declined — and what activation would mean.
 

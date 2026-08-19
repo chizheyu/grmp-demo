@@ -420,13 +420,18 @@ reflection(pid){
    into the sentence. The page used to name one person ("the designated Escalation Owner
    (Esther)") while two accounts held the escalation role — a safeguarding promise the build
    did not keep, and the kind of drift that only shows up when someone re-reads the roles.
-   Derive it, and the sentence cannot go stale when the roles change. */
+   Derive it, and the sentence cannot go stale when the roles change.
+   Said by job title, not by name — Esther, 18 Aug: "to be sustainable as people change, Job
+   title R&R remains". The person in the chair leaves; the chair keeps the duty, and a
+   safeguarding promise has to survive the handover without anyone remembering to edit it. */
 _escalationOwners(){
-  const holders = (__demo.db.config.admins||[]).filter(a=>(a.roles||[]).includes('escalation'));
-  const names = holders.map(a=>`${a.name} (${a.role})`);
-  if(!names.length) return 'the designated Escalation Owner';
-  if(names.length===1) return `the designated Escalation Owner, ${names[0]}`;
-  return `the designated escalation route: ${names.slice(0,-1).join(', ')} and ${names[names.length-1]}`;
+  const titles = (__demo.db.config.admins||[])
+    .filter(a=>(a.roles||[]).includes('escalation'))
+    .map(a=>a.title).filter(Boolean)
+    .map(t=>`<b>the ${esc(t)}</b>`);
+  if(!titles.length) return 'the designated Escalation Owner';
+  if(titles.length===1) return `the designated Escalation Owner, ${titles[0]}`;
+  return `the designated escalation owners — ${titles.slice(0,-1).join(', ')} and ${titles[titles.length-1]}`;
 },
 
 /* ---------- 1.4 concern ---------- */
@@ -435,7 +440,7 @@ concern(){
     <h1>Raise a concern</h1>
     <p class="lede">If something in your mentoring experience isn't right — for example inappropriate behaviour —
       tell us here, privately.</p>
-    <div class="privacy-note">🔒 <span>Your report goes <b>only</b> to ${esc(this._escalationOwners())}.
+    <div class="privacy-note">🔒 <span>Your report goes <b>only</b> to ${this._escalationOwners()}.
       Coordinators, reviewers and IT support cannot see it. The case is handled under SMC's Grievance &amp;
       Misconduct process — this platform records only that a referral was made.</span></div>
     ${inferred('Q6')}

@@ -7,7 +7,13 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 
 let pass = 0, fail = 0;
+/* Same refusal as backend_test.js: an assertion handed `(()=>{...})` instead of its result
+   is truthy forever and can never fail. Caught for real on 19 Aug; refused by shape now. */
 function T(name, cond, note) {
+  if (typeof cond === 'function') {
+    fail++; console.log('  FAIL', name, '— assertion was handed a function, not its result (would be green forever)');
+    return;
+  }
   if (cond) { pass++; console.log('  PASS', name); }
   else { fail++; console.log('  FAIL', name, note ? '— ' + note : ''); }
 }
@@ -79,16 +85,30 @@ check('decisions', () => V.decisions());
 /* Sibling of the black-hole guard in backend_test.js. The concern page used to name one
    person as sole recipient while two accounts held the escalation role — participant-facing
    copy claiming a narrower audience than the permission model actually grants. The sentence
-   is derived from the roles now, so this pins the derivation, not the wording. */
+   is derived from the roles now, so this pins the derivation, not the wording.
+   Since 18 Aug it is derived down to the job title as well (Esther: "to be sustainable as
+   people change, Job title R&R remains"), which makes "no personal name on this page" a
+   promise in its own right — the day someone leaves the chair, the page must not still be
+   pointing a student at them. */
 {
   const html = V.concern();
+  /* Assert on what the page says, not on its markup: "SMC HR & Transformation" ships as
+     "&amp;", and a guard that only ever sees source would have called that title missing. */
+  const plain = h => h.replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  const read = plain(html);
   const holders = db.config.admins.filter(a => (a.roles || []).includes('escalation'));
-  T('the concern page names every account that can actually open the inbox',
-    holders.length > 0 && holders.every(a => html.includes(a.name)));
-  T('and promises nothing about people who cannot',
+  T('the concern page names the job title of every account that can actually open the inbox',
+    holders.length > 0 && holders.every(a => a.title && read.includes(a.title)));
+  /* The name check stays on the raw markup — a name hiding in an attribute or a title=""
+     is still a name pointed at a person who may have left. */
+  T('and carries no personal name at all, so it survives the person leaving the chair',
+    db.config.admins.every(a => !html.includes(a.name)));
+  T('and promises nothing about people who cannot open it',
     db.config.admins.filter(a => !(a.roles || []).includes('escalation'))
-      .every(a => !html.includes(a.name))
-    && html.includes('Coordinators, reviewers and IT support cannot see it'));
+      .every(a => !a.title || !read.includes(a.title))
+    && read.includes('Coordinators, reviewers and IT support cannot see it'));
 }
 
 /* The other half of the Telegram fix: the preferred contact method has to be readable as a

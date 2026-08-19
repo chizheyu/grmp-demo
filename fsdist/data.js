@@ -698,7 +698,10 @@ function buildSeed(){
   const confirmedIds = people.filter(p=>p.appStatus==='accepted' && p.kickoff && p.kickoff.status==='confirmed').map(p=>p.id);
   const events = {
     kickoff:      {name:'Kick-Off Night', date:'2026-10-01', time:'7.30 p.m. to 9.00 p.m.', venue:'SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902', attendance:pickN(confirmedIds, Math.floor(confirmedIds.length*0.9))},
-    appreciation: {name:'Appreciation Night', date:'2027-03-26', venue:'to be confirmed', attendance:[]},
+    /* Moved off 26 Mar 2027 on Esther's 18 Aug note: that Friday is Good Friday, a gazetted
+       Singapore public holiday. Nothing in the build had ever checked a programme date against
+       the calendar people actually live in — see the non-working-day sweep in backend_test.js. */
+    appreciation: {name:'Appreciation Night', date:'2027-04-02', venue:'to be confirmed', attendance:[]},
   };
 
   /* concerns: 1 sample referral */
@@ -745,6 +748,12 @@ function buildSeed(){
     {u:'mentor.bench', pass:'grmp2026', kind:'person', personId:acctReserve.id, label:'Mentor — Reserve Mentor list (opted in)'},
   ];
 
+  /* Decision cards quote dates back to the team. Typing them out is how a card ends up
+     announcing 26 Mar while the system runs 2 Apr, so the prose is composed from the same
+     fields the build uses. (Pinned by 'the decision card quotes the dates the system runs'.) */
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec'];
+  const dLong = iso => `${+iso.slice(8,10)} ${MON[+iso.slice(5,7)-1]} ${iso.slice(0,4)}`;
+
   return {
     version:1, today:TODAY,
     archives:[], aiCache:{}, sessions:{},
@@ -776,8 +785,13 @@ function buildSeed(){
                  {n:3,label:'Know Your Path',start:'2027-02-01',end:'2027-03-31'}],
       ackLadder:[{date:'2026-09-17',what:'Acceptance reminder — sent once, no same-day nudge (confirmed)',who:'accepted, place not yet confirmed'},
                  {date:'2026-09-27',what:'Reserve-activation reminder — one to two days before the activation deadline',who:'activated reserves, place not yet confirmed'}],
-      admins:[{name:'Esther', role:'Programme Owner', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
-              {name:'Wei Kiat', role:'Programme Lead', roles:['lead','coordinator','mentor_reviewer','mentee_reviewer','escalation']},
+      /* `role` is the seat inside GRMP; `title` is the job title the organisation knows the
+         holder by. Participant-facing copy says the title, never the name — Esther, 18 Aug:
+         "to be sustainable as people change, Job title R&R remains". Titles are only filled in
+         where the programme has actually published one (they are diffed against the signature
+         block in backend_test.js); nobody's title is invented to fill a column. */
+      admins:[{name:'Esther', role:'Programme Owner', title:'Chief, SMC HR & Transformation', roles:['lead','mentor_reviewer','mentee_reviewer','escalation']},
+              {name:'Wei Kiat', role:'Programme Lead', title:'GRMP Programme Lead', roles:['lead','coordinator','mentor_reviewer','mentee_reviewer','escalation']},
               {name:'Kenzie', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer']},
               {name:'Yu Tong', role:'Mentor Reviewer (SMU)', roles:['mentor_reviewer','dashboard_viewer']},
               {name:'Portia', role:'Mentee Reviewer (SMU)', roles:['mentee_reviewer','dashboard_viewer']},
@@ -789,9 +803,9 @@ function buildSeed(){
         Q3:{title:'Matching signals now follow the application specs: three ranked industry preferences on the mentee form, matched against the mentor’s industry on the same 17-option list, plus breadth and diversity. The earlier three-track model (our addition) is removed. Scoring weights remain a first cut to tune with the team.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Mentee Application Spec — industry preferences replace tracks'}},
         Q4:{title:'Application forms now follow Joanne’s specs verbatim: staged 4-step mentor and mentee applications, PDPA collected once at application, no save-and-resume (completed in one sitting).', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Mentor/Mentee Application Specs — built as specified'}},
         Q5:{title:'No acknowledgement after the final reminder → treated as withdrawn, seat freed', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'confirmed in-app'}},
-        Q6:{title:'Concern link on every public page + the acknowledgement page. Primary recipient: Wei Kiat (Programme Lead, first point of contact); Esther as alternate escalation where further review is needed.', inferred:true, settled:{by:'Esther', on:'2026-08-06', via:'feedback F0806-174654'}},
+        Q6:{title:'Concern link on every public page + the acknowledgement page. Primary recipient: Wei Kiat (Programme Lead, first point of contact); Esther as alternate escalation where further review is needed. Amended 18 Aug: the page states the escalation route by job title rather than by name — "to be sustainable as people change, Job title R&R remains" (Esther). The same two people hold it; the sentence is generated from whoever holds the escalation role, so it cannot outlive a handover.', inferred:true, settled:{by:'Esther', on:'2026-08-18', via:'feedback F0806-174654 (route) + 18 Aug group message (named by title, not by person)'}},
         Q7:{title:'Lean scope: no pair/meeting/availability tracking, no kickoff-goals form, no reflection content stored', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'confirmed in-app'}},
-        Q8:{title:'Registration 1–10 Sept 2026 · Kick-Off Night 1 Oct 2026, 7.30–9.00 pm at SMU ALCove · Appreciation Night 26 Mar 2027.', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'group message — dates entered into the system'}},
+        Q8:{title:`Registration 1–10 Sept 2026 · Kick-Off Night ${dLong(events.kickoff.date)}, 7.30–9.00 pm at SMU ALCove · Appreciation Night ${dLong(events.appreciation.date)}. Appreciation Night moved from 26 Mar 2027, which is Good Friday — a gazetted public holiday — leaving the other two dates as Wei Kiat confirmed them. Every programme date is now checked against Singapore public holidays and non-working days as part of the test suite.`, inferred:true, settled:{by:'Wei Kiat, amended by Esther', on:'2026-08-18', via:'group message 4 Aug (all three dates) → Esther 18 Aug (public-holiday clash on 26 Mar)'}},
         Q9:{title:'Approval auto-issues the acceptance email (approval and invitation are one action, no separate send step) — the spec marks this [CONFIRM]; it is running as the default.', inferred:true, settled:{by:'Esther and Joanne', on:'2026-08-18', via:'feedback F0817-145316 and F0818-131700 — both confirmed the running behaviour'}},
         Q10:{title:'Draft-saving on the application forms is removed: the specs confirm no save-and-resume (no applicant login, so no identity to attach a partial record to). This supersedes the earlier draft behaviour built from feedback F0806-205424; a browser leave-site warning guards accidental loss instead.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Portal Capability & Technical Assumptions §1 [CONFIRMED]'}},
         Q11:{title:'Orientation videos are an optional briefing resource, not a gate: the binding step is the acceptance gate (Rules + COI + Kick-Off attendance), per the post-selection specs. Kick-Off exceptions route to Esther Koh and Wei Kiat Koh.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Post-Selection Specs §2.1 — gate defines confirmation'}},

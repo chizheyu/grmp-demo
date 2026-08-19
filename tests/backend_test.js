@@ -8,7 +8,17 @@ const {Store, D, INDUSTRIES, FACULTIES, FORM_OPTS, COPY, MAILS} = G;
 const fs = require('fs'), path = require('path');
 
 let pass=0, fail=0;
-function T(name, cond){ if(cond){pass++; console.log('  PASS', name);} else {fail++; console.log('  FAIL', name);} }
+/* A guard handed `(()=>{...})` instead of `(()=>{...})()` passes forever: a function object
+   is truthy, so the assertion is green no matter what it would have found. Cost one real
+   finding on 19 Aug before a deliberate break-it run exposed it. A suite that cannot fail is
+   worse than no suite, so the harness refuses the shape rather than trusting the writer. */
+function T(name, cond){
+  if(typeof cond === 'function'){
+    fail++; console.log('  FAIL', name, '— assertion was handed a function, not its result (would be green forever)');
+    return;
+  }
+  if(cond){pass++; console.log('  PASS', name);} else {fail++; console.log('  FAIL', name);}
+}
 function fresh(){ Store.reset(); return Store.load(); }
 
 /* A complete, valid application payload for each kind (the specs' field set). */
@@ -764,7 +774,142 @@ T('selection timeline constants match the standards note',
   db.config.registration.closes==='2026-09-10' && db.config.selection.approvalsBy==='2026-09-16'
   && db.config.selection.outcomeBy==='2026-09-18' && db.config.selection.acceptBy==='2026-09-20'
   && db.config.selection.reserveAcceptBy==='2026-09-29'
-  && db.events.kickoff.date==='2026-10-01' && db.events.kickoff.venue==='SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902');
+  && db.events.kickoff.date==='2026-10-01' && db.events.kickoff.venue==='SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902'
+  && db.events.appreciation.date==='2027-04-02');
+
+/* ---- the calendar people actually live in ------------------------------------------
+   Esther, 18 Aug: "26 March 2027 is a Public Holiday. Pls move to 2 April 2027." She was
+   right — 2027-03-26 is Good Friday. The class behind that one line: the build published
+   dates people were expected to attend or act on, and nothing in it had ever checked those
+   dates against Singapore's calendar. It took a person who happened to know the date. This
+   is the machine knowing it instead, which matters most for the dates nobody has set yet —
+   Joanne is still holding the full calendar (Q13), and it will land in these same fields.
+
+   Gazetted holidays fail outright. Weekends are a judgement call, not an error, so each one
+   has to be written down with the reason it is acceptable — an unexplained new weekend date
+   fails until somebody rules on it. Same "cry wolf on purpose" rule the content suite uses. */
+console.log('— programme dates vs the Singapore calendar (no date on a day people cannot keep) —');
+{
+  const iso = d => d.toISOString().slice(0,10);
+  const dow = s => new Date(s+'T00:00:00Z').getUTCDay();          // 0 Sun … 6 Sat
+  /* Good Friday is computed, not typed: anonymous Gregorian computus. The one holiday in
+     range that moves every year is the one that caused this, so it is derived. */
+  const easter = y => {
+    const a=y%19, b=Math.floor(y/100), c=y%100, d=Math.floor(b/4), e=b%4,
+          f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3), h=(19*a+b-d-g+15)%30,
+          i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);
+    return new Date(Date.UTC(y, Math.floor((h+l-7*m+114)/31)-1, ((h+l-7*m+114)%31)+1));
+  };
+  const goodFriday = y => { const d=easter(y); d.setUTCDate(d.getUTCDate()-2); return iso(d); };
+
+  /* MOM-gazetted Singapore public holidays. COVERED says how far this table can speak;
+     a programme date outside it fails asking to be extended, because a lookup table that
+     silently answers "not a holiday" for years it has never heard of is worse than none. */
+  const COVERED = [2026, 2027];
+  const GAZETTED = {
+    '2026-01-01':"New Year's Day", '2026-02-17':'Chinese New Year', '2026-02-18':'Chinese New Year',
+    [goodFriday(2026)]:'Good Friday', '2026-05-01':'Labour Day', '2026-05-31':'Vesak Day',
+    '2026-06-01':'Vesak Day (in lieu)', '2026-08-09':'National Day', '2026-08-10':'National Day (in lieu)',
+    '2026-11-08':'Deepavali', '2026-11-09':'Deepavali (in lieu)', '2026-12-25':'Christmas Day',
+    '2027-01-01':"New Year's Day", '2027-02-06':'Chinese New Year', '2027-02-07':'Chinese New Year',
+    '2027-02-08':'Chinese New Year (in lieu)', [goodFriday(2027)]:'Good Friday',
+    '2027-05-01':'Labour Day', '2027-05-03':'Labour Day (in lieu)', '2027-08-09':'National Day',
+    '2027-12-25':'Christmas Day', '2027-12-27':'Christmas Day (in lieu)',
+  };
+  /* Moon-sighted and lunisolar dates that are not gazetted this far out. Listed rather than
+     omitted: an estimate said out loud can be checked against MOM later, a missing row cannot. */
+  const ESTIMATED = {
+    '2026-03-21':'Hari Raya Puasa (estimated)', '2026-03-23':'Hari Raya Puasa in lieu (estimated)',
+    '2026-05-27':'Hari Raya Haji (estimated)',
+    '2027-03-10':'Hari Raya Puasa (estimated)', '2027-05-17':'Hari Raya Haji (estimated)',
+    '2027-05-20':'Vesak Day (estimated)', '2027-10-28':'Deepavali (estimated)',
+  };
+
+  const c = db.config, sel = c.selection;
+  /* kind drives the verdict: 'attend' and 'send' and 'deadline' are days a human has to be
+     available; 'window' is only a boundary of a period and may fall anywhere. */
+  const DATES = [
+    {what:'Registration opens',            iso:c.registration.opens,  kind:'window'},
+    {what:'Registration closes',           iso:c.registration.closes, kind:'deadline'},
+    {what:'Approvals by',                  iso:sel.approvalsBy,       kind:'deadline'},
+    {what:'Acceptance reminder',           iso:sel.reminderOn,        kind:'send'},
+    {what:'Outcome by',                    iso:sel.outcomeBy,         kind:'send'},
+    {what:'Acceptance deadline',           iso:sel.acceptBy,          kind:'deadline'},
+    {what:'Reserve activation deadline',   iso:sel.reserveAcceptBy,   kind:'deadline'},
+    ...(c.ackLadder||[]).map(a=>({what:'Reminder: '+a.what.split('—')[0].trim(), iso:a.date, kind:'send'})),
+    ...(c.rotations||[]).flatMap(r=>[{what:`Rotation ${r.n} start`, iso:r.start, kind:'window'},
+                                     {what:`Rotation ${r.n} end`,   iso:r.end,   kind:'window'}]),
+    ...Object.values(db.events||{}).map(e=>({what:e.name, iso:e.date, kind:'attend'})),
+  ].filter(d=>d.iso);
+
+  const outside = DATES.filter(d=>!COVERED.includes(+d.iso.slice(0,4)));
+  T(`every programme date falls in a year the holiday table covers (${COVERED.join(', ')})`, (()=>{
+    if(outside.length) console.log('    outside the table, extend it before trusting this suite: '
+      + outside.map(d=>`${d.what} ${d.iso}`).join('; '));
+    return outside.length===0;
+  })());
+
+  const clashes = DATES.filter(d=>GAZETTED[d.iso]);
+  T('no programme date lands on a gazetted Singapore public holiday', (()=>{
+    if(clashes.length) console.log('    ' + clashes.map(d=>`${d.what} ${d.iso} = ${GAZETTED[d.iso]}`).join('; '));
+    return clashes.length===0;
+  })());
+
+  T('and none on an estimated one either, or the estimate is written down as accepted', (()=>{
+    const soft = DATES.filter(d=>ESTIMATED[d.iso]);
+    if(soft.length) console.log('    ' + soft.map(d=>`${d.what} ${d.iso} ≈ ${ESTIMATED[d.iso]}`).join('; '));
+    return soft.length===0;
+  })());
+
+  /* Reviewed weekend dates. Each key is the field, not the date, so moving the date does not
+     silently inherit somebody else's ruling — the reason has to be re-read and re-typed. */
+  const WEEKEND_OK = {
+    'Acceptance deadline|2026-09-20':
+      'an online action on a portal that is open all weekend, and the date the Pre-Login spec '
+      + 'and Esther both asked for; flagged to the team rather than moved',
+    'Reminder: Reserve-activation reminder|2026-09-27':
+      'automated send, one to two days before the 29 Sept activation deadline as specified; '
+      + 'a Sunday send is not ideal and 28 Sept would satisfy the same rule — left for the '
+      + 'calendar owner to rule on with the rest of the set (Q13)',
+  };
+  T('every weekend date has been looked at, with the reason written down', (()=>{
+    const weekend = DATES.filter(d=>d.kind!=='window' && (dow(d.iso)===0 || dow(d.iso)===6));
+    const unruled = weekend.filter(d=>!WEEKEND_OK[`${d.what}|${d.iso}`]);
+    if(unruled.length) console.log('    weekend date nobody has ruled on: '
+      + unruled.map(d=>`${d.what} ${d.iso} (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow(d.iso)]})`).join('; '));
+    return unruled.length===0;
+  })());
+}
+
+/* ---- job titles, not names, on the safeguarding promise ---------------------------- */
+console.log('— escalation route is stated by job title, and the titles are the published ones —');
+T('every account that can open the concern inbox has a job title to be named by', (()=>{
+  const holders = db.config.admins.filter(a=>(a.roles||[]).includes('escalation'));
+  return holders.length>0 && holders.every(a=>!!a.title);
+})());
+/* Two places now carry a person's job title: this field and the letter signature block.
+   Two copies of one fact is how the concern page drifted in the first place, so they are
+   diffed rather than trusted. */
+T('and it is the same title the programme signs its letters with', (()=>
+  db.config.admins.filter(a=>a.title).every(a=>{
+    const sig = db.config.signatories.find(s=>s.name.startsWith(a.name));
+    return !sig || sig.titles.includes(a.title);
+  }))());
+
+/* ---- prose that quotes a date must quote the date the system runs ------------------ */
+T('the decision card quotes the dates the system actually runs', (()=>{
+  const q8 = db.config.openItems.Q8.title;
+  const short = iso => `${+iso.slice(8,10)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec'][+iso.slice(5,7)-1]} ${iso.slice(0,4)}`;
+  return q8.includes(short(db.events.kickoff.date)) && q8.includes(short(db.events.appreciation.date));
+})());
+T('and so does the manual, where it names one', (()=>{
+  const md = fs.readFileSync(path.join(__dirname,'..','USER_MANUAL.md'),'utf8');
+  const m = md.match(/Appreciation Night \(([^)]*)\)/);
+  const a = db.events.appreciation.date;
+  const short = `${+a.slice(8,10)} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec'][+a.slice(5,7)-1]} ${a.slice(0,4)}`;
+  if(m && !m[1].includes(short)) console.log(`    manual says "${m[1]}", config says ${short}`);
+  return !m || m[1].includes(short);
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail?1:0);
