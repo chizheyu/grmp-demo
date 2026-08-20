@@ -7,7 +7,7 @@
    ALL participant-facing legal text and email copy lives HERE (COPY / MAILS), verbatim from
    the specs — views interpolate, never rewrite. */
 
-const DB_KEY = 'grmp_demo_v6';   // bumped: R5 spec model (forms/gate/reserve/industries)
+const DB_KEY = 'grmp_demo_v7';   // bumped: Cycle 1 date amendments (batch outcome send, reminder rule)
 const TODAY = '2026-12-15';
 
 /* Node compatibility: same file runs headless for CLI backend tests (localStorage shim). */
@@ -442,6 +442,29 @@ const MAILS = {
     body:(v)=>[`Dear ${v.name},`,'',
       `Your one-time verification code is: ${v.code}`,'',
       'Enter it on the portal sign-in screen to continue. If you did not request this code, you can ignore this email.'].join('\n')},
+  /* DRAFT — ours, not the programme's. Every other template in this file is verbatim from
+     an approved spec; this one had no spec, because nobody had noticed that a matched pair
+     were never given a way to reach each other. The pair card showed a name and a
+     background, this email was a subject line with an empty body, and the FAQ told them the
+     conversations are "arranged directly between the two of you".
+     Written to be corrected: sent to Joanne on 20 Aug for her wording. Marked `draft` so
+     the console says so out loud rather than letting it pass for approved copy. */
+  pair_match: {sign:'wk', draft:'awaiting the UX owner’s wording (sent 20 Aug 2026)',
+    subject:(v)=>`Your Rotation ${v.rotation} match: ${v.rotLabel}`,
+    /* One copy each, not one email to both: the message carries a personal portal link,
+       and a shared copy would have walked the mentor onto the mentee's page. The other
+       person's address is written into the body instead, which is the thing the pair
+       actually needs and the thing the system was not giving them. */
+    body:(v,CF)=>[`Dear ${v.name},`,'',
+      `You have been matched for Rotation ${v.rotation} of the ${CF.progFull}, ${v.rotLabel}, which runs from ${v.rotStart} to ${v.rotEnd}.`,'',
+      (v.mentee ? `Your mentor for this rotation is ${v.otherName}` : `You will be mentoring ${v.otherName}`)
+        + (v.otherLine ? `, ${v.otherLine}.` : '.'),'',
+      'The first move is yours to make together. Please make contact in the first week and agree when you will meet. The programme asks for at least two conversations during the rotation, virtually or in person, at whatever times suit you both. There is nothing to book through us.','',
+      `You can reach ${v.otherName} at ${v.otherEmail}${v.otherLinkedin?`, and their LinkedIn profile is ${v.otherLinkedin}`:''}. Their details are also on your GRMP page, along with the reflection prompts for ${v.rotLabel} if you would like a shape for the first conversation:`,'',
+      `${v.link}`,'',
+      'At the end of the rotation we ask the mentee to confirm that the two conversations took place and to write a short private reflection. What you discuss is yours: the programme records that the conversations happened, never what was said.','',
+      `If anything changes, or the pairing is not working, please write to us at ${CF.enquiries} and we will help.`,'',
+      'Warm regards,'].join('\n')},
   onboarding: {sign:'wk', subject:(v,CF)=>`Your place in GRMP is confirmed, ${v.name}`,
     body:(v,CF)=>[`Dear ${v.name},`,'',
       'Thank you, your place in the programme is confirmed. Your acknowledgements have been recorded, and your personal page is now your home for the whole cycle: your rotations, your checkpoints and your certificate all live there.','',
@@ -449,6 +472,22 @@ const MAILS = {
       `We will see you at the Kick-Off on ${CF.kickoffLong}, ${CF.kickoffTime}, ${CF.kickoffVenue}.`,'',
       '[Placeholder pending approved copy: the portal onboarding email is an outstanding content item, shared between mentor and mentee. This confirmation text will be replaced verbatim when the programme team supplies it.]','',
       'Warm regards,'].join('\n')},
+};
+
+/* Placeholder data for reading a template with nobody real in it. It sits beside the
+   templates deliberately: the preview used to pass one fixed bag of three variables, so
+   any template needing a fourth previewed as "undefined" the first time somebody opened
+   it. A template arrives with its own sample now, or it does not preview. */
+const MAIL_PREVIEW = (db, tpl) => {
+  const r1 = ((db.config.rotations||[])[0])||{};
+  const base = {name:'[Name]', link:'[personalized link]', code:'123456'};
+  const per = {
+    pair_match: {mentee:true, otherName:'[Mentor name]', otherEmail:'[mentor email]',
+      otherLinkedin:'linkedin.com/in/[profile]', otherLine:'[job title] at [organisation]',
+      rotation:r1.n||1, rotLabel:r1.label||'[rotation theme]',
+      rotStart:r1.start?D.fmtLong(r1.start):'[start]', rotEnd:r1.end?D.fmtLong(r1.end):'[end]'},
+  };
+  return {...base, ...(per[tpl]||{})};
 };
 
 /* ---------- seed content pools (fictional, varied — never all-same columns) ---------- */
@@ -590,7 +629,10 @@ function buildSeed(){
   const kickoffExceptions = [];
   people.filter(p=>p.appStatus==='accepted').forEach(p=>{
     if(lateAck.includes(p)) return;                          // gate untouched — place NOT confirmed
-    const d = '2026-09-'+String(17+Math.floor(rnd()*8)).padStart(2,'0');
+    /* Between the outcome batch (14 Sept) and the acceptance deadline (20 Sept). It used
+       to run 17–24 Sept, which put a quarter of the cohort through the gate after the
+       deadline that is supposed to close it — invisible in the UI, wrong in the data. */
+    const d = '2026-09-'+String(15+Math.floor(rnd()*6)).padStart(2,'0');
     const hh = 9+Math.floor(rnd()*12), mm = Math.floor(rnd()*60);
     p.ack = {rules:isoAt(d,hh,mm), coi:isoAt(d,hh,Math.min(59,mm+2)), kickoff:isoAt(d,hh,Math.min(59,mm+4))};
     p.coi = {declared:false, details:''};
@@ -694,6 +736,13 @@ function buildSeed(){
   if(preview[0]) builderReflections.push({menteeId:preview[0].id, at:'2027-03-12',
     text:'GRMP gave me three very different mirrors. I will pay it forward by mentoring two juniors in my CCA and starting a monthly peer career circle.'});
 
+  /* The outcome batch already went out in this cohort's timeline: one send on 14 Sept
+     carrying every decision made during the 10–13 Sept review window. Decisions taken
+     after a batch has been released send individually — see D.decide. */
+  people.filter(p=>['accepted','reserve_invited','declined','declined_not_selected','declined_ineligible'].includes(p.appStatus))
+        .forEach(p=>{ p.decisionAt='2026-09-14'; p.outcomeSentAt='2026-09-14'; });
+  const outcomeBatch = {at:'2026-09-14', by:'Wei Kiat', count:people.filter(p=>p.outcomeSentAt).length};
+
   /* events — Kick-Off details are spec-confirmed constants */
   const confirmedIds = people.filter(p=>p.appStatus==='accepted' && p.kickoff && p.kickoff.status==='confirmed').map(p=>p.id);
   const events = {
@@ -713,20 +762,20 @@ function buildSeed(){
   const sampleReserveM = mentorReserve[0], sampleReserveE = menteeReserve[0];
   const lateOne = lateAck[0];
   const emails = [
-    {at:'2026-08-20', to:'mentor invitation list (mail-merge)', tpl:'mentor_invite', vars:{name:'[Name]'}, kind:'invite'},
-    {at:'2026-08-20', to:'mentee invitation list (mail-merge)', tpl:'mentee_invite', vars:{name:'[Name]'}, kind:'invite'},
+    {at:'2026-08-31', to:'mentor invitation list (mail-merge)', tpl:'mentor_invite', vars:{name:'[Name]'}, kind:'invite', by:'Esther Koh'},
+    {at:'2026-08-31', to:'mentee invitation list (mail-merge)', tpl:'mentee_invite', vars:{name:'[Name]'}, kind:'invite', by:'Wei Kiat Koh'},
     {at:sampleAcceptM.submittedAt, to:sampleAcceptM.email, tpl:'mentor_receipt', vars:{name:sampleAcceptM.name}, kind:'receipt'},
     {at:sampleAcceptE.submittedAt, to:sampleAcceptE.email, tpl:'mentee_receipt', vars:{name:sampleAcceptE.name}, kind:'receipt'},
-    {at:'2026-09-16', to:sampleAcceptM.email, tpl:'mentor_accept', vars:{name:sampleAcceptM.name, link:'#/me/'+sampleAcceptM.id}, kind:'decision'},
-    {at:'2026-09-16', to:sampleAcceptE.email, tpl:'mentee_accept', vars:{name:sampleAcceptE.name, link:'#/me/'+sampleAcceptE.id}, kind:'decision'},
-    {at:'2026-09-16', to:sampleReserveM.email, tpl:'mentor_reserve', vars:{name:sampleReserveM.name}, kind:'decision'},
-    {at:'2026-09-16', to:sampleReserveE.email, tpl:'mentee_reserve', vars:{name:sampleReserveE.name}, kind:'decision'},
-    {at:'2026-09-23', to:lateOne.email, tpl:'mentee_accept_reminder', vars:{name:lateOne.name, link:'#/me/'+lateOne.id}, kind:'reminder'},
-    {at:'2026-09-28', to:'all matched pairs', subject:'Your Rotation 1 match — Know Yourself', kind:'match'},
+    {at:'2026-09-14', to:sampleAcceptM.email, tpl:'mentor_accept', vars:{name:sampleAcceptM.name, link:'#/me/'+sampleAcceptM.id}, kind:'decision'},
+    {at:'2026-09-14', to:sampleAcceptE.email, tpl:'mentee_accept', vars:{name:sampleAcceptE.name, link:'#/me/'+sampleAcceptE.id}, kind:'decision'},
+    {at:'2026-09-14', to:sampleReserveM.email, tpl:'mentor_reserve', vars:{name:sampleReserveM.name}, kind:'decision'},
+    {at:'2026-09-14', to:sampleReserveE.email, tpl:'mentee_reserve', vars:{name:sampleReserveE.name}, kind:'decision'},
+    {at:'2026-09-18', to:lateOne.email, tpl:'mentee_accept_reminder', vars:{name:lateOne.name, link:'#/me/'+lateOne.id}, kind:'reminder'},
+    {at:'2026-09-28', to:'all matched pairs', subject:'Your Rotation 1 match: Know Yourself', kind:'match'},
     {at:'2026-11-25', to:'mentees', subject:'Rotation 1 close-off — two quick confirmations', kind:'closeoff'},
-    {at:'2026-11-30', to:'all matched pairs', subject:'Your Rotation 2 match — Know Your World', kind:'match'},
+    {at:'2026-11-30', to:'all matched pairs', subject:'Your Rotation 2 match: Know Your World', kind:'match'},
   ];
-  lateOne.acceptReminderAt = '2026-09-23';
+  lateOne.acceptReminderAt = '2026-09-18';
 
   /* preset accounts: 6 admins + 5 participant personas (picked deterministically) */
   const acctGate = lateAck[1];
@@ -754,6 +803,27 @@ function buildSeed(){
   const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sept','Oct','Nov','Dec'];
   const dLong = iso => `${+iso.slice(8,10)} ${MON[+iso.slice(5,7)-1]} ${iso.slice(0,4)}`;
 
+  /* `opens` is the day the forms start accepting submissions: 31 Aug, when the
+     invitations go out (mentee list from Wei Kiat, mentor list from Esther). It is
+     deliberately not published — the site states a closing date, never an opening one. */
+  const registration = {opens:'2026-08-31', closes:'2026-09-09'};
+  /* Selection timeline — "GRMP 2.0 Cycle 1: Date Amendments" (Joanne, 20 Aug 2026,
+     reviewed and confirmed by Esther and Wei Kiat). This closes Q13, which had been
+     held open since 18 Aug because Esther's 14 Sept and the Pre-Login spec's 18 Sept
+     disagreed. Every date below is diffed against specs_joanne_r11/confirmed_dates.json
+     in backend_test.js, which also re-checks the weekday Joanne wrote in brackets
+     against the real calendar.
+     Two mechanism changes ride in with the dates, which is why this was never a
+     one-line config edit:
+       · outcomeBy is a SINGLE BATCH SEND on the day, not a rolling send fired by each
+         approval. It reverses the behaviour recorded in Q9 — see D.sendOutcomeBatch.
+       · the acceptance reminder is no longer a typed date. It is a rule, and one rule
+         for both the main and the reserve flow — see D.reminderDueDate. */
+  const selection = {reviewFrom:'2026-09-10', approvalsBy:'2026-09-13',
+             outcomeBy:'2026-09-14', outcomeSend:'batch', acceptBy:'2026-09-20',
+             reserveActivateFrom:'2026-09-21', reserveAcceptBy:'2026-09-26',
+             reminderRule:{afterEmailDays:2, beforeDeadlineDays:2}, menteeCap:60};
+
   return {
     version:1, today:TODAY,
     archives:[], aiCache:{}, sessions:{},
@@ -762,17 +832,7 @@ function buildSeed(){
       // Briefing recordings (optional resource, NOT a gate — the binding Kick-Off
       // confirmation lives in the acceptance gate per the post-selection specs).
       orientationVideo:'', orientationVideoMentor:'',
-      registration:{opens:'2026-09-01', closes:'2026-09-10'},
-      /* Selection timeline — spec-confirmed constants (Standards note §1).
-         R6: accept-by moved 26 Sept → 20 Sept. Both sources now say 20: the Pre-Login Site
-         spec carries it as confirmed-do-not-reopen, and Esther asked for the same shift in
-         F0816-152143. The single-shot acceptance reminder moves with it (three days before
-         the deadline, as before). Reserve activation stays 29 Sept: no spec changed it, and
-         it still sits clear of the Kick-Off.
-         OPEN: Esther also asked for outcome-by 14 Sept; the later spec says 18 Sept and lists
-         it as confirmed. Left at 18 pending the team's answer — see GRMP_R6_Spec_Delta §4. */
-      selection:{approvalsBy:'2026-09-16', outcomeBy:'2026-09-18', acceptBy:'2026-09-20',
-                 reserveAcceptBy:'2026-09-29', reminderOn:'2026-09-17', menteeCap:60},
+      registration, selection,
       mail:{from:'SMC GRMP Team', replyTo:'smu.smc@sa.smu.edu.sg'},
       signatories:[
         {name:'Esther Koh', titles:['Chief, SMC HR & Transformation']},
@@ -783,8 +843,10 @@ function buildSeed(){
       rotations:[{n:1,label:'Know Yourself',start:'2026-10-01',end:'2026-11-30'},
                  {n:2,label:'Know Your World',start:'2026-12-01',end:'2027-01-31'},
                  {n:3,label:'Know Your Path',start:'2027-02-01',end:'2027-03-31'}],
-      ackLadder:[{date:'2026-09-17',what:'Acceptance reminder — sent once, no same-day nudge (confirmed)',who:'accepted, place not yet confirmed'},
-                 {date:'2026-09-27',what:'Reserve-activation reminder — one to two days before the activation deadline',who:'activated reserves, place not yet confirmed'}],
+      /* ackLadder used to sit here as two typed dates (17 and 27 Sept). It is now computed
+         from the reminder rule — see D.ackLadder. A typed date next to a rule that resolves
+         to a different day is exactly how a system ends up publishing one promise and
+         keeping another. */
       /* `role` is the seat inside GRMP; `title` is the job title the organisation knows the
          holder by. Participant-facing copy says the title, never the name — Esther, 18 Aug:
          "to be sustainable as people change, Job title R&R remains". Titles are only filled in
@@ -805,16 +867,17 @@ function buildSeed(){
         Q5:{title:'No acknowledgement after the final reminder → treated as withdrawn, seat freed', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'confirmed in-app'}},
         Q6:{title:'Concern link on every public page + the acknowledgement page. Primary recipient: Wei Kiat (Programme Lead, first point of contact); Esther as alternate escalation where further review is needed. Amended 18 Aug: the page states the escalation route by job title rather than by name — "to be sustainable as people change, Job title R&R remains" (Esther). The same two people hold it; the sentence is generated from whoever holds the escalation role, so it cannot outlive a handover.', inferred:true, settled:{by:'Esther', on:'2026-08-18', via:'feedback F0806-174654 (route) + 18 Aug group message (named by title, not by person)'}},
         Q7:{title:'Lean scope: no pair/meeting/availability tracking, no kickoff-goals form, no reflection content stored', inferred:true, settled:{by:'Wei Kiat', on:'2026-08-04', via:'confirmed in-app'}},
-        Q8:{title:`Registration 1–10 Sept 2026 · Kick-Off Night ${dLong(events.kickoff.date)}, 7.30–9.00 pm at SMU ALCove · Appreciation Night ${dLong(events.appreciation.date)}. Appreciation Night moved from 26 Mar 2027, which is Good Friday — a gazetted public holiday — leaving the other two dates as Wei Kiat confirmed them. Every programme date is now checked against Singapore public holidays and non-working days as part of the test suite.`, inferred:true, settled:{by:'Wei Kiat, amended by Esther', on:'2026-08-18', via:'group message 4 Aug (all three dates) → Esther 18 Aug (public-holiday clash on 26 Mar)'}},
-        Q9:{title:'Approval auto-issues the acceptance email (approval and invitation are one action, no separate send step) — the spec marks this [CONFIRM]; it is running as the default.', inferred:true, settled:{by:'Esther and Joanne', on:'2026-08-18', via:'feedback F0817-145316 and F0818-131700 — both confirmed the running behaviour'}},
+        Q8:{title:`Registration ${dLong(registration.opens)} to ${dLong(registration.closes)} (the forms open the day the invitations go out; no opening date is published) · Kick-Off Night ${dLong(events.kickoff.date)}, 7.30–9.00 pm at SMU ALCove · Appreciation Night ${dLong(events.appreciation.date)}. Appreciation Night moved from 26 Mar 2027, which is Good Friday — a gazetted public holiday — leaving the other two dates as Wei Kiat confirmed them. Registration closes ${dLong(registration.closes)}, one day earlier than Wei Kiat's original 10 Sept, per the 20 Aug Cycle 1 amendments. Every programme date is now checked against Singapore public holidays and non-working days as part of the test suite.`, inferred:true, settled:{by:'Wei Kiat, amended by Esther and the Cycle 1 date amendments', on:'2026-08-20', via:'group message 4 Aug (all three dates) → Esther 18 Aug (public-holiday clash on 26 Mar) → Joanne 20 Aug amendments doc (registration closes 9 Sept)'}},
+        Q9:{title:'Superseded on 20 August. It used to read: approval auto-issues the acceptance email, approval and invitation being one action. The Cycle 1 date amendments replace that with a single batch send on the outcome date — the cohort hears on one day, and a decision revised during the review window never reaches an inbox in its earlier form. Approvals taken after the batch has gone out still send immediately, so nobody decided late waits for a batch that has already left.', inferred:true, settled:{by:'Esther and Wei Kiat, via Joanne', on:'2026-08-20', via:'F0817-145316 / F0818-131700 confirmed the rolling send; the 20 Aug Cycle 1 amendments replaced it with a batch send'}},
         Q10:{title:'Draft-saving on the application forms is removed: the specs confirm no save-and-resume (no applicant login, so no identity to attach a partial record to). This supersedes the earlier draft behaviour built from feedback F0806-205424; a browser leave-site warning guards accidental loss instead.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Portal Capability & Technical Assumptions §1 [CONFIRMED]'}},
         Q11:{title:'Orientation videos are an optional briefing resource, not a gate: the binding step is the acceptance gate (Rules + COI + Kick-Off attendance), per the post-selection specs. Kick-Off exceptions route to Esther Koh and Wei Kiat Koh.', inferred:true, settled:{by:'Joanne (spec)', on:'2026-08-14', via:'Post-Selection Specs §2.1 — gate defines confirmation'}},
         Q12:{title:'Visual styling deliberately stays as the current neutral theme: the specs say do not invent a brand theme, and SMC brand guidelines/assets are an outstanding input (owner: SMC comms lead). Restyle lands when the assets do.', inferred:true},
-        Q13:{title:'Selection dates, as they now run. Acceptance deadline: 20 September (moved from 26) — the Pre-Login Site spec and Esther’s 16 August note both ask for this, and it flows through the acceptance emails, the Reserve emails and the reminder automatically. Outcome by: 18 September — the Pre-Login Site spec carries it as a confirmed date, and that spec is the later document and already adopted the acceptance change from the same note, so we have followed it rather than treat the pair as unsettled. Esther’s note had suggested 14 September for this one: if that is still what you want, say so here and it is a one-line change. Status 18 Aug: Joanne is holding this one — the acceptance and outcome dates are interconnected with the rest of the calendar and she will come back with the set. The dates below keep running until she does.', inferred:true},
+        Q13:{title:`Selection dates, settled. The full calendar came back from Joanne on 20 August, reviewed by Esther and Wei Kiat, and it resolves the 14-vs-18 September disagreement in favour of Esther's 14th. As now built: applications close ${dLong(registration.closes)} (one day earlier), review and selection ${dLong(selection.reviewFrom)} to ${dLong(selection.approvalsBy)}, outcome notifications ${dLong(selection.outcomeBy)}, acceptance deadline ${dLong(selection.acceptBy)} (unchanged), Reserve activation rolling from ${dLong(selection.reserveActivateFrom)} with a ${dLong(selection.reserveAcceptBy)} deadline (three days earlier). Two of these are mechanism changes, not dates: outcomes are a single batch send on the day rather than an email fired by each approval — which supersedes Q9 — and the acceptance reminder is now a rule (48h after the person's own email, or two days before their own deadline, whichever is later; no automated reminder at all if that lands on or after the deadline, and the team is given the names to contact instead). One rule, both flows.`, inferred:true, settled:{by:'Esther and Wei Kiat, via Joanne', on:'2026-08-20', via:'GRMP 2.0 Cycle 1: Date Amendments and Site Changes — specs_joanne_r11/'}},
+        Q15:{title:`For Joanne (UX owner) — the match email and what a pair card shows. Neither existed as a decision until 20 August, because nobody had noticed the gap: the pair card gave a name and a background with no way to reach anyone, the match email was a subject line with an empty body, and the FAQ answer says the conversations are "arranged directly between the two of you". Built as proposed and agreed on 20 Aug: the card shows the other person's email address and LinkedIn, deliberately not their phone number, which is a different order of thing to hand over automatically and least of all a student's; the email goes out at approval, one copy each rather than one shared copy, carrying the other person's address, the rotation dates and a nudge to make contact in the first week. The consent already covers it in the wording of 18 Aug ("relevant personal information may be shared with your matched mentor or mentee"). The copy itself is OURS, not the programme's: it is the only template in the system with no approved spec behind it, it is marked draft in the Emails library, and it was sent to Joanne on 20 Aug for her wording. Replace it verbatim when hers comes back.`, inferred:true},
         Q14:{title:'For Joanne (UX owner) — three things the Pre-Login Site spec left to you, which we filled in rather than invented, all reversible: (a) the two [CONTENT] FAQ answers are drafted from what the build actually does (no account or password to apply; two conversations per rotation plus a short close-off) and are labelled "awaiting owner confirmation" on the page itself; (b) the FAQ mentee-eligibility answer now says "current SMU undergraduate", the inconsistency your own spec flagged, so it matches the Mentees page and the application gate; (c) the private "Raise a concern" link stays as a fourth footer item — it is not in your footer spec, but Esther required a private concern route on every public page in August, and we would rather show you the clash than quietly drop a safeguarding channel. Confirmed: both answers stand (the line "Accounts exist only for the programme team" is removed and the confirmation badges are gone), eligibility wording stands, concern link stays.', inferred:true, settled:{by:'Joanne', on:'2026-08-18', via:'feedback F0818-131510 / F0818-131600 / F0818-131630 — all three confirmed, account line removed'}},
       },
     },
-    people, reviews, pairs, events, concerns, emails,
+    people, reviews, pairs, events, concerns, emails, outcomeBatch,
     midreviews, builderReflections, menteeMidReviews, endEvaluations, certificates:[], audit:[],
   };
 }
@@ -875,7 +938,11 @@ const D = {
       progFull: (inst ? inst+'–SMC' : 'SMC')+' Global-Ready Mentoring Programme (GRMP)',
       enquiries: (c.mail&&c.mail.replyTo)||'smu.smc@sa.smu.edu.sg',
       mailFrom: (c.mail&&c.mail.from)||'SMC GRMP Team',
-      appreciationDate: appre ? `${D.monthName(appre)} ${appre.slice(8,10).replace(/^0/,'')}, ${appre.slice(0,4)}` : null,
+      appreciationDate: appre ? D.fmtLong(appre) : null,   // "2 April 2027", like every other date in the build
+      /* The move off Good Friday pushed it past the last rotation, so the copy can no
+         longer imply it happens inside the six months. Derived, not asserted: if a future
+         cycle lands it back inside the cycle the sentence disappears by itself. */
+      appreciationAfterCycle: !!(appre && appre > r[2].end),
       mentors: db.people.filter(p=>p.kind==='mentor'&&p.appStatus==='accepted').length,
       mentees: db.people.filter(p=>p.kind==='mentee'&&p.appStatus==='accepted').length,
       reserveN: db.people.filter(p=>p.appStatus==='reserve_invited').length,
@@ -887,7 +954,12 @@ const D = {
       r1Span:span(r[0].start,r[0].end), r2Span:span(r[1].start,r[1].end), r3Span:span(r[2].start,r[2].end),
       applyMonth:D.monthName((c.registration&&c.registration.opens)||r[0].start),
       applyShort:D.monthShort((c.registration&&c.registration.opens)||r[0].start),
-      regWindow: c.registration ? `${Number(c.registration.opens.slice(8,10))}–${Number(c.registration.closes.slice(8,10))} ${D.monthShort(c.registration.opens)}` : '',
+      /* "1–10 Sept" was fine while both ends shared a month. The amendments moved the
+         opening to 31 Aug and this rendered "31–9 Aug" — caught by tests/date_sweep.js,
+         which is the whole argument for sweeping rendered text rather than source. */
+      regWindow: c.registration ? (c.registration.opens.slice(0,7)===c.registration.closes.slice(0,7)
+        ? `${Number(c.registration.opens.slice(8,10))}–${Number(c.registration.closes.slice(8,10))} ${D.monthShort(c.registration.opens)}`
+        : `${Number(c.registration.opens.slice(8,10))} ${D.monthShort(c.registration.opens)} – ${Number(c.registration.closes.slice(8,10))} ${D.monthShort(c.registration.closes)}`) : '',
       regCloses: c.registration ? c.registration.closes : '',
       applyClosesLong: c.registration ? D.fmtLong(c.registration.closes) : '',
       approvalsByLong: sel.approvalsBy ? D.fmtLong(sel.approvalsBy) : '',
@@ -1144,20 +1216,51 @@ const D = {
                      proposed:proposed||null, proposedBasis:(proposed&&proposed.basis)||null});
     D.logAudit(db, db.today, reviewer, 'scored', personId);
   },
-  /* R5 decisions: approval auto-issues the outcome email (approval and invitation are a
-     single action — spec flow stage 0, running as default Q9). Decline is per-variant. */
+  /* Outcome notifications — Cycle 1 amendments (Joanne, 20 Aug, confirmed by Esther and
+     Wei Kiat): ONE batch send on the outcome date, not a send fired by each approval.
+     This reverses Q9 ("approving is the send"), so it is recorded rather than slipped in.
+     Two things follow from batching that are worth more than the plumbing:
+       · a decision revised during the review window leaves no trace in anyone's inbox,
+         because the template is resolved from the person's FINAL status at send time,
+         not from the click that first set it;
+       · the cohort hears on one day, which is the promise the confirmation screen makes.
+     Decisions taken after the batch has gone out send immediately: a straggler decided on
+     the 16th must not sit waiting for a batch that already left. */
+  outcomeTplFor(p){
+    switch(p.appStatus){
+      case 'accepted':              return p.kind+'_accept';
+      case 'reserve_invited':       return p.kind+'_reserve';
+      case 'declined':              return p.kind==='mentor' ? 'mentor_decline' : null;
+      case 'declined_not_selected': return p.kind==='mentee' ? 'mentee_decline_not_selected' : null;
+      case 'declined_ineligible':   return p.kind==='mentee' ? 'mentee_decline_ineligible' : null;
+      default: return null;
+    }
+  },
+  outcomeReleased: db => !!(db.outcomeBatch && db.outcomeBatch.at),
+  outcomeQueue:    db => db.people.filter(p=>p.decisionAt && !p.outcomeSentAt),
+  outcomeDue:      db => !!(db.config.selection||{}).outcomeBy && db.today >= db.config.selection.outcomeBy,
+  sendOutcomeMail(db, p){
+    const tpl=D.outcomeTplFor(p); if(!tpl) return false;
+    db.emails.push({at:db.today,to:p.email,tpl,vars:{name:p.name,link:'#/me/'+p.id},kind:'decision'});
+    p.outcomeSentAt=db.today;
+    return true;
+  },
+  sendOutcomeBatch(db, actor){
+    if(D.outcomeReleased(db)) return null;                   // one batch, once
+    const sent=D.outcomeQueue(db).filter(p=>D.sendOutcomeMail(db,p));
+    db.outcomeBatch={at:db.today, by:actor, count:sent.length};
+    D.logAudit(db, db.today, actor, 'outcome_batch_sent:'+sent.length, 'decisions');
+    return sent;
+  },
   decide(db, personId, decision, actor){
     const p=D.person(db,personId); if(!p) return null;
-    const CF=D.cohortFacts(db);
-    let tpl=null;
-    if(decision==='accepted'){ tpl = p.kind+'_accept'; p.acceptedAt=db.today; }
-    else if(decision==='reserve_invited'){ tpl = p.kind+'_reserve'; p.reserveOptIn=null; }
-    else if(decision==='declined' && p.kind==='mentor'){ tpl='mentor_decline'; }
-    else if(decision==='declined_not_selected' && p.kind==='mentee'){ tpl='mentee_decline_not_selected'; }
-    else if(decision==='declined_ineligible' && p.kind==='mentee'){ tpl='mentee_decline_ineligible'; }
-    else return null;                                        // wrong variant for this kind
+    const prev=p.appStatus;
     p.appStatus=decision;
-    db.emails.push({at:db.today,to:p.email,tpl,vars:{name:p.name,link:'#/me/'+p.id},kind:'decision'});
+    if(!D.outcomeTplFor(p)){ p.appStatus=prev; return null; }  // wrong variant for this kind
+    if(decision==='accepted') p.acceptedAt=db.today;
+    if(decision==='reserve_invited') p.reserveOptIn=null;
+    p.decisionAt=db.today;
+    if(D.outcomeReleased(db)) D.sendOutcomeMail(db,p);         // batch has gone: send now
     D.logAudit(db, db.today, actor, 'decision:'+decision, personId);
     return p;
   },
@@ -1181,10 +1284,55 @@ const D = {
     return p;
   },
   /* Acceptance reminders — sent ONCE per person (confirmed: no final same-day nudge),
-     only to accepted people whose place is not yet confirmed. Activated reserves get
-     the compressed activation-reminder variant. */
+     only to accepted people whose place is not yet confirmed. Activated reserves get the
+     compressed activation-reminder variant.
+     WHEN is now a rule rather than a date, and one rule for both flows (Cycle 1
+     amendments): "on the later of (a) 48 hours after their acceptance or activation
+     email, and (b) two days before their deadline. If that date falls on or after the
+     deadline itself, no automated reminder is sent and the team contacts the person
+     directly."
+     That last sentence is the half a build quietly drops. Somebody activated three days
+     before the deadline gets NO automated chase — so the system has to hand them to a
+     human by name (D.reminderManual) instead of letting them vanish from the list.
+     Both halves are checked against the doc's own worked examples in backend_test.js. */
+  reminderRule: db => (db.config.selection&&db.config.selection.reminderRule)||{afterEmailDays:2,beforeDeadlineDays:2},
+  reminderDueOn(db, base, deadline){
+    if(!base||!deadline) return null;
+    const r=D.reminderRule(db);
+    const after=D.shiftDate(base, r.afterEmailDays), before=D.shiftDate(deadline, -r.beforeDeadlineDays);
+    const due = after>before ? after : before;
+    return due>=deadline ? null : due;
+  },
+  /* The date their acceptance or activation email actually went out — the batch date for
+     the main cohort, the activation day for a reserve. Falls back to the planned outcome
+     date so the ladder can be drawn before anything has been sent. */
+  reminderBaseDate(db, p){
+    return p.activatedFromReserve || p.outcomeSentAt
+        || (db.outcomeBatch&&db.outcomeBatch.at) || (db.config.selection||{}).outcomeBy || null;
+  },
+  reminderDueDate: (db,p) => D.reminderDueOn(db, D.reminderBaseDate(db,p), D.deadlineFor(db,p)),
+  reminderPending: db => db.people.filter(p=>p.appStatus==='accepted' && !D.ackComplete(p) && !p.acceptReminderAt),
   reminderTargets(db){
-    return db.people.filter(p=>p.appStatus==='accepted' && !D.ackComplete(p) && !p.acceptReminderAt);
+    return D.reminderPending(db).filter(p=>{const d=D.reminderDueDate(db,p); return d && d<=db.today;});
+  },
+  reminderManual(db){                       // the machine will never chase these — a human must
+    return D.reminderPending(db).filter(p=>!D.reminderDueDate(db,p));
+  },
+  /* The ladder the console prints, computed from the same rule the sender uses. */
+  ackLadder(db){
+    const sel=db.config.selection||{}, r=D.reminderRule(db), out=[];
+    const main=D.reminderDueOn(db, sel.outcomeBy, sel.acceptBy);
+    out.push({date: main||'—', who:'accepted in the outcome batch, place not yet confirmed',
+      what:`Acceptance reminder — once, ${r.afterEmailDays*24}h after the outcome email or ${r.beforeDeadlineDays} days before the deadline, whichever is later`});
+    if(sel.reserveActivateFrom && sel.reserveAcceptBy){
+      const first=D.reminderDueOn(db, sel.reserveActivateFrom, sel.reserveAcceptBy);
+      const lastAuto=D.shiftDate(sel.reserveAcceptBy, -(r.afterEmailDays+1));
+      out.push({date:(first?first+' onwards':'—')+', per person', who:'activated reserves, place not yet confirmed',
+        what:'Reserve acceptance reminder — the same rule, counted from each activation'});
+      out.push({date:'no automated send', who:`anyone activated after ${D.fmtDMY(lastAuto)}`,
+        what:'Too close to the deadline for a reminder to be worth sending — the team contacts them directly'});
+    }
+    return out;
   },
   /* Who is inside the programme group channel and who is not — mentors use WhatsApp,
      mentees use Telegram. Asking someone how they would rather be reached and then making
@@ -1358,8 +1506,9 @@ const D = {
   },
   /* Release rule (Q5, Wei Kiat-confirmed): place not confirmed after the deadline →
      treated as withdrawn, seat freed for the Reserve list. Explicit action, not a cron —
-     freeing a seat is a decision a human owns. Per-person deadline: 26 Sept, or 29 Sept
-     for activated reserves. */
+     freeing a seat is a decision a human owns. The deadline is per person: the cohort
+     acceptance date, or the later reserve date for an activated reserve — read from
+     config, never named here, because a date typed into a comment is a date that rots. */
   deadlineFor(db,p){
     const sel=db.config.selection||{};
     return p.activatedFromReserve ? (sel.reserveAcceptBy||sel.acceptBy) : sel.acceptBy;
@@ -1385,11 +1534,21 @@ const D = {
   approvePair(db, pairId, actor){
     const pr=db.pairs.find(p=>p.id===pairId); pr.status='approved'; pr.approvedAt=db.today;
     const m=D.person(db,pr.mentorId), e=D.person(db,pr.menteeId);
-    db.emails.push({at:db.today,to:`${m.email}, ${e.email}`,kind:'match',subject:`Your Rotation ${pr.rotation} match: ${m.name} ↔ ${e.name}`});
     const rot=db.config.rotations.find(r=>r.n===pr.rotation);
+    const common={rotation:pr.rotation, rotLabel:(rot&&rot.label)||'',
+                  rotStart:rot?D.fmtLong(rot.start):'', rotEnd:rot?D.fmtLong(rot.end):''};
+    [[e,m,true],[m,e,false]].forEach(([to,other,isMentee])=>{
+      db.emails.push({at:db.today, to:to.email, kind:'match', tpl:'pair_match',
+        vars:{...common, name:to.name, mentee:isMentee, link:'#/me/'+to.id,
+              otherName:other.name, otherEmail:other.email, otherLinkedin:other.linkedin||'',
+              otherLine: isMentee
+                ? [other.designation, other.org].filter(Boolean).join(' at ')
+                : (other.degree && other.university ? `who is reading ${other.degree} at ${other.university}`
+                   : [other.degree, other.university].filter(Boolean).join(' at '))}});
+    });
     if(rot && db.today>=rot.start){
       db.emails.push({at:db.today,to:`${m.email}, ${e.email}`,kind:'guide',
-        subject:`Rotation ${pr.rotation} guide — ${rot.label}`});
+        subject:`Rotation ${pr.rotation} guide: ${rot.label}`});
     }
     D.logAudit(db, db.today, actor, 'pair_approved', pairId);
   },
@@ -1499,15 +1658,19 @@ const D = {
     db.config.rotations = opts.rotations;
     const delta = Number(opts.rotations[0].start.slice(0,4)) - oldR1Year;
     const sh=iso=>iso?String(Number(iso.slice(0,4))+delta)+iso.slice(4):iso;
-    if(opts.ackLadder) db.config.ackLadder = opts.ackLadder;
-    else db.config.ackLadder = (db.config.ackLadder||[]).map(l=>({...l, date: sh(l.date)}));
     if(db.config.registration)
       db.config.registration={opens:sh(db.config.registration.opens), closes:sh(db.config.registration.closes)};
     if(db.config.selection){
       const s=db.config.selection;
-      db.config.selection={...s, approvalsBy:sh(s.approvalsBy), outcomeBy:sh(s.outcomeBy),
-        acceptBy:sh(s.acceptBy), reserveAcceptBy:sh(s.reserveAcceptBy), reminderOn:sh(s.reminderOn)};
+      db.config.selection={...s, reviewFrom:sh(s.reviewFrom), approvalsBy:sh(s.approvalsBy),
+        outcomeBy:sh(s.outcomeBy), acceptBy:sh(s.acceptBy),
+        reserveActivateFrom:sh(s.reserveActivateFrom), reserveAcceptBy:sh(s.reserveAcceptBy)};
     }
+    /* A new cycle has not sent its outcomes yet. Carrying the old batch record over would
+       make the first approval of the new cohort send on the spot, which is the behaviour
+       the amendments removed. */
+    db.outcomeBatch = null;
+    db.people.forEach(p=>{ delete p.decisionAt; delete p.outcomeSentAt; });
     db.today = opts.today;
     D.logAudit(db, opts.today, opts.actor||'lead', 'new_cycle_started:'+newId+' (archived '+old.id+')', 'config');
     return newId;
@@ -1559,7 +1722,7 @@ const D = {
       from:CF.mailFrom, replyTo:CF.enquiries};
   },
 };
-const GRMP_EXPORT = {Store, D, DB_KEY, buildSeed, INDUSTRIES, IND_OTHER, FACULTIES,
+const GRMP_EXPORT = {Store, D, DB_KEY, buildSeed, MAIL_PREVIEW, INDUSTRIES, IND_OTHER, FACULTIES,
   MENTEE_CRITERIA, MENTOR_CRITERIA, FORM_OPTS, COPY, MAILS, RESOURCES};
 if (typeof window !== 'undefined') window.GRMP = GRMP_EXPORT;
 if (typeof module !== 'undefined' && module.exports) module.exports = GRMP_EXPORT;

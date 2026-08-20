@@ -4,7 +4,7 @@
    variants, industry-preference matching), lifecycle rules, and the VERBATIM guard
    (legal text + email copy compared against Joanne's spec files where present). */
 const G = require('../data.js');
-const {Store, D, INDUSTRIES, FACULTIES, FORM_OPTS, COPY, MAILS} = G;
+const {Store, D, INDUSTRIES, FACULTIES, FORM_OPTS, COPY, MAILS, MAIL_PREVIEW} = G;
 const fs = require('fs'), path = require('path');
 
 let pass=0, fail=0;
@@ -231,6 +231,58 @@ const e2 = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted');
 D.decide(db, e2.id, 'declined_ineligible', 'Esther');
 T('the ineligible decline sends its own honest variant', db.emails.some(e=>e.tpl==='mentee_decline_ineligible'&&e.to===e2.email));
 
+/* ---- outcomes go out as ONE batch, not on each approval ---------------------------
+   The amendment that is a mechanism, not a date. The test that matters is the negative
+   one: before the batch is released, an approved applicant has heard NOTHING. A build
+   that quietly kept sending on approval would still pass every "decision recorded" check
+   in this file, which is exactly why that check is written the other way round here. */
+console.log('— outcome notifications: one batch send, and nothing before it —');
+db = fresh();
+db.outcomeBatch = null;                                     // back to the review window
+db.people.forEach(p=>{ delete p.decisionAt; delete p.outcomeSentAt; });
+db.emails = [];
+db.today = '2026-09-12';
+const b1 = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted');
+const b2 = db.people.find(p=>p.kind==='mentor'&&p.appStatus==='submitted');
+D.decide(db, b1.id, 'accepted', 'Esther');
+D.decide(db, b2.id, 'reserve_invited', 'Esther');
+T('a decision inside the review window is recorded but reaches nobody',
+  D.person(db,b1.id).appStatus==='accepted' && D.person(db,b1.id).decisionAt==='2026-09-12'
+  && !D.person(db,b1.id).outcomeSentAt && db.emails.filter(e=>e.kind==='decision').length===0);
+T('and the console can say who is waiting', D.outcomeQueue(db).length===2 && !D.outcomeReleased(db));
+T('the send is not open before the outcome date', !D.outcomeDue(db));
+D.decide(db, b1.id, 'reserve_invited', 'Esther');            // reviewer changes their mind
+T('a decision revised before the send leaves no earlier version anywhere',
+  D.outcomeQueue(db).length===2 && db.emails.filter(e=>e.kind==='decision').length===0);
+db.today = '2026-09-14';
+T('on the outcome date the send opens', D.outcomeDue(db));
+const batch = D.sendOutcomeBatch(db, 'Wei Kiat');
+T('one release sends every held decision, on the day, from the final status', batch.length===2
+  && db.emails.filter(e=>e.kind==='decision'&&e.at==='2026-09-14').length===2
+  && db.emails.some(e=>e.tpl==='mentee_reserve'&&e.to===b1.email)
+  && !db.emails.some(e=>e.tpl==='mentee_accept'&&e.to===b1.email));
+T('the release is recorded with who, when and how many',
+  db.outcomeBatch.at==='2026-09-14' && db.outcomeBatch.by==='Wei Kiat' && db.outcomeBatch.count===2
+  && db.audit.some(a=>a.action==='outcome_batch_sent:2'));
+T('and it cannot be sent twice', D.sendOutcomeBatch(db,'Wei Kiat')===null
+  && db.emails.filter(e=>e.kind==='decision').length===2);
+db.today = '2026-09-16';
+const late = db.people.find(p=>p.kind==='mentee'&&p.appStatus==='submitted');
+D.decide(db, late.id, 'accepted', 'Esther');
+T('a straggler decided after the batch is emailed immediately, not left waiting',
+  D.person(db,late.id).outcomeSentAt==='2026-09-16'
+  && db.emails.some(e=>e.tpl==='mentee_accept'&&e.to===late.email&&e.at==='2026-09-16'));
+
+/* Seed integrity: a gate completed after the deadline that is supposed to close it is
+   data nobody would ever see and everybody would trust. */
+T('every seeded gate completion falls between the outcome batch and that person\'s deadline', (()=>{
+  const d0 = fresh();
+  const bad = d0.people.filter(p=>p.placeConfirmedAt)
+    .filter(p=>p.placeConfirmedAt < d0.config.selection.outcomeBy || p.placeConfirmedAt > D.deadlineFor(d0,p));
+  if(bad.length) console.log('    '+bad.slice(0,3).map(p=>`${p.name} confirmed ${p.placeConfirmedAt}, deadline ${D.deadlineFor(d0,p)}`).join('; '));
+  return bad.length===0;
+})());
+
 console.log('— OTP link login (personalized link + emailed one-time code) —');
 db = fresh();
 const gated = db.people.find(p=>p.appStatus==='accepted'&&!D.placeConfirmed(p));
@@ -295,13 +347,31 @@ T('reminders sent with the verbatim template + stamped', sent.length===targets0.
   && sent.every(p=>p.acceptReminderAt===db.today)
   && db.emails.filter(e=>e.kind==='reminder'&&e.at===db.today).length===sent.length);
 T('sending twice sends nothing more (once per person, confirmed rule)', D.sendAcceptanceReminders(db,'Wei Kiat').length===0);
+/* The reserve half of the rule, run on the clock it was written for. The doc's own
+   worked example: activated 21 Sept, deadline 26 Sept, reminder 24 Sept. */
 db = fresh();
+db.today = '2026-09-21';
 const resAct = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
 D.activateReserve(db, resAct.id, 'Esther');
-T('an activated-but-unconfirmed reserve gets the activation reminder variant', (()=>{
+T('an activated reserve is not chased the moment they are activated',
+  D.reminderDueDate(db,resAct)==='2026-09-24' && !D.reminderTargets(db).some(p=>p.id===resAct.id));
+db.today = '2026-09-24';
+T('an activated-but-unconfirmed reserve gets the activation reminder variant, on the day the rule gives', (()=>{
   const out=D.sendAcceptanceReminders(db,'Wei Kiat');
   return out.some(p=>p.id===resAct.id) && db.emails.some(e=>e.tpl===resAct.kind+'_reserve_activation_reminder'&&e.to===resAct.email);
 })());
+/* And the half that is easy to lose: activated too late for a reminder to be worth
+   sending, the person must be handed to a human rather than dropped off the list. */
+db = fresh();
+db.today = '2026-09-24';
+const lateAct = db.people.find(p=>p.appStatus==='reserve_invited'&&p.reserveOptIn===true);
+D.activateReserve(db, lateAct.id, 'Esther');
+T('activated 24 Sept: no automated reminder, and the person is named for a human to chase',
+  D.reminderDueDate(db,lateAct)===null
+  && !D.reminderTargets(db).some(p=>p.id===lateAct.id)
+  && D.reminderManual(db).some(p=>p.id===lateAct.id));
+T('and sending the batch of reminders does not quietly include them',
+  !D.sendAcceptanceReminders(db,'Wei Kiat').some(p=>p.id===lateAct.id));
 
 console.log('— release rule: per-person deadline, human-owned —');
 db = fresh();
@@ -383,6 +453,25 @@ T('a discarded mentee can be suggested again',
   D.suggestMatches(db,2).some(s=>s.menteeId===menteeOfDoomed));
 D.approvePair(db, sugg[0].id, 'Esther');
 T('approval flips status + notifies both', db.pairs.find(x=>x.id===sugg[0].id).status==='approved' && db.emails.some(e=>e.kind==='match'&&e.at===db.today));
+/* The match email had a body of nothing while the FAQ told the pair to arrange their own
+   conversations. Now it carries the other person's address — and, the part worth a test,
+   ONE COPY EACH: a shared email carrying a personal portal link would have walked the
+   mentor onto the mentee's page. */
+{
+  const pr = db.pairs.find(x=>x.id===sugg[0].id);
+  const mm = D.person(db,pr.mentorId), ee = D.person(db,pr.menteeId);
+  const sent = db.emails.filter(e=>e.kind==='match'&&e.at===db.today&&e.tpl==='pair_match');
+  T('the match email goes out once to each side, never as one shared copy', sent.length===2
+    && sent.some(e=>e.to===mm.email) && sent.some(e=>e.to===ee.email));
+  T('each copy carries the other person\'s contact details and the reader\'s own portal link', (()=>
+    sent.every(e=>{
+      const mine = e.to===ee.email ? ee : mm, other = e.to===ee.email ? mm : ee;
+      const body = D.renderMail(db,e).body;
+      return body.includes(other.email) && body.includes('#/me/'+mine.id) && !body.includes('#/me/'+other.id);
+    }))());
+  T('and it is flagged as our draft, not as approved programme copy',
+    !!MAILS.pair_match.draft && /awaiting/i.test(MAILS.pair_match.draft));
+}
 
 console.log('— audit discipline —');
 T('I3 every audit entry carries a real timestamp', (()=>{
@@ -419,6 +508,44 @@ T('F1 a pair approved after its rotation started still gets the guide', (()=>{
   D.approvePair(db, lateSugg[0].id, 'Esther');
   return db.emails.filter(e=>e.kind==='guide').length === before+1;
 })());
+
+/* ---- everything in the seed has to be something the database can hold ---------------
+   Found the hard way on 20 Aug: `outcomeBatch` was added to the seed and never added to
+   FIRE.slices, so the sandbox had the record and the live platform did not — the same
+   build reading "outcomes not released yet" from one database and the truth from the
+   other. The class is broader than one field: a top-level key the persistence layer has
+   never heard of is a fact that silently does not survive a page reload. */
+console.log('— the seed and the Firestore slice list are the same set —');
+{
+  const src = fs.readFileSync(path.join(__dirname,'..','fire.js'),'utf8');
+  const m = src.match(/slices:\s*\[([\s\S]*?)\]/);
+  const slices = m ? m[1].split(',').map(x=>x.trim().replace(/^['"]|['"]$/g,'')).filter(Boolean) : [];
+  /* `sessions` is deliberately local: login state is per browser and fire.js drops it. */
+  const LOCAL_ONLY = ['sessions'];
+  const seedKeys = Object.keys(fresh()).filter(k=>!LOCAL_ONLY.includes(k));
+  T('fire.js declares a slice list at all', slices.length>10);
+  const unsaved = seedKeys.filter(k=>!slices.includes(k));
+  T('every top-level field in the seed is a slice the database persists', (()=>{
+    if(unsaved.length) console.log('    the platform would silently lose: '+unsaved.join(', '));
+    return unsaved.length===0;
+  })());
+  const orphan = slices.filter(k=>!seedKeys.includes(k) && !LOCAL_ONLY.includes(k));
+  T('and no slice is persisted that the seed never creates', (()=>{
+    if(orphan.length) console.log('    slice with nothing behind it: '+orphan.join(', '));
+    return orphan.length===0;
+  })());
+  /* A slice that is a record, not a collection, must say so: the backfill for a missing
+     slice defaults to [], and [] is truthy — an absent record would read as present. */
+  /* Read to the end of the statement, not to the first '}': the map itself contains {}
+     values, and a lazy [^}]* stopped inside `events:{}` and reported four false leaks. */
+  const defaults = (src.match(/sliceDefaults:\s*\{([\s\S]*?)\},\n/)||[])[1]||'';
+  const nonCollections = seedKeys.filter(k=>!Array.isArray(fresh()[k]));
+  const undeclared = nonCollections.filter(k=>!new RegExp('\\b'+k+'\\s*:').test(defaults));
+  T('and every non-collection slice declares its own default, so it cannot backfill to []', (()=>{
+    if(undeclared.length) console.log('    would backfill to [] and read as present: '+undeclared.join(', '));
+    return undeclared.length===0;
+  })());
+}
 
 console.log('— no hardcoded cohort facts in the views —');
 T('view files carry no year / institution / count / month literals', (()=>{
@@ -527,7 +654,10 @@ T('mentors carried over as invited, gate state cleared', db.people.length===befo
   db.people.every(p=>p.kind==='mentor'&&p.appStatus==='invited'&&!p.ack&&!p.coi&&!p.kickoff&&!p.placeConfirmedAt));
 T('pairs/reviews/certs cleared', db.pairs.length===0 && db.reviews.length===0 && db.certificates.length===0);
 T('rotations + selection dates shifted into the new cycle', db.config.rotations[0].start==='2027-10-01' && db.today==='2027-09-01'
-  && db.config.selection.acceptBy==='2027-09-20' && db.config.selection.reserveAcceptBy==='2027-09-29');
+  && db.config.selection.acceptBy==='2027-09-20' && db.config.selection.reserveAcceptBy==='2027-09-26'
+  && db.config.selection.reserveActivateFrom==='2027-09-21' && db.config.selection.reviewFrom==='2027-09-10');
+T('and the new cycle has not sent its outcomes: the batch record is cleared', !D.outcomeReleased(db)
+  && D.outcomeQueue(db).length===0 && db.people.every(p=>!p.outcomeSentAt));
 const inv = db.people[0];
 T('confirmReturn flips invited→accepted + email', D.confirmReturn(db, inv.id)===true &&
   D.person(db,inv.id).appStatus==='accepted' && db.emails.some(e=>e.subject&&e.subject.includes('Welcome back')));
@@ -561,7 +691,7 @@ T('the recording never blocks anyone (no gate involvement)', (()=>{
 console.log('— verbatim guard: subjects + signature rules on all templates —');
 db = fresh();
 const CF = D.cohortFacts(db);
-const rm = tpl => D.renderMail(db, {tpl, vars:{name:'[Name]', link:'[personalized link]', code:'123456'}});
+const rm = tpl => D.renderMail(db, {tpl, vars:MAIL_PREVIEW(db, tpl)});
 const SUBJECTS = {
   mentor_invite:'Shape a Global-Ready Leader as an SMU–SMC GRMP Mentor',
   mentee_invite:'An Invitation to Grow: Join the SMU–SMC Global-Ready Mentoring Programme',
@@ -588,9 +718,11 @@ Object.entries(SUBJECTS).forEach(([k,subj])=>{
 /* Deadline dates inside these fragments come from config, not from the template text: the
    accept-by moved 26 Sept -> 20 Sept in R6 (later pre-login spec, confirmed; Esther asked for
    the same in F0816-152143), so the sentence stays verbatim while the date follows the cycle. */
+const LONG = iso => D.fmtLong(iso);
+const SEL = () => db.config.selection;
 const BODY_SPOT = {
   mentor_accept:['We are delighted to let you know that your application to mentor with the SMU–SMC Global-Ready Mentoring Programme (GRMP) is successful. Thank you for the care you put into your application, and welcome.',
-    'Please complete this by 20 September 2026.'],
+    `Please complete this by ${LONG(SEL().acceptBy)}.`],
   mentee_accept:['and to confirm your attendance at the Kick-Off. This confirms your place.',
     'The GRMP portal is the one place to track your GRMP participation and your wider SMC journey, and you will use it throughout the programme.'],
   mentor_accept_reminder:['If you did not receive the verification code, please check your spam or junk folder, or email us at smu.smc@sa.smu.edu.sg and we will help.',
@@ -598,10 +730,10 @@ const BODY_SPOT = {
   mentee_accept_reminder:['Places in this cycle are limited. If your circumstances have changed and you are no longer able to take part, we would be grateful if you could let us know, so that we may offer your place to another student.'],
   mentor_reserve:['we will give you at least two weeks’ notice, along with the materials you need to begin well.',
     'a place on the Reserve Mentor list is not a guarantee of participation this cycle.',
-    'Please let us know by 20 September 2026 whether you are happy to be placed on the Reserve Mentor list.'],
+    `Please let us know by ${LONG(SEL().acceptBy)} whether you are happy to be placed on the Reserve Mentor list.`],
   mentee_reserve:['a place on the Reserve Mentee list is not a guarantee of participation this cycle.'],
-  mentor_reserve_activation:['As this is a later activation, please complete this by 29 September 2026 so that we can prepare you for the Kick-Off on 1 October 2026.'],
-  mentee_reserve_activation:['Please complete this by 29 September 2026 so that we can prepare you for the Kick-Off on 1 October 2026.'],
+  mentor_reserve_activation:[`As this is a later activation, please complete this by ${LONG(SEL().reserveAcceptBy)} so that we can prepare you for the Kick-Off on ${LONG(db.events.kickoff.date)}.`],
+  mentee_reserve_activation:[`Please complete this by ${LONG(SEL().reserveAcceptBy)} so that we can prepare you for the Kick-Off on ${LONG(db.events.kickoff.date)}.`],
   mentor_decline:['The response to this cycle was exceptional, with many more applications than the places available. After careful consideration, we are not able to offer you a mentoring place this programme cycle.',
     'This reflects the strength of the pool rather than any shortcoming in your application'],
   mentee_decline_not_selected:['After careful consideration, we are not able to offer you a place this programme cycle.'],
@@ -610,7 +742,7 @@ const BODY_SPOT = {
     'Expand your network as part of a global community of 5,000+ SMC members across 35 countries.'],
   mentee_invite:['The people who shape us are often the ones who see the world differently from us.',
     'Understand yourself first: your interests, strengths and values, before turning to careers and choices.'],
-  mentor_receipt:['We will review applications from across the cohort and be in touch by 18 September 2026 with the next steps. If you are confirmed as a mentor, that message will include your onboarding details.'],
+  mentor_receipt:[`We will review applications from across the cohort and be in touch by ${LONG(SEL().outcomeBy)} with the next steps. If you are confirmed as a mentor, that message will include your onboarding details.`],
   mentee_receipt:['Places are limited, and we read every application with care.'],
 };
 Object.entries(BODY_SPOT).forEach(([k,frags])=>{
@@ -630,10 +762,18 @@ T('operational chase-ups are signed by Wei Kiat Koh ONLY', ['mentor_receipt','me
   const b=rm(k).body;
   return !b.includes('Esther Koh') && b.includes('Wei Kiat Koh\nVice President External, SMU–SMC\nGRMP Programme Lead');
 }));
-T('sender identity: From SMC GRMP Team, reply-to smu.smc@sa.smu.edu.sg on every template', Object.keys(SUBJECTS).every(k=>{
+/* Over MAILS, not over SUBJECTS. These two used to iterate the verbatim-subject map, which
+   a template added later never joins — so the house-style rule silently stopped applying to
+   exactly the templates most likely to be freshly written. Caught by the pair_match draft,
+   which sailed through with an em dash in it. */
+T('sender identity: From SMC GRMP Team, reply-to smu.smc@sa.smu.edu.sg on every template', Object.keys(MAILS).every(k=>{
   const m=rm(k); return m.from==='SMC GRMP Team' && m.replyTo==='smu.smc@sa.smu.edu.sg';
 }));
-T('no em dashes in any participant-facing email (house style)', Object.keys(SUBJECTS).every(k=>!rm(k).body.includes('—')&&!rm(k).subject.includes('—')));
+T('no em dashes in any participant-facing email (house style)', Object.keys(MAILS).every(k=>{
+  const m=rm(k); const bad=m.body.includes('—')||m.subject.includes('—');
+  if(bad) console.log('    em dash in '+k);
+  return !bad;
+}));
 T('no template leaks ${ / undefined / NaN', Object.keys(MAILS).every(k=>{
   const m=rm(k); const s=m.subject+m.body;
   return !/\$\{|undefined|\bNaN\b/.test(s);
@@ -770,12 +910,73 @@ T('nothing reads the industry list by hard-coded index (the list grows)', (()=>{
 T('faculty list is the 7 verified schools, no Other', FACULTIES.length===7
   && FACULTIES.includes('Yong Pung How School of Law') && FACULTIES.includes('College of Integrative Studies')
   && !FACULTIES.includes('Other'));
-T('selection timeline constants match the standards note',
-  db.config.registration.closes==='2026-09-10' && db.config.selection.approvalsBy==='2026-09-16'
-  && db.config.selection.outcomeBy==='2026-09-18' && db.config.selection.acceptBy==='2026-09-20'
-  && db.config.selection.reserveAcceptBy==='2026-09-29'
-  && db.events.kickoff.date==='2026-10-01' && db.events.kickoff.venue==='SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902'
-  && db.events.appreciation.date==='2027-04-02');
+/* ---- the dates the build runs vs the dates the programme confirmed -------------------
+   Retyping a date into a test only proves the test and the build were typed by the same
+   hand on the same day. These are diffed against Joanne's 20 Aug amendments doc three
+   ways: the transcription must appear verbatim in the PDF's extracted text, the weekday
+   she wrote in brackets must be the real weekday of that date, and the config field the
+   build reads must equal it. A slip survives one check, not three. */
+console.log('— confirmed dates: config vs the amendments doc vs the calendar —');
+{
+  const DIR = path.join(__dirname, '..', '..', 'specs_joanne_r11');
+  const jf = path.join(DIR, 'confirmed_dates.json'), tf = path.join(DIR, 'GRMP_Cycle1_Date_Amendments.txt');
+  T('the confirmed-dates source and the doc it was transcribed from are both present',
+    fs.existsSync(jf) && fs.existsSync(tf));
+  if(fs.existsSync(jf) && fs.existsSync(tf)){
+    const SRC = JSON.parse(fs.readFileSync(jf,'utf8'));
+    const doc = fs.readFileSync(tf,'utf8').replace(/\s+/g,' ');
+    const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const read = f => f.split(/[.\[\]]/).filter(Boolean).reduce((o,k)=>o==null?o:o[/^\d+$/.test(k)?+k:k],
+      {config:db.config, events:db.events, derived:{mainAcceptanceReminder:(D.ackLadder(db)[0]||{}).date}});
+
+    const missing = SRC.dates.filter(d=>!doc.includes(d.docText));
+    T('every transcribed date appears verbatim in the doc Joanne sent', (()=>{
+      if(missing.length) console.log('    not found in the PDF text: '+missing.map(d=>d.docText).join('; '));
+      return missing.length===0;
+    })());
+
+    const wrongDay = SRC.dates.filter(d=>{
+      const m = d.docText.match(/\((\w{3})\)$/); if(!m) return false;
+      return DOW[new Date(d.iso+'T00:00:00Z').getUTCDay()] !== m[1];
+    });
+    T('and the weekday written next to each one is the real weekday', (()=>{
+      if(wrongDay.length) console.log('    '+wrongDay.map(d=>`${d.docText} is really a ${DOW[new Date(d.iso+'T00:00:00Z').getUTCDay()]}`).join('; '));
+      return wrongDay.length===0;
+    })());
+
+    const drifted = SRC.dates.filter(d=>read(d.field)!==d.iso);
+    T('and the build runs exactly those dates', (()=>{
+      if(drifted.length) console.log('    '+drifted.map(d=>`${d.field}: build says ${read(d.field)}, doc says ${d.iso} (${d.what})`).join('; '));
+      return drifted.length===0;
+    })());
+
+    /* The reverse assertion. Swapping one baseline file for a newer one and changing
+       nothing else is how a verbatim guard goes on passing while the thing it guards has
+       moved — R8's lesson, applied here to the superseded key-dates line. */
+    const oldSpec = path.join(__dirname,'..','..',SRC.supersedes.file);
+    T('the superseded key-dates line is still on file, and is NOT what the system runs', (()=>{
+      if(!fs.existsSync(oldSpec)) return true;
+      const txt = fs.readFileSync(oldSpec,'utf8');
+      const stillThere = txt.includes(SRC.supersedes.line);
+      const stale = ['10 September 2026','18 September 2026','26 March 2027'];
+      const nowRuns = [D.fmtLong(db.config.registration.closes), D.fmtLong(db.config.selection.outcomeBy),
+                       D.fmtLong(db.events.appreciation.date)];
+      const overlap = stale.filter(x=>nowRuns.includes(x));
+      if(overlap.length) console.log('    the build still runs a superseded date: '+overlap.join('; '));
+      return stillThere && overlap.length===0;
+    })());
+
+    /* The reminder rule, checked against the doc's own worked examples rather than
+       against my reading of it. */
+    SRC.reminderRule.workedExamples.forEach(ex=>{
+      T(`reminder rule · ${ex.case}: emailed ${ex.emailed}, deadline ${ex.deadline} → ${ex.reminder||'no automated send'}`,
+        D.reminderDueOn(db, ex.emailed, ex.deadline) === ex.reminder);
+    });
+  }
+}
+T('the venue and the fixed Kick-Off details are unchanged',
+  db.events.kickoff.venue==='SMU ALCove, 80 Stamford Road, #B1-62, Singapore 178902'
+  && db.events.kickoff.time==='7.30 p.m. to 9.00 p.m.');
 
 /* ---- the calendar people actually live in ------------------------------------------
    Esther, 18 Aug: "26 March 2027 is a Public Holiday. Pls move to 2 April 2027." She was
@@ -831,12 +1032,16 @@ console.log('— programme dates vs the Singapore calendar (no date on a day peo
   const DATES = [
     {what:'Registration opens',            iso:c.registration.opens,  kind:'window'},
     {what:'Registration closes',           iso:c.registration.closes, kind:'deadline'},
+    {what:'Review window opens',           iso:sel.reviewFrom,        kind:'window'},
     {what:'Approvals by',                  iso:sel.approvalsBy,       kind:'deadline'},
-    {what:'Acceptance reminder',           iso:sel.reminderOn,        kind:'send'},
     {what:'Outcome by',                    iso:sel.outcomeBy,         kind:'send'},
     {what:'Acceptance deadline',           iso:sel.acceptBy,          kind:'deadline'},
+    {what:'Reserve activation opens',      iso:sel.reserveActivateFrom, kind:'send'},
     {what:'Reserve activation deadline',   iso:sel.reserveAcceptBy,   kind:'deadline'},
-    ...(c.ackLadder||[]).map(a=>({what:'Reminder: '+a.what.split('—')[0].trim(), iso:a.date, kind:'send'})),
+    /* The reminder dates are computed from the rule now, so the calendar check reads the
+       same ladder the console prints — a rule that resolves onto a public holiday is
+       exactly as broken as a typed one, and nobody would be looking. */
+    ...D.ackLadder(db).map(a=>({what:'Reminder: '+a.what.split('—')[0].trim(), iso:/^\d{4}-\d{2}-\d{2}/.test(a.date)?a.date.slice(0,10):null, kind:'send'})),
     ...(c.rotations||[]).flatMap(r=>[{what:`Rotation ${r.n} start`, iso:r.start, kind:'window'},
                                      {what:`Rotation ${r.n} end`,   iso:r.end,   kind:'window'}]),
     ...Object.values(db.events||{}).map(e=>({what:e.name, iso:e.date, kind:'attend'})),
@@ -864,13 +1069,21 @@ console.log('— programme dates vs the Singapore calendar (no date on a day peo
   /* Reviewed weekend dates. Each key is the field, not the date, so moving the date does not
      silently inherit somebody else's ruling — the reason has to be re-read and re-typed. */
   const WEEKEND_OK = {
+    'Approvals by|2026-09-13':
+      'internal only. The team set their own review window at 10–13 Sept (Thu to Sun) in the '
+      + '20 Aug amendments; no applicant is asked to do anything on this day, and the outcome '
+      + 'batch the next morning is what makes it a Sunday finish. Theirs to change, not ours',
+    'Reserve activation deadline|2026-09-26':
+      'an online action on a portal that is open all weekend, the same reasoning as the main '
+      + 'acceptance deadline, and the date the 20 Aug amendments confirm (26 Sep 2026 (Sat) — '
+      + 'the weekday is written into the doc, so it was seen)',
     'Acceptance deadline|2026-09-20':
       'an online action on a portal that is open all weekend, and the date the Pre-Login spec '
       + 'and Esther both asked for; flagged to the team rather than moved',
-    'Reminder: Reserve-activation reminder|2026-09-27':
-      'automated send, one to two days before the 29 Sept activation deadline as specified; '
-      + 'a Sunday send is not ideal and 28 Sept would satisfy the same rule — left for the '
-      + 'calendar owner to rule on with the rest of the set (Q13)',
+    /* The 27 Sept Sunday send is gone: it was a typed date, and the amendments replaced it
+       with a rule that lands on 24 Sept for the earliest activation. Kept here as a note
+       rather than deleted, so the next person can see that the Sunday was answered, not
+       forgotten. */
   };
   T('every weekend date has been looked at, with the reason written down', (()=>{
     const weekend = DATES.filter(d=>d.kind!=='window' && (dow(d.iso)===0 || dow(d.iso)===6));

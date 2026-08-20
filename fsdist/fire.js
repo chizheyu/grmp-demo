@@ -8,7 +8,17 @@
 
 const FIRE = {
   slices: ['people','pairs','reviews','midreviews','menteeMidReviews','endEvaluations','builderReflections','certificates',
-           'concerns','emails','audit','events','config','archives','aiCache','today','version'],
+           'concerns','emails','audit','events','config','archives','aiCache','today','version','outcomeBatch'],
+  /* Not every slice is a collection. The backfill below used to default anything missing to
+     [], which is right for a list and wrong for a record: outcomeBatch came back as [] on
+     the platform while the sandbox had an object, so the same build read "the outcomes have
+     not been released" from one database and the truth from the other. Anything not listed
+     here is a collection and still defaults to []. */
+  sliceDefaults: {outcomeBatch:null, events:{}, aiCache:{}, version:1,
+                  /* config and today default to null on purpose: a database without them is
+                     not a database this build can render, and failing loudly beats drawing a
+                     page full of blanks. */
+                  config:null, today:null},
   fs: null,
   last: {},            // sliceName -> last JSON string seen (from snapshot or own write)
   ready: false,
@@ -32,7 +42,7 @@ const FIRE = {
        previous build. Default it locally ([] — every optional slice is a collection)
        instead of returning null, which would hang every client on "Connecting…"
        until someone hand-wiped Firestore. persist() writes the backfill on first use. */
-    this.slices.forEach(s => { if(!(s in db)) db[s] = []; });
+    this.slices.forEach(s => { if(!(s in db)) db[s] = (s in this.sliceDefaults) ? this.sliceDefaults[s] : []; });
     return db;
   },
 

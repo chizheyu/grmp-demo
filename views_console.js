@@ -224,8 +224,22 @@ v_decisions(admin){
   const ready = db.people.filter(p=>p.appStatus==='submitted' && db.reviews.some(v=>v.personId===p.id));
   const noScores = db.people.filter(p=>p.appStatus==='submitted' && !db.reviews.some(v=>v.personId===p.id));
   return `<h1 class="co-title">Decisions</h1>
-  <p class="co-sub">Single decision authority: you. Reviewers recommend; every acceptance, Reserve-list placement and decline is yours, logged and auditable. <b>Approving is the send:</b> each decision issues its outcome email automatically, verbatim from the approved templates — acceptance emails carry the personal link and the ${CF.acceptByLong} deadline.</p>
+  <p class="co-sub">Single decision authority: you. Reviewers recommend; every acceptance, Reserve-list placement and decline is yours, logged and auditable. <b>Deciding is not sending.</b> Decisions are held and released in one batch on ${CF.outcomeByLong}, so the cohort hears on the same day and a decision you revise before the send never reaches anyone in its earlier form. Acceptance emails carry the personal link and the ${CF.acceptByLong} deadline.</p>
   ${inferred('Q9')}
+  ${(()=>{
+    /* The queue is the honest version of "you decided": until the batch goes out, an
+       approved applicant has heard nothing. Hiding that behind a green tick is how a team
+       ends up believing sixty people know something they do not. */
+    const q=D.outcomeQueue(db), rel=D.outcomeReleased(db);
+    if(rel) return `<div class="qcard"><b style="font-size:13.5px">Outcome notifications released</b>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 0">Sent as one batch on <b>${GRMP.D.fmtLong(db.outcomeBatch.at)}</b> by ${esc(db.outcomeBatch.by||'the programme team')} — ${db.outcomeBatch.count} ${db.outcomeBatch.count===1?'notification':'notifications'}. Decisions made from now on send immediately, so nobody decided late waits for a batch that has already gone.</p></div>`;
+    return `<div class="qcard"><b style="font-size:13.5px">Outcome notifications — held for the batch send</b>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 8px">${q.length} decision${q.length===1?'':'s'} recorded and waiting. Nothing has reached an applicant yet: they all go out together on <b>${CF.outcomeByLong}</b>, which is the date both application forms promise.</p>
+      ${q.length?`<div style="font-size:12.5px;color:var(--ink-2)">${q.slice(0,8).map(x=>esc(x.name)+' · '+x.appStatus.replace(/_/g,' ')).join(' &middot; ')}${q.length>8?` &middot; and ${q.length-8} more`:''}</div>`:''}
+      ${D.outcomeDue(db)
+        ? `<button class="btn sm btn-primary" style="margin-top:10px" data-act="sendOutcomeBatch" data-actor="${admin.name}"${q.length?'':' disabled'}>Release ${q.length} outcome notification${q.length===1?'':'s'} →</button>`
+        : `<p style="font-size:12px;color:var(--ink-3);margin:8px 0 0">The send opens on ${CF.outcomeByLong}. On the simulated clock it is ${db.today}.</p>`}</div>`;
+  })()}
   ${ready.length? ready.map(p=>`
     <div class="qcard">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -368,9 +382,9 @@ v_reminders(admin){
   const notConfirmed = acc.filter(p=>!D.placeConfirmed(p));
   const targets = D.reminderTargets(db);
   return `<h1 class="co-title">Reminders — the machine chases, not you</h1>
-  <p class="co-sub">Acceptance reminders follow the confirmed rule: <b>sent once</b>, a few days before the ${CF.acceptByLong} deadline, only to accepted people whose place is not yet confirmed. Activated reserves get the compressed variant before ${CF.reserveAcceptByLong}. No final same-day nudge.</p>
-  <table class="tb"><tr><th>When (scheduled)</th><th>What</th><th>Who receives it</th></tr>
-    ${(db.config.ackLadder||[]).map(l=>`<tr><td>${l.date}</td><td>${l.what}</td><td>${l.who}</td></tr>`).join('')}
+  <p class="co-sub">Acceptance reminders follow the confirmed rule: <b>sent once</b> to anyone still unconfirmed, on the later of 48 hours after their own acceptance or activation email and two days before their own deadline (${CF.acceptByLong}, or ${CF.reserveAcceptByLong} for an activated reserve). If that lands on or after the deadline there is <b>no automated reminder at all</b> and the team contacts the person — those names are listed below rather than left to be noticed. No final same-day nudge.</p>
+  <table class="tb"><tr><th>When (from the rule)</th><th>What</th><th>Who receives it</th></tr>
+    ${D.ackLadder(db).map(l=>`<tr><td>${l.date}</td><td>${l.what}</td><td>${l.who}</td></tr>`).join('')}
     <tr><td>rotation end −7d</td><td>Close-off reminder</td><td>mentees with open close-off</td></tr>
     <tr><td>${CF.midMonth} window</td><td>Mid-programme review request</td><td>mentors</td></tr>
     <tr><td>${CF.closingMonth} window</td><td>Builder’s Commitment request</td><td>mentees</td></tr>
@@ -384,8 +398,23 @@ v_reminders(admin){
       <span class="badge ${p.acceptReminderAt?'b-ok':'b-warn'}" style="margin-left:auto"><span class="d"></span>${p.acceptReminderAt?'reminded '+p.acceptReminderAt:'not yet reminded'}</span>
       <a style="font-size:12px" href="#/me/${p.id}">page →</a></div>`).join('')||'<p style="color:var(--ink-3);font-size:13px;margin:6px 0 0">Everyone accepted has confirmed their place.</p>'}
     ${targets.length?`<button class="btn sm btn-primary" style="margin-top:10px" data-act="sendReminders" data-actor="${admin.name}">Send ${targets.length} reminder${targets.length>1?'s':''} now →</button>
-    <span style="font-size:11px;color:var(--ink-3);margin-left:8px">in production this fires on the scheduled date; staging sends on demand</span>`:''}
+    <span style="font-size:11px;color:var(--ink-3);margin-left:8px">in production this fires on the date the rule gives each person; staging sends on demand</span>`:''}
   </div>
+  ${(()=>{
+    /* The rule's second sentence, made visible. Someone activated three days before the
+       deadline gets no automated chase — if that only lived in the rule, the system would
+       be quietly dropping the people with the least time left. */
+    const manual = D.reminderManual(db);
+    if(!manual.length) return '';
+    return `<div class="qcard" style="margin-top:12px">
+      <b style="font-size:13.5px">The system will not remind these ${manual.length} — you have to (${manual.length})</b>
+      <p style="font-size:12.5px;color:var(--ink-2);margin:6px 0 8px">Their reminder date falls on or after their own deadline, so the rule says no automated send. Contact them directly.</p>
+      ${manual.map(p=>`<div style="display:flex;gap:10px;align-items:center;padding:5px 0;border-top:1px solid var(--line-2);font-size:13px;flex-wrap:wrap">
+        <b>${esc(p.name)}</b><span style="color:var(--ink-3);font-size:11.5px">${p.kind}${p.activatedFromReserve?' · activated '+p.activatedFromReserve:''}</span>
+        <span style="color:var(--ink-3);font-size:12px">deadline ${D.deadlineFor(db,p)||'—'} · ${esc(p.email||'')}${p.phone?' · '+esc(p.phone):''}</span>
+        <a style="font-size:12px;margin-left:auto" href="#/me/${p.id}">page →</a></div>`).join('')}
+    </div>`;
+  })()}
   ${(()=>{
     /* The other half of Joanne's Telegram catch. Asking a mentor how they want to be reached
        is worthless if answering it puts the answer somewhere nobody looks. The question is
@@ -546,7 +575,7 @@ v_certificates(admin){
     ? '3 close-offs · mid-prog review (R2) · end-prog evaluation (R3) · Builder’s Commitment'
     : 'mid-prog feedback · end-prog evaluation';
   return `<h1 class="co-title">Certificates</h1>
-  <p class="co-sub">Certificates are <b>printed and presented at the Appreciation Night</b> (${CF.appreciationDate||CF.closingMonth}).
+  <p class="co-sub">Certificates are <b>printed and presented at the Appreciation Night</b> (${CF.appreciationDate||CF.closingMonth}${CF.appreciationAfterCycle?', a closing celebration shortly after the cycle ends':''}; time and venue to be confirmed).
   This page tracks who qualifies under the completion criteria and records the decision; the email participants get is a heads-up, not the certificate itself.</p>
   ${inferred('Q2')}
   <div style="margin:0 0 14px"><button class="btn btn-primary" data-act="issueCerts" data-actor="${admin.name}">Mark all qualifying certificates ready (${eligibleN})</button></div>
@@ -636,15 +665,15 @@ v_emails(admin){
   const TPL_GROUPS = [
     ['Mentor set', ['mentor_invite','mentor_receipt','mentor_accept','mentor_accept_reminder','mentor_reserve','mentor_reserve_activation','mentor_reserve_activation_reminder','mentor_decline']],
     ['Mentee set', ['mentee_invite','mentee_receipt','mentee_accept','mentee_accept_reminder','mentee_reserve','mentee_reserve_activation','mentee_reserve_activation_reminder','mentee_decline_not_selected','mentee_decline_ineligible']],
-    ['Operational', ['otp_code','onboarding']],
+    ['Operational', ['otp_code','onboarding','pair_match']],
   ];
   const tplName = k => k.replace(/^(mentor|mentee)_/,'').replace(/_/g,' ');
   return `<h1 class="co-title">Emails</h1>
   <p class="co-sub">Sender identity on every system email: From <b>${CF.mailFrom}</b>, reply-to <b>${CF.enquiries}</b> (configured at the mail-platform level in production). Bodies are the approved verbatim templates — open any row or template to read the exact copy. Relationship-defining emails are dual-signed (Esther Koh + Wei Kiat Koh); operational chase-ups are signed by Wei Kiat Koh only.</p>
   <div class="qcard"><b style="font-size:13.5px">Approved templates (verbatim, from the specs)</b>
-    <p style="font-size:12px;color:var(--ink-3);margin:4px 0 8px">Click to preview with placeholder data. The onboarding email is a placeholder pending approved copy (outstanding content item).</p>
+    <p style="font-size:12px;color:var(--ink-3);margin:4px 0 8px">Click to preview with placeholder data. Two are not approved copy yet and say so on the button: the onboarding email is an outstanding content item, and the match email is our draft, with the UX owner for her wording.</p>
     ${TPL_GROUPS.map(([g,keys])=>`<div style="font-size:12.5px;margin:6px 0"><b>${g}:</b>
-      ${keys.map(k=>`<button class="btn sm btn-ghost" style="margin:2px" data-act="openMailTpl" data-tpl="${k}">${tplName(k)}</button>`).join('')}</div>`).join('')}
+      ${keys.map(k=>`<button class="btn sm btn-ghost" style="margin:2px" data-act="openMailTpl" data-tpl="${k}" title="${esc((GRMP.MAILS[k]&&GRMP.MAILS[k].draft)||'approved copy')}">${tplName(k)}${(GRMP.MAILS[k]&&GRMP.MAILS[k].draft)?' <span class="badge b-ai" style="font-size:9.5px">draft</span>':''}</button>`).join('')}</div>`).join('')}
   </div>
   <h3 style="font-size:14.5px;margin:14px 0 8px">Sent log (${db.emails.length})</h3>
   <table class="tb"><tr><th>Date</th><th>To</th><th>Subject</th><th></th></tr>
@@ -669,12 +698,13 @@ v_config(admin){
     ${db.config.rotations.map(r=>`<tr><td>R${r.n}</td><td>${r.label}</td><td>${r.start} → ${r.end}</td></tr>`).join('')}</table></div>
   <div class="qcard"><b>Selection timeline (spec-confirmed)</b>
     <table class="tb" style="margin-top:8px"><tr><th>Milestone</th><th>Date</th></tr>
-      <tr><td>Applications open → close</td><td>${db.config.registration.opens} → ${db.config.registration.closes}</td></tr>
-      <tr><td>Internal review & approvals completed</td><td>${sel.approvalsBy||'—'}</td></tr>
-      <tr><td>Applicants told the outcome by</td><td>${sel.outcomeBy||'—'}</td></tr>
-      <tr><td>Acceptance reminder (once)</td><td>${sel.reminderOn||'—'}</td></tr>
+      <tr><td>Applications open (invitations go out; not published) → close</td><td>${db.config.registration.opens} → ${db.config.registration.closes}</td></tr>
+      <tr><td>Review and selection window</td><td>${sel.reviewFrom||'—'} → ${sel.approvalsBy||'—'}</td></tr>
+      <tr><td>Outcome notifications (single batch send)</td><td>${sel.outcomeBy||'—'}</td></tr>
+      <tr><td>Acceptance reminder (once, from the rule)</td><td>${(D.ackLadder(db)[0]||{}).date||'—'}</td></tr>
       <tr><td>Acceptance deadline (complete the portal gate)</td><td>${sel.acceptBy||'—'}</td></tr>
-      <tr><td>Reserve-activation acceptance deadline</td><td>${sel.reserveAcceptBy||'—'}</td></tr>
+      <tr><td>Reserve activation opens (rolling)</td><td>${sel.reserveActivateFrom||'—'}</td></tr>
+      <tr><td>Reserve acceptance deadline</td><td>${sel.reserveAcceptBy||'—'}</td></tr>
       <tr><td>Kick-Off Night</td><td>${db.events.kickoff.date} · ${db.events.kickoff.time||''} · ${db.events.kickoff.venue||''}</td></tr>
       <tr><td>Mentee cap</td><td>${sel.menteeCap||'—'} (Reserve list beyond the cap)</td></tr></table></div>
   <div class="qcard"><b>Roles — ${db.config.cohort.label}</b>

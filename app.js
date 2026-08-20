@@ -926,6 +926,13 @@ const Actions = {
       'They receive their activation acceptance email with the later deadline, and enter the normal acceptance-gate flow.', false,
       ()=>call('activateReserve', d.person, d.actor).then(r=>toast(r?'Activated — acceptance email sent with the later deadline.':'Could not activate.', !!r)));
   },
+  sendOutcomeBatch(d){
+    const q = GRMP.D.outcomeQueue(__demo.db).length;
+    if(!q){ toast('Nothing is waiting — no decisions have been recorded since the last send.', false); return; }
+    confirmBox(`Release ${q} outcome notification${q>1?'s':''}?`,
+      'One send, to everyone decided so far — acceptances, Reserve invitations and declines together, each verbatim from its approved template. It cannot be taken back, and it can only be done once: decisions made afterwards send individually.', false,
+      ()=>call('sendOutcomeBatch', d.actor).then(out=>toast(`${(out||[]).length} outcome notification(s) sent.`)));
+  },
   sendReminders(d){
     const n = GRMP.D.reminderTargets(__demo.db).length;
     if(!n){ toast('Nobody is waiting on a reminder — everyone accepted has confirmed (or already been reminded).', false); return; }
@@ -1035,7 +1042,8 @@ const Actions = {
   },
   openMailTpl(d){
     showEmail({tpl:d.tpl, to:'(template preview)', at:db.today,
-      vars:{name:'[Name]', link:'#/me/'+(db.people.find(p=>p.appStatus==='accepted')||{id:'E001'}).id, code:'123456'}});
+      vars:{...GRMP.MAIL_PREVIEW(db, d.tpl),
+            link:'#/me/'+(db.people.find(p=>p.appStatus==='accepted')||{id:'E001'}).id}});
   },
   raiseConcern(){
     const t = document.getElementById('cn-text').value.trim();

@@ -209,6 +209,19 @@ console.log('— R5: the gate, OTP card and staged form render in every state �
   vm.runInContext('window.__APPLY = null', ctx);
 }
 
+/* The pair card used to show a name, a background and no way to reach anyone, while the
+   FAQ said the conversations are "arranged directly between the two of you". */
+{
+  const db2 = G.db;
+  const pair = db2.pairs.find(p=>p.status==='approved'||p.status==='closed');
+  const mentee = G.GRMP.D.person(db2, pair.menteeId), mentor = G.GRMP.D.person(db2, pair.mentorId);
+  const html = G.Views.personal(mentee.id);
+  T('a matched participant can actually reach the other person from their pair card',
+    html.includes(mentor.email) && html.includes('mailto:'+mentor.email));
+  T('and the phone number is not handed over with it',
+    !mentor.phone || !html.includes(mentor.phone));
+}
+
 console.log('— and the same sweep on a brand-new cycle (derived-facts proof) —');
 G.GRMP.D.startNewCycle(db, { label: 'GRMP 2031 (NTU pilot)', today: '2031-09-01', actor: 'smoke',
   rotations: [{ n: 1, label: 'Know Yourself', start: '2031-10-01', end: '2031-11-30' },

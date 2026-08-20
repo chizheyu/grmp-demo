@@ -13,7 +13,9 @@
 | Mentors & mentees | **No accounts, no passwords — ever.** The acceptance email carries a personal link; opening it asks for the email they applied with, sends a **one-time verification code** to that email, and the code signs them in. (A forwarded link alone cannot confirm a place — that is the point.) |
 | The programme team (~6 people) | Sign in to the console with their accounts (Google sign-in in production; passcode accounts in staging). |
 
-**The selection timeline (spec-confirmed constants, shown in Configuration):** applications 1–10 Sept · approvals completed by 16 Sept · outcome by 18 Sept · acceptance reminder (once) 17 Sept · acceptance deadline **20 Sept** · reserve-activation deadline **29 Sept** · Kick-Off **1 Oct, 7.30–9.00 pm, SMU ALCove**.
+**The selection timeline (Cycle 1 date amendments, 20 Aug 2026 — shown in Configuration):** applications open 31 Aug (invitations go out; no opening date is published) · applications close **9 Sept** · review and selection 10–13 Sept · **outcome notifications 14 Sept, one batch send** · acceptance reminder 18 Sept (from the rule, not typed) · acceptance deadline **20 Sept** · Reserve activation rolling from 21 Sept · Reserve acceptance deadline **26 Sept** · Kick-Off **1 Oct, 7.30–9.00 pm, SMU ALCove** · Appreciation Night **2 Apr 2027**, a closing celebration held shortly after the cycle ends.
+
+**The reminder rule** (one rule, both flows): a reminder fires to anyone still unconfirmed on the later of 48 hours after their own acceptance or activation email and two days before their own deadline. If that lands on or after the deadline, **no automated reminder is sent** — the Reminders page names those people instead, and the team contacts them directly.
 
 ---
 
@@ -50,7 +52,7 @@ Shared footer on every page: **About SMC** · **SMC Charter** (hosted PDF, opens
 
 ## 2 · Accepted participant — link, code, gate, page
 
-**2.1 The acceptance email** (verbatim, dual-signed by Esther Koh and Wei Kiat Koh) carries the personal link and the 20 Sept deadline.
+**2.1 The acceptance email** (verbatim, dual-signed by Esther Koh and Wei Kiat Koh) carries the personal link and the 20 Sept deadline. It goes out in the **14 Sept batch**, not at the moment of approval — see 4.x.
 
 **2.2 Sign-in.** The link opens a check: *enter the email you applied with* → a one-time code is emailed → entering it signs you in. Wrong email or wrong code: a clear message, no data shown.
 
@@ -90,6 +92,8 @@ Completing all three **confirms the place**: the onboarding email fires *(copy i
 **4.1 Decisions. Approving is the send:** every decision issues its verbatim outcome email automatically (spec flow stage 0 — approval and invitation are one action; running as the default, Q9 card to confirm). The buttons per applicant:
 - **Accept** → acceptance email with personal link + 20 Sept deadline
 - **Reserve list** → the Reserve email (opt-in requested by 20 Sept)
+
+**Deciding is not sending.** Decisions taken during the review window are held; the page shows how many are waiting and releases them in **one batch on 14 Sept**, which is the date both application forms promise. A decision you revise before the release never reaches anyone in its earlier form. After the batch has gone out, later decisions send immediately — a straggler must not wait for a batch that has already left. One release only; the record shows who sent it, when, and how many.
 - Mentor: **Decline** · Mentee: **Decline (not selected)** / **Decline (ineligible)** — two honest variants: "more applications than places" is true for one and misleading for the other.
 
 **4.2 Matching (per rotation).** One pool — hard constraints: ≤2 mentees per mentor · no repeat mentor · **only confirmed places enter matching**. **Suggest matches** scores every eligible mentor on the mentee's three ranked industry preferences (first +10 · second +6 · third +3), significant cross-industry breadth (+2), organisation diversity across rotations (+3) and load spread; the top match is proposed with its actual scoring reasons quoted. Declared conflicts of interest from the gate are listed above the board for the Lead to check against. Alternatives, swap and discard work per proposal; nothing is matched until the Lead approves.
@@ -102,11 +106,11 @@ Completing all three **confirms the place**: the onboarding email fires *(copy i
 
 **5.1 Dashboard.** The worklist ("what needs you"), then the standing state: **Place confirmed X/Y (gate done, by 20 Sept)** with the per-person not-yet-confirmed list (which of the three items each is missing, and whether they have been reminded), Kick-Off confirmations, open exceptions, Reserve-list counts, submissions, certificates. Tiles link to the page where the work happens. CSV export is restricted to the Lead.
 
-**5.2 Reminders.** The confirmed rule, mechanised: acceptance reminders are sent **once** per person, only to accepted-but-unconfirmed, a few days before 20 Sept (activated reserves: the compressed variant before 29 Sept; no same-day nudge). Staging has a "send now" control; production runs it on schedule. After the deadline passes, the **seat release** list appears — releasing is an explicit human action; freed seats go to the Reserve list.
+**5.2 Reminders.** The confirmed rule, mechanised: acceptance reminders are sent **once** per person, only to accepted-but-unconfirmed, on the date the rule gives each person — 18 Sept for the main cohort, and for an activated reserve two days before their own 26 Sept deadline (24 Sept for anyone activated on the 21st). Anyone activated too late for that to be worth sending gets **no automated reminder** and is listed by name for the team to contact. No same-day nudge. Staging has a "send now" control; production runs it on schedule. After the deadline passes, the **seat release** list appears — releasing is an explicit human action; freed seats go to the Reserve list.
 
 Also on this page: **Programme channels**, the roster for the two group chats (mentors on WhatsApp, mentees on Telegram), built straight from the consent question on the application. It shows how many of the accepted consented, and names everyone who did not alongside how they asked to be reached — with the email address or phone number their own answer points at, so there is nothing to look up separately. This is where you build the groups and where you find the handful who are contacted individually.
 
-**5.3 Reserve lists.** Both lists ranked by committee score, with the reply state (opted in / awaiting / declined — replies arrive by email and are recorded here) and **Activate**: sends the activation acceptance email with the 29 Sept deadline and puts the person into the normal gate flow. Places opening too late for email: contact the person directly (confirmed — no email fallback deadline).
+**5.3 Reserve lists.** Both lists ranked by committee score, with the reply state (opted in / awaiting / declined — replies arrive by email and are recorded here) and **Activate**: sends the activation acceptance email with the 26 Sept deadline and puts the person into the normal gate flow. Places opening too late for email: contact the person directly (confirmed — no email fallback deadline).
 
 **5.4 Exceptions.** Kick-Off exception requests (decide: approve / ask to attend — participant notified either way), overdue close-offs (remind), and mentor dropouts (mentees re-matched from the opted-in Reserve Mentor list within 7 days).
 
@@ -141,7 +145,7 @@ No pair/meeting tracking during rotations · no availability collection · no re
 SMC brand guidelines & assets (styling waits for them — Q12) · portal onboarding email copy · form fill-time estimate to measure on a real fill-through.
 
 Opened by the pre-login and Resources build specs:
-- **Outcome-by date, 14 or 18 Sept — still open (Q13).** The Programme Owner asked for 14 Sept (F0816-152143); the later Pre-Login Site spec lists 18 Sept as confirmed. Running on **18 Sept**. On 18 Aug the UX owner took the whole date set back to reconcile the interconnected dates and will return with them. (Accept-by is settled at **20 Sept** — both sources agree.)
+- ~~**Outcome-by date, 14 or 18 Sept — still open (Q13).**~~ **Settled 20 Aug 2026.** The UX owner returned the full calendar (*GRMP 2.0 Cycle 1: Date Amendments*, reviewed by the Programme Owner and the Programme Lead), and it resolves the conflict in favour of **14 Sept** — as a single batch send. Applications close a day earlier (**9 Sept**), the Reserve deadline moves three days earlier (**26 Sept**), Reserve activation becomes rolling from 21 Sept, and the acceptance reminder becomes a rule rather than a date. Accept-by is unchanged at 20 Sept.
 - ~~Two FAQ answers awaiting owner confirmation~~ — **closed 18 Aug.** Both answers confirmed by the UX owner (F0818-131510); the line "Accounts exist only for the programme team" was removed on her instruction, and the on-page badges are gone.
 - ~~FAQ mentee eligibility~~ — **closed 18 Aug.** The SMU-undergraduate wording is confirmed (F0818-131600).
 - ~~Concern link in the footer~~ — **closed 18 Aug.** Confirmed to stay as the fourth footer item (F0818-131630).

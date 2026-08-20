@@ -981,7 +981,7 @@ personal(personId){
     } else if(eligible && !cert){
       nextCard = `<div class="card"><h3>🎉 You qualify for your certificate</h3>
         <p style="font-size:13px;color:var(--ink-2)">Three close-offs, mid-programme review, end-of-programme evaluation and your Builder’s Commitment — all in.
-        Certificates are printed and presented at the Appreciation Night; you'll get an email when yours is ready.</p></div>`;
+        Certificates are printed and presented at the Appreciation Night${CF.appreciationAfterCycle?', a closing celebration held shortly after the programme ends':''}; you'll get an email when yours is ready.</p></div>`;
     } else if(!myPairs.length){
       nextCard = `<div class="card"><h3>🤝 Matching in progress</h3>
         <p style="font-size:13px;color:var(--ink-2)">Your place is confirmed. The programme team is preparing
@@ -1025,7 +1025,17 @@ personal(personId){
           <b>${esc(other.name)}</b> ${chip(mentee?other.industry:(other.industryPrefs||[])[0])}
           <div style="font-size:12.5px;color:var(--ink-2)">${mentee?esc((other.designation||'')+' · '+(other.org||'')):esc((other.university||'')+' · '+(other.degree||'')+', '+(other.year||''))}</div>
           <div style="font-size:12px;color:var(--ink-3);margin-top:3px">${mentee?esc('Background: '+(other.background||'')):esc('Growth focus: '+String(other.prompt1||'').slice(0,110)+'…')}</div>
-          ${other.linkedin?`<div style="font-size:12px;margin-top:3px"><a href="${esc(/^https?:/i.test(other.linkedin)?other.linkedin:'https://'+other.linkedin)}" target="_blank" rel="noopener">LinkedIn profile ↗</a></div>`:''}
+          ${/* The FAQ says the conversations are "arranged directly between the two of you",
+                which was not something the pair could actually do: this card carried a name
+                and a background and no way to reach anyone. Email and LinkedIn, as agreed
+                with the UX owner on 20 Aug — deliberately not the phone number, which is a
+                different order of thing to hand over automatically, least of all a student's.
+                Covered by the consent both of them gave: "relevant personal information may
+                be shared with your matched mentor or mentee". */''}
+          <div style="font-size:12px;margin-top:4px">
+            <a href="mailto:${esc(other.email||'')}">${esc(other.email||'')}</a>
+            ${other.linkedin?` · <a href="${esc(/^https?:/i.test(other.linkedin)?other.linkedin:'https://'+other.linkedin)}" target="_blank" rel="noopener">LinkedIn profile ↗</a>`:''}
+          </div>
         </div></div>
       ${x.status==='closed'&&x.closeoff&&x.closeoff.comment&&mentee?`<div style="margin-top:10px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:9px;padding:9px 12px;font-size:12.5px"><b style="color:var(--ink-3);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Your close-off note</b><br>“${esc(x.closeoff.comment)}”</div>`:''}
       <p style="font-size:12px;color:var(--ink-3);margin:10px 0 0">Guide: <a href="#/reflection/${personId}">${rot.label} — reflection prompts</a> · suggested first step: a 30-minute intro call.</p>

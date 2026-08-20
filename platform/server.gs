@@ -96,6 +96,10 @@ function boot(token) {
 /* ---------- permission model ---------- */
 const PERMS = {
   decide: ['lead'], approvePair: ['lead'], issueCertificates: ['lead'],
+  /* The batch release is the send, so it sits with the decision authority, not with the
+     coordinator tools. sendAcceptanceReminders was missing from this map entirely — the
+     console has offered that button since R5 and this server would have refused it. */
+  sendOutcomeBatch: ['lead'], sendAcceptanceReminders: ['lead', 'coordinator'],
   startNewCycle: ['lead'], adminReset: ['lead'], setToday: ['lead', 'coordinator'],
   suggestMatches: ['lead', 'coordinator'], replaceMentor: ['lead', 'coordinator'],
   promoteWaitlist: ['lead', 'coordinator'], toggleAttendance: ['lead', 'coordinator'],
